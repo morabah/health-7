@@ -19,7 +19,7 @@ import {
   BloodType,
   NotificationType
 } from '@/types/enums';
-import { logInfo, logError, logValidation } from '@/lib/logger';
+import { logInfo, logError, logValidation, logWarn } from '@/lib/logger';
 
 // Mock the localDb functions to avoid actual API calls during testing
 jest.mock('@/lib/localDb', () => ({
@@ -38,6 +38,45 @@ import {
   getAppointments, 
   getNotifications 
 } from '@/lib/localDb';
+
+// Enhanced validation helper with detailed reporting
+interface ValidationResult {
+  isValid: boolean;
+  entityType: string;
+  entityId?: string;
+  errors?: string[];
+  fieldErrors?: Record<string, string[]>;
+}
+
+// Helper function to format validation errors
+const formatZodErrors = (errors: any): { message: string, fieldErrors: Record<string, string[]> } => {
+  const fieldErrors: Record<string, string[]> = {};
+  
+  if (errors.format) {
+    const formattedErrors = errors.format();
+    for (const [path, error] of Object.entries(formattedErrors)) {
+      if (path === '_errors') continue;
+      if (typeof error === 'object' && error !== null && '_errors' in error) {
+        // Type assertion to ensure the _errors property is treated as string[]
+        const errorMessages = (error as { _errors: string[] })._errors;
+        fieldErrors[path] = errorMessages;
+      }
+    }
+  } else if (errors.errors) {
+    errors.errors.forEach((err: any) => {
+      const path = err.path.join('.');
+      if (!fieldErrors[path]) {
+        fieldErrors[path] = [];
+      }
+      fieldErrors[path].push(err.message);
+    });
+  }
+  
+  return {
+    message: errors.message || 'Validation failed',
+    fieldErrors
+  };
+};
 
 describe('Database Schema Validation', () => {
   // Mock data setup
@@ -139,6 +178,36 @@ describe('Database Schema Validation', () => {
     }
   ];
 
+  // Add some edge cases for testing validation robustness
+  // Invalid patient with missing required fields
+  const invalidPatient: PatientProfile = {
+    userId: 'invalid-user',
+    dateOfBirth: 'not-a-date', // Invalid date format
+    gender: 'UNKNOWN' as any, // Invalid enum value
+    bloodType: null,
+    medicalHistory: null
+  };
+
+  // Invalid appointment with incorrect data types
+  const invalidAppointment: Appointment = {
+    id: 'invalid-appt',
+    patientId: '', // Empty string instead of valid ID
+    doctorId: 'user2',
+    appointmentDate: 'tomorrow', // Invalid date
+    startTime: '25:00', // Invalid time
+    endTime: '26:00', // Invalid time
+    status: 'PENDING' as any, // String instead of enum
+    notes: null,
+    createdAt: '2023-01-01T00:00:00Z',
+    updatedAt: '2023-01-01T00:00:00Z',
+    appointmentType: AppointmentType.IN_PERSON,
+    patientName: 'John Doe',
+    doctorName: 'Dr. Smith',
+    doctorSpecialty: 'Cardiology',
+    reason: 'Annual checkup',
+    videoCallUrl: null
+  };
+
   beforeEach(() => {
     // Set up mock return values
     (getUsers as jest.Mock).mockResolvedValue(mockUsers);
@@ -146,10 +215,18 @@ describe('Database Schema Validation', () => {
     (getDoctors as jest.Mock).mockResolvedValue(mockDoctors);
     (getAppointments as jest.Mock).mockResolvedValue(mockAppointments);
     (getNotifications as jest.Mock).mockResolvedValue(mockNotifications);
+
+    // Spy on console methods to verify logging
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'info').mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    (console.error as jest.Mock).mockRestore();
+    (console.warn as jest.Mock).mockRestore();
+    (console.info as jest.Mock).mockRestore();
   });
 
   test('User profiles match schema', async () => {
@@ -158,7 +235,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each user against schema
     users.forEach(user => {
-      const { id, ...userData } = user;
+      const { id: _id, ...userData } = user;
       const result = UserProfileSchema.safeParse(userData);
       
       if (!result.success) {
@@ -207,7 +284,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each appointment against schema
     appointments.forEach(appointment => {
-      const { id, ...appointmentData } = appointment;
+      const { id: _id, ...appointmentData } = appointment;
       const result = AppointmentSchema.safeParse(appointmentData);
       
       if (!result.success) {
@@ -224,7 +301,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each notification against schema
     notifications.forEach(notification => {
-      const { id, ...notificationData } = notification;
+      const { id: _id, ...notificationData } = notification;
       const result = NotificationSchema.safeParse(notificationData);
       
       if (!result.success) {
@@ -235,7 +312,38 @@ describe('Database Schema Validation', () => {
     });
   });
 
-  test('Validates database entries against all schemas', async () => {
+  test('Should detect and report invalid data', () => {
+    // Test patient validation with invalid data
+    const patientResult = PatientProfileSchema.safeParse(invalidPatient);
+    expect(patientResult.success).toBe(false);
+    
+    if (!patientResult.success) {
+      const formatted = formatZodErrors(patientResult.error);
+      expect(formatted.fieldErrors).toBeDefined();
+      expect(Object.keys(formatted.fieldErrors).length).toBeGreaterThan(0);
+      
+      // Check if dateOfBirth error is detected
+      expect(formatted.fieldErrors.dateOfBirth).toBeDefined();
+    }
+    
+    // Test appointment validation with invalid data
+    const { id: _id, ...appointmentData } = invalidAppointment;
+    const appointmentResult = AppointmentSchema.safeParse(appointmentData);
+    expect(appointmentResult.success).toBe(false);
+    
+    if (!appointmentResult.success) {
+      const formatted = formatZodErrors(appointmentResult.error);
+      expect(formatted.fieldErrors).toBeDefined();
+      expect(Object.keys(formatted.fieldErrors).length).toBeGreaterThan(0);
+      
+      // Check if specific errors are detected
+      expect(formatted.fieldErrors.patientId || 
+             formatted.fieldErrors.appointmentDate || 
+             formatted.fieldErrors.startTime).toBeDefined();
+    }
+  });
+
+  test('Validates database entries against all schemas with detailed reports', async () => {
     // Run all validations and log results
     try {
       const users = await getUsers();
@@ -244,56 +352,209 @@ describe('Database Schema Validation', () => {
       const appointments = await getAppointments();
       const notifications = await getNotifications();
       
-      let totalValidated = 0;
-      let totalErrors = 0;
+      const validationResults: ValidationResult[] = [];
       
       // Validate users
       users.forEach(user => {
-        const { id, ...userData } = user;
+        const { id: _id, ...userData } = user;
         const result = UserProfileSchema.safeParse(userData);
-        totalValidated++;
-        if (!result.success) totalErrors++;
+        
+        validationResults.push({
+          isValid: result.success,
+          entityType: 'UserProfile',
+          entityId: _id,
+          errors: !result.success ? [result.error.message] : undefined,
+          fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
+        });
       });
       
       // Validate patients
       patients.forEach(patient => {
         const result = PatientProfileSchema.safeParse(patient);
-        totalValidated++;
-        if (!result.success) totalErrors++;
+        
+        validationResults.push({
+          isValid: result.success,
+          entityType: 'PatientProfile',
+          entityId: patient.userId,
+          errors: !result.success ? [result.error.message] : undefined,
+          fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
+        });
       });
       
       // Validate doctors
       doctors.forEach(doctor => {
         const result = DoctorProfileSchema.safeParse(doctor);
-        totalValidated++;
-        if (!result.success) totalErrors++;
+        
+        validationResults.push({
+          isValid: result.success,
+          entityType: 'DoctorProfile',
+          entityId: doctor.userId,
+          errors: !result.success ? [result.error.message] : undefined,
+          fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
+        });
       });
       
       // Validate appointments
       appointments.forEach(appointment => {
         const { id, ...appointmentData } = appointment;
         const result = AppointmentSchema.safeParse(appointmentData);
-        totalValidated++;
-        if (!result.success) totalErrors++;
+        
+        validationResults.push({
+          isValid: result.success,
+          entityType: 'Appointment',
+          entityId: id,
+          errors: !result.success ? [result.error.message] : undefined,
+          fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
+        });
       });
       
       // Validate notifications
       notifications.forEach(notification => {
         const { id, ...notificationData } = notification;
         const result = NotificationSchema.safeParse(notificationData);
-        totalValidated++;
-        if (!result.success) totalErrors++;
+        
+        validationResults.push({
+          isValid: result.success,
+          entityType: 'Notification',
+          entityId: id,
+          errors: !result.success ? [result.error.message] : undefined,
+          fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
+        });
       });
       
-      logInfo(`Database validation complete: ${totalValidated} entries validated, ${totalErrors} errors found`);
+      // Generate detailed report
+      const totalEntities = validationResults.length;
+      const validEntities = validationResults.filter(r => r.isValid).length;
+      const invalidEntities = totalEntities - validEntities;
+      
+      // Log summary
+      logInfo(`Database validation summary: ${totalEntities} entities checked, ${validEntities} valid, ${invalidEntities} invalid`);
+      
+      // Log detailed issues for invalid entities
+      if (invalidEntities > 0) {
+        const invalidResults = validationResults.filter(r => !r.isValid);
+        
+        invalidResults.forEach(result => {
+          logWarn(`${result.entityType} (ID: ${result.entityId}) validation failed:`, {
+            errors: result.errors,
+            fieldErrors: result.fieldErrors
+          });
+        });
+      }
+      
+      // Group validation results by entity type
+      const resultsByType: Record<string, { total: number, valid: number, invalid: number }> = {};
+      
+      validationResults.forEach(result => {
+        if (!resultsByType[result.entityType]) {
+          resultsByType[result.entityType] = { total: 0, valid: 0, invalid: 0 };
+        }
+        
+        resultsByType[result.entityType].total++;
+        if (result.isValid) {
+          resultsByType[result.entityType].valid++;
+        } else {
+          resultsByType[result.entityType].invalid++;
+        }
+      });
+      
+      // Log breakdown by type
+      Object.entries(resultsByType).forEach(([type, counts]) => {
+        logInfo(`${type}: ${counts.valid}/${counts.total} valid (${counts.invalid} invalid)`);
+      });
       
       // Log validation success for task
-      logValidation('1.17', 'success', 'Database schema validation test created and successfully run');
+      logValidation('1.17', 'success', 'Database schema validation test executed with detailed reporting');
+      
+      // Final assertion
+      expect(invalidEntities).toBe(0);
+    } catch (error) {
+      logError('Error during database validation:', error);
+      throw error;
+    }
+  });
+
+  test('Creates schema validation report with timing metrics', async () => {
+    try {
+      // Track execution time
+      const startTime = performance.now();
+      
+      const users = await getUsers();
+      const patients = await getPatients();
+      const doctors = await getDoctors();
+      const appointments = await getAppointments();
+      const notifications = await getNotifications();
+      
+      let totalValidated = 0;
+      let totalErrors = 0;
+      const entityCounts: Record<string, number> = {
+        users: users.length,
+        patients: patients.length,
+        doctors: doctors.length,
+        appointments: appointments.length,
+        notifications: notifications.length
+      };
+      
+      // Validate users
+      for (const user of users) {
+        const { id, ...userData } = user;
+        const result = UserProfileSchema.safeParse(userData);
+        totalValidated++;
+        if (!result.success) totalErrors++;
+      }
+      
+      // Validate patients
+      for (const patient of patients) {
+        const result = PatientProfileSchema.safeParse(patient);
+        totalValidated++;
+        if (!result.success) totalErrors++;
+      }
+      
+      // Validate doctors
+      for (const doctor of doctors) {
+        const result = DoctorProfileSchema.safeParse(doctor);
+        totalValidated++;
+        if (!result.success) totalErrors++;
+      }
+      
+      // Validate appointments
+      for (const appointment of appointments) {
+        const { id, ...appointmentData } = appointment;
+        const result = AppointmentSchema.safeParse(appointmentData);
+        totalValidated++;
+        if (!result.success) totalErrors++;
+      }
+      
+      // Validate notifications
+      for (const notification of notifications) {
+        const { id, ...notificationData } = notification;
+        const result = NotificationSchema.safeParse(notificationData);
+        totalValidated++;
+        if (!result.success) totalErrors++;
+      }
+      
+      // Calculate execution time
+      const endTime = performance.now();
+      const executionTime = (endTime - startTime).toFixed(2);
+      
+      // Generate report
+      const validationReport = {
+        timestamp: new Date().toISOString(),
+        executionTimeMs: executionTime,
+        totalEntitiesValidated: totalValidated,
+        totalErrors,
+        entityCounts,
+        status: totalErrors === 0 ? 'PASSED' : 'FAILED'
+      };
+      
+      logInfo(`Database schema validation report:`, validationReport);
       
       // Final assertion
       expect(totalErrors).toBe(0);
+      expect(validationReport.status).toBe('PASSED');
+      
     } catch (error) {
-      logError('Error during database validation:', error);
+      logError('Error generating validation report:', error);
       throw error;
     }
   });

@@ -1,0 +1,63 @@
+📁 src/app
+├── (public)                        # No auth required
+│   ├── page.tsx                    →  GET  /            | Landing / marketing *
+│   ├── about/                      →  GET  /about       | About us *
+│   ├── contact/                    →  GET  /contact     | Contact form *
+│   └── find-doctors/               →  GET  /find-doctors| Search card grid *
+│
+├── (auth)                          # Public, but hidden when authed
+│   ├── login/                      →  /auth/login                 *
+│   ├── register/
+│   │   ├── choice/                →  /auth/register              *
+│   │   ├── patient/               →  /auth/register/patient      *
+│   │   └── doctor/                →  /auth/register/doctor       *
+│   ├── forgot-password/           →  /auth/forgot-password       *
+│   └── reset-password/[token]/    →  /auth/reset-password/:token *
+│
+├── (platform)                      # Requires auth, role-aware layout
+│   ├── dashboard/                  →  /dashboard          | Role-switch: patient↔doctor↔admin *
+│   │
+│   ├── patient/                    # PATIENT-ONLY ROUTES
+│   │   ├── dashboard/              →  /patient/dashboard       *
+│   │   ├── appointments/           →  /patient/appointments    *
+│   │   ├── profile/                →  /patient/profile         *
+│   │   └── appointments/
+│   │       └── cancel/[id]/        →  /patient/appointments/:id/cancel  (modal shell) *
+│   │
+│   ├── doctor/                     # DOCTOR-ONLY ROUTES
+│   │   ├── dashboard/              →  /doctor/dashboard        *
+│   │   ├── appointments/           →  /doctor/appointments     *
+│   │   │   └── complete/[id]/      →  /doctor/appointments/:id/complete (modal) *
+│   │   ├── profile/                →  /doctor/profile          *
+│   │   └── availability/           →  /doctor/availability     *
+│   │
+│   ├── admin/                      # ADMIN-ONLY ROUTES
+│   │   ├── dashboard/              →  /admin/dashboard        *
+│   │   ├── users/                  →  /admin/users           *
+│   │   ├── doctors/                →  /admin/doctors         *
+│   │   └── doctor-verification/
+│   │       └── [doctorId]/         →  /admin/doctor-verification/:doctorId  *
+│   │
+│   ├── notifications/              →  /notifications        | Shared centre *
+│   └── book-appointment/
+│       └── [doctorId]/             →  /book-appointment/:doctorId *
+│
+├── cms/                            # CMS Portal (Admin access)
+│   ├── page.tsx                    →  /cms                | CMS Dashboard *
+│   ├── users/                      →  /cms/users          | User Management *
+│   ├── content/                    →  /cms/content        | Content Management *
+│   │   ├── new/                    →  /cms/content/new    | Create Content Form *
+│   │   └── edit/[id]/              →  /cms/content/edit/:id | Edit Content Form *
+│   ├── todo/                       →  /cms/todo           | Task Management *
+│   └── doctor-verification/        →  /cms/doctor-verification | Verification Queue *
+│       └── [doctorId]/             →  /cms/doctor-verification/:doctorId | Review Doctor *
+│
+├── cms-validation/                 →  /cms-validation     | Data Integrity Tool *
+│
+├── doctor-profile/[doctorId]/      →  /doctor-profile/:doctorId   | Public profile *
+│
+├── (dev)                           # Stripped in prod build
+│   ├── ui-test/                    →  /dev/ui-test         | Primitive showcase ✓
+│   └── cms/validation/             →  /dev/cms/validation  | Data integrity tool ✓
+│
+└── not-found.tsx                   →  404 fallback global  | Shared

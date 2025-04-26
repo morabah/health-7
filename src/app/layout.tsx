@@ -1,36 +1,43 @@
-import React from 'react';
+import '@/styles/globals.css';          // tailwind + tokens
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+import { ThemeProvider } from '@/context/ThemeContext';   // empty stub for now
+import { AuthProvider } from '@/context/AuthContext';     // empty stub for now
+import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
-// Import app configuration early for initialization
-import '@/config/appConfig';
-// Import global styles (includes Tailwind CSS directives)
-import '@/styles/globals.css';
 
-/**
- * Root layout metadata
- */
+const inter = Inter({ subsets: ['latin'] });
+
 export const metadata: Metadata = {
-  title: 'Health Appointment System',
-  description: 'Book and manage healthcare appointments',
+  title: {
+    default: 'Health Appointment',
+    template: '%s | Health Appointment',
+  },
+  description: 'Book, manage and track doctor appointments effortlessly.',
 };
 
-/**
- * Root layout component
- * This layout wraps all pages in the application
- * Uses Tailwind CSS for styling
- * 
- * @param props - Contains children components
- * @returns Root layout with children
- */
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      {/* Add className to enable future dark mode toggling */}
-      <body className="min-h-screen bg-gray-50">
-        <main className="container mx-auto">{children}</main>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${inter.className} min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 antialiased`}
+      >
+        <ThemeProvider>
+          <AuthProvider>
+            <Navbar />
+
+            {/* Main content – leaves space for sticky navbar */}
+            <main className="flex-1 container mx-auto w-full px-4 pt-16 pb-10">
+              {children}
+            </main>
+
+            <Footer />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

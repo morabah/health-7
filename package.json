@@ -9,11 +9,13 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "db:seed:local": "node ./scripts/seedLocalDb.mjs",
+    "db:seed:local": "tsx ./scripts/seedLocalDb.ts",
     "test": "jest --coverage",
     "test:ci": "jest --bail --silent",
     "test:e2e": "playwright test --headed=false",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck:watch": "tsc --noEmit -p tsconfig.test.json --watch"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -29,16 +31,20 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@headlessui/react": "^2.2.2",
     "@hookform/resolvers": "^5.0.1",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "eslint-config-next": "^14.2.0",
+    "lucide-react": "^0.503.0",
     "mitt": "^3.0.1",
     "next": "~14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.56.1",
+    "tailwind-merge": "^3.2.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {
@@ -46,6 +52,7 @@
     "@babel/preset-env": "^7.26.9",
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.27.0",
+    "@faker-js/faker": "^9.7.0",
     "@playwright/test": "^1.52.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -57,6 +64,7 @@
     "babel-jest": "^29.7.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -66,6 +74,8 @@
     "prettier": "^3.5.3",
     "tailwindcss": "^3.3.0",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.3"
   }
 }

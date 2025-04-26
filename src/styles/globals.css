@@ -3,6 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './tokens.css';
+
 /* Base styles that apply to the whole application */
 html,
 body {
@@ -29,25 +31,36 @@ a {
 }
 
 /* Dark mode styles */
-.dark {
-  @apply bg-gray-900 text-white;
-}
+html.dark { color-scheme: dark; }
 
 /* Custom component styles using Tailwind's @apply */
 @layer components {
   .btn-primary {
-    @apply px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors;
+    @apply px-4 py-2 bg-primary text-white rounded-md hover:opacity-90 transition-colors;
   }
   
   .btn-secondary {
     @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors;
   }
   
+  .btn-danger {
+    @apply px-4 py-2 bg-danger text-white rounded-md hover:opacity-90 transition-colors;
+  }
+  
   .form-input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500;
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/60 ring-offset-2;
   }
   
   .card {
-    @apply p-6 border rounded-lg shadow-sm bg-white dark:bg-gray-800;
+    @apply p-6 border rounded-lg shadow-md bg-white dark:bg-gray-800 overflow-hidden;
   }
+}
+
+/* Smooth underline hover */
+.nav-link::after {
+  @apply block h-px w-0 bg-primary transition-all duration-200;
+  content: '';
+}
+.nav-link:hover::after {
+  @apply w-full;
 }

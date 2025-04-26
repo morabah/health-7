@@ -6,6 +6,7 @@ import { logInfo } from '@/lib/logger';
 import type { LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
 import { appEventBus } from '@/lib/eventBus';
 import { API_MODE, IS_MOCK_MODE } from '@/config/appConfig';
+import { logValidation, ValidationStep } from '@/lib/validation';
 
 /**
  * CMS Landing Page
@@ -17,14 +18,14 @@ import { API_MODE, IS_MOCK_MODE } from '@/config/appConfig';
  */
 export default function CMSPage() {
   // State for tracking validation steps and logs
-  const [validationSteps, setValidationSteps] = useState<ValidationEventPayload[]>([]);
+  const [validationSteps, setValidationSteps] = useState<ValidationStep[]>([]);
   const [logs, setLogs] = useState<LogEventPayload[]>([]);
   
   // Subscribe to validation and log events
   useEffect(() => {
     // Handler for validation events
     const handleValidation = (payload: ValidationEventPayload) => {
-      setValidationSteps(prev => [payload, ...prev]);
+      setValidationSteps(prev => [...prev, payload as ValidationStep]);
     };
     
     // Handler for log events
@@ -39,6 +40,9 @@ export default function CMSPage() {
     // Log initial state
     logInfo('CMS Validation page mounted');
     
+    // Sample validation step for testing
+    logValidation('CMS.1', 'success', 'CMS Dashboard loaded successfully');
+    
     // Cleanup subscriptions on unmount
     return () => {
       appEventBus.off('validation_event', handleValidation);
@@ -50,6 +54,15 @@ export default function CMSPage() {
   const handleClearLogs = () => {
     setLogs([]);
   };
+  
+  // Admin menu items
+  const menuItems = [
+    { label: 'User Management', href: '/cms/users', description: 'Manage patients, doctors and admin users' },
+    { label: 'Content Management', href: '/cms/content', description: 'Manage site content and announcements' },
+    { label: 'Doctor Verification', href: '/cms/doctor-verification', description: 'Review and verify doctor applications' },
+    { label: 'Data Validation', href: '/cms-validation', description: 'Validate system data integrity' },
+    { label: 'Task Management', href: '/cms/todo', description: 'Manage tasks and to-do lists' },
+  ];
   
   return (
     <div className="p-8">
@@ -113,63 +126,19 @@ export default function CMSPage() {
       
       {/* CMS Navigation Section */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-3">User Management</h2>
-          <p className="text-gray-600 mb-4">
-            Manage patients, doctors, and administrators
-          </p>
-          <div className="mt-auto">
-            <Link 
-              href="/cms/users" 
-              className="btn-primary"
-            >
-              Manage Users
-            </Link>
-          </div>
-        </div>
-        
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-3">Content Management</h2>
-          <p className="text-gray-600 mb-4">
-            Edit site content, announcements, and resources
-          </p>
-          <div className="mt-auto">
-            <Link 
-              href="/cms/content" 
-              className="btn-primary"
-            >
-              Manage Content
-            </Link>
-          </div>
-        </div>
-        
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-3">Doctor Verification</h2>
-          <p className="text-gray-600 mb-4">
-            Review and verify healthcare provider credentials
-          </p>
-          <div className="mt-auto">
-            <Link 
-              href="/cms/doctor-verification" 
-              className="btn-primary"
-            >
-              Verification Queue
-            </Link>
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-3">Data Validation</h2>
-          <p className="text-gray-600 mb-4">
-            Validate data integrity against schema definitions
-          </p>
-          <div className="mt-auto">
-            <Link 
-              href="/cms-validation" 
-              className="btn-primary"
-            >
-              Validate Data
-            </Link>
+        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+          <h2 className="text-xl font-semibold mb-3">Admin Tools</h2>
+          <div className="grid grid-cols-1 gap-4">
+            {menuItems.map((item, index) => (
+              <Link
+                key={index}
+                href={item.href}
+                className="p-4 border rounded hover:bg-gray-50 flex flex-col"
+              >
+                <span className="font-medium text-lg">{item.label}</span>
+                <span className="text-sm text-gray-500">{item.description}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

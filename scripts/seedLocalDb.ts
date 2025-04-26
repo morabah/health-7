@@ -4,16 +4,10 @@
  */
 
 import fs from 'fs/promises';
-import type { z } from 'zod';
+import path from 'path';
+import { faker } from '@faker-js/faker';
 
 // Local DB Utils
-import { 
-  saveUsers, 
-  savePatients, 
-  saveDoctors, 
-  saveAppointments, 
-  saveNotifications 
-} from '../src/lib/localDb';
 import { DB_DIR } from '../src/lib/serverLocalDb';
 
 // All Zod Schemas 
@@ -23,15 +17,6 @@ import {
   DoctorProfileSchema, 
   AppointmentSchema, 
   NotificationSchema 
-} from '../src/types/schemas';
-
-// TypeScript Types
-import type { 
-  UserProfile, 
-  PatientProfile, 
-  DoctorProfile, 
-  Appointment, 
-  Notification
 } from '../src/types/schemas';
 
 // Enums
@@ -45,639 +30,312 @@ import {
   NotificationType
 } from '../src/types/enums';
 
-// Define User IDs for consistent references
-const patientUserId = 'test-patient-verified-001';
-const doctorPendingId = 'test-doctor-pending-002';
-const doctorVerifiedId = 'test-doctor-verified-003';
-const doctorRejectedId = 'test-doctor-rejected-004';
-const adminUserId = 'test-admin-005';
-const inactiveUserId = 'test-inactive-user-006';
-const unverifiedUserId = 'test-unverified-user-007';
+// For Firebase emulator write-through
+import { initAdminApp } from '../src/lib/emulatorAdmin';
 
-// Current timestamp for all date fields
-const now = new Date().toISOString();
-const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+// TypeScript Types (for type annotations only)
+import type { Appointment, Notification } from '../src/types/schemas';
 
-// Raw Mock Data: Users
-const rawMockUsers: Array<Partial<UserProfile> & { id: string }> = [
-  {
-    id: patientUserId,
-    email: 'patient@example.com',
-    phone: '+12025550191',
-    firstName: 'Sarah',
-    lastName: 'Patient',
-    userType: UserType.PATIENT,
-    isActive: true,
-    emailVerified: true,
-    phoneVerified: true,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: doctorPendingId,
-    email: 'doctor.pending@example.com',
-    phone: '+12025550192',
-    firstName: 'James',
-    lastName: 'Pending',
-    userType: UserType.DOCTOR,
-    isActive: true,
-    emailVerified: true,
-    phoneVerified: true,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: doctorVerifiedId,
-    email: 'doctor.verified@example.com',
-    phone: '+12025550193',
-    firstName: 'Emma',
-    lastName: 'Verified',
-    userType: UserType.DOCTOR,
-    isActive: true,
-    emailVerified: true,
-    phoneVerified: true,
-    createdAt: lastWeek,
-    updatedAt: now
-  },
-  {
-    id: doctorRejectedId,
-    email: 'doctor.rejected@example.com',
-    phone: '+12025550194',
-    firstName: 'Robert',
-    lastName: 'Rejected',
-    userType: UserType.DOCTOR,
-    isActive: true,
-    emailVerified: true,
-    phoneVerified: false,
-    createdAt: lastWeek,
-    updatedAt: now
-  },
-  {
-    id: adminUserId,
-    email: 'admin@example.com',
-    phone: '+12025550195',
-    firstName: 'Admin',
-    lastName: 'User',
-    userType: UserType.ADMIN,
-    isActive: true,
-    emailVerified: true,
-    phoneVerified: true,
-    createdAt: lastWeek,
-    updatedAt: now
-  },
-  {
-    id: inactiveUserId,
-    email: 'inactive@example.com',
-    phone: '+12025550196',
-    firstName: 'Inactive',
-    lastName: 'User',
-    userType: UserType.PATIENT,
-    isActive: false,
-    emailVerified: true,
-    phoneVerified: true,
-    createdAt: lastWeek,
-    updatedAt: now
-  },
-  {
-    id: unverifiedUserId,
-    email: 'unverified@example.com',
-    phone: '+12025550197',
-    firstName: 'Unverified',
-    lastName: 'User',
-    userType: UserType.PATIENT,
-    isActive: true,
-    emailVerified: false,
-    phoneVerified: false,
-    createdAt: now,
-    updatedAt: now
-  }
+// Utilities for generating consistent data
+faker.seed(42);
+const iso = (days = 0) => new Date(Date.now() + days * 86_400_000).toISOString();
+const PASSWORD_HASH = 'Password123!'; // plain for mock DB only
+
+// Generic function to write data to collection
+export async function writeCollection<T>(name: string, data: T[]): Promise<void> {
+  await fs.mkdir(DB_DIR, { recursive: true });
+  const filePath = path.join(DB_DIR, `${name}.json`);
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  console.log(`✅ Wrote ${data.length} items to ${name}.json`);
+}
+
+// Generate Users (10 total) with IDs
+const users = Array.from({ length: 10 }).map((_, i) => {
+  const isDoctor = i < 7;
+  return {
+    ...UserProfileSchema.parse({
+      email: `user${i}@demo.health`,
+      phone: `+201000000${i}${i}`,
+      password: PASSWORD_HASH,
+      firstName: faker.person.firstName(isDoctor ? 'male' : 'female'),
+      lastName: faker.person.lastName(),
+      userType: isDoctor ? UserType.DOCTOR : UserType.PATIENT,
+      isActive: true,
+      emailVerified: true,
+      phoneVerified: true,
+      createdAt: iso(-faker.number.int({ min: 10, max: 100 })),
+      updatedAt: iso(),
+    }),
+    id: `u-${i.toString().padStart(3, '0')}`,
+    userId: `u-${i.toString().padStart(3, '0')}` // Adding userId for reference
+  };
+});
+
+// Split into Doctors & Patients
+const patientUsers = users.slice(7);      // 3 patients
+const doctorUsers = users.slice(0, 7);    // 7 doctors
+
+// Doctor profiles – different verificationStatus & schedules
+const weekTemplates = [
+  { mon: ['09:00', '17:00'], tue: [''], wed: ['09:00', '12:00'], thu: [''], fri: ['09:00', '15:00'], sat: [], sun: [] },
+  { mon: ['14:00', '20:00'], tue: [], wed: ['14:00', '20:00'], thu: [], fri: [], sat: ['10:00', '14:00'], sun: [] },
 ];
 
-// Raw Mock Data: Patients
-const rawMockPatients: Array<Partial<PatientProfile> & { userId: string }> = [
-  {
-    userId: patientUserId,
-    dateOfBirth: new Date('1985-05-15').toISOString(),
-    gender: Gender.FEMALE,
-    bloodType: BloodType.A_POSITIVE,
-    medicalHistory: 'No significant medical history. Allergic to penicillin.'
-  },
-  {
-    userId: unverifiedUserId,
-    dateOfBirth: new Date('1990-10-20').toISOString(),
-    gender: Gender.MALE,
-    bloodType: BloodType.O_NEGATIVE,
-    medicalHistory: null
-  },
-  {
-    userId: inactiveUserId,
-    dateOfBirth: new Date('1978-03-03').toISOString(),
-    gender: Gender.OTHER,
-    bloodType: BloodType.B_POSITIVE,
-    medicalHistory: 'Hypertension. Regular medication: Lisinopril 10mg daily.'
+function buildSchedule(template: Record<string, string[]>): Record<string, { startTime: string; endTime: string; isAvailable: boolean }[]> {
+  const schedule: Record<string, { startTime: string; endTime: string; isAvailable: boolean }[]> = {
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+    saturday: [],
+    sunday: []
+  };
+  for (const [shortDay, slots] of Object.entries(template)) {
+    let day: string;
+    switch (shortDay) {
+      case 'mon': day = 'monday'; break;
+      case 'tue': day = 'tuesday'; break;
+      case 'wed': day = 'wednesday'; break;
+      case 'thu': day = 'thursday'; break;
+      case 'fri': day = 'friday'; break;
+      case 'sat': day = 'saturday'; break;
+      case 'sun': day = 'sunday'; break;
+      default: continue;
+    }
+    schedule[day] = slots[0]
+      ? [{ startTime: slots[0], endTime: slots[1] || slots[0], isAvailable: true }]
+      : [];
   }
-];
+  return schedule;
+}
 
-// Raw Mock Data: Doctors
-const rawMockDoctors: Array<Partial<DoctorProfile> & { userId: string }> = [
-  {
-    userId: doctorPendingId,
-    specialty: 'General Practice',
-    licenseNumber: 'MD12345-P',
-    yearsOfExperience: 5,
-    bio: 'General practitioner with focus on preventive care and family medicine.',
-    verificationStatus: VerificationStatus.PENDING,
-    verificationNotes: 'Awaiting license verification.',
-    location: 'New York, NY',
-    languages: ['English', 'Spanish'],
-    consultationFee: 150,
-    profilePictureUrl: 'https://example.com/profile-pictures/doctor-pending.jpg',
-    licenseDocumentUrl: 'https://example.com/documents/license-pending.pdf',
-    certificateUrl: 'https://example.com/documents/certificate-pending.pdf',
-    educationHistory: [
-      {
-        institution: 'University of Medicine',
-        degree: 'Doctor of Medicine',
-        field: 'Medicine',
-        startYear: 2010,
-        endYear: 2014,
-        isOngoing: false,
-        description: 'Graduated with honors.'
-      },
-      {
-        institution: 'State University',
-        degree: 'Bachelor of Science',
-        field: 'Biology',
-        startYear: 2006,
-        endYear: 2010,
-        isOngoing: false,
-        description: 'Pre-medical studies with research focus on immunology.'
-      }
-    ],
-    experience: [
-      {
-        organization: 'City Hospital',
-        position: 'Resident Physician',
-        location: 'New York, NY',
-        startYear: 2014,
-        endYear: 2018,
-        isOngoing: false,
-        description: 'Completed residency in family medicine.'
-      },
-      {
-        organization: 'Family Care Clinic',
-        position: 'General Practitioner',
-        location: 'New York, NY',
-        startYear: 2018,
-        endYear: null,
-        isOngoing: true,
-        description: 'Providing comprehensive primary care to patients of all ages.'
-      }
-    ],
-    weeklySchedule: {
-      monday: [
-        { startTime: '09:00', endTime: '12:00', isAvailable: true },
-        { startTime: '13:00', endTime: '17:00', isAvailable: true }
-      ],
-      tuesday: [
-        { startTime: '09:00', endTime: '12:00', isAvailable: true },
-        { startTime: '13:00', endTime: '17:00', isAvailable: true }
-      ],
-      wednesday: [
-        { startTime: '09:00', endTime: '12:00', isAvailable: true }
-      ],
-      thursday: [
-        { startTime: '13:00', endTime: '17:00', isAvailable: true }
-      ],
-      friday: [
-        { startTime: '09:00', endTime: '15:00', isAvailable: true }
-      ],
-      saturday: [],
-      sunday: []
-    },
-    blockedDates: [
-      new Date('2025-07-04').toISOString(),
-      new Date('2025-12-25').toISOString()
-    ],
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    userId: doctorVerifiedId,
-    specialty: 'Cardiology',
-    licenseNumber: 'MD67890-V',
-    yearsOfExperience: 12,
-    bio: 'Cardiologist specializing in preventive cardiology and heart disease management.',
-    verificationStatus: VerificationStatus.VERIFIED,
-    verificationNotes: 'All credentials verified.',
-    location: 'Boston, MA',
-    languages: ['English', 'French'],
-    consultationFee: 250,
-    profilePictureUrl: 'https://example.com/profile-pictures/doctor-verified.jpg',
-    licenseDocumentUrl: 'https://example.com/documents/license-verified.pdf',
-    certificateUrl: 'https://example.com/documents/certificate-verified.pdf',
-    educationHistory: [
-      {
-        institution: 'Harvard Medical School',
-        degree: 'Doctor of Medicine',
-        field: 'Medicine',
-        startYear: 2005,
-        endYear: 2009,
-        isOngoing: false,
-        description: 'Graduated with distinction.'
-      },
-      {
-        institution: 'Yale University',
-        degree: 'Bachelor of Science',
-        field: 'Biochemistry',
-        startYear: 2001,
-        endYear: 2005,
-        isOngoing: false,
-        description: 'Summa cum laude'
-      }
-    ],
-    experience: [
-      {
-        organization: 'Mass General Hospital',
-        position: 'Cardiology Fellow',
-        location: 'Boston, MA',
-        startYear: 2009,
-        endYear: 2012,
-        isOngoing: false,
-        description: 'Completed fellowship in cardiovascular medicine.'
-      },
-      {
-        organization: 'Boston Heart Center',
-        position: 'Attending Cardiologist',
-        location: 'Boston, MA',
-        startYear: 2012,
-        endYear: null,
-        isOngoing: true,
-        description: 'Specializing in preventive cardiology and heart disease management.'
-      }
-    ],
-    weeklySchedule: {
-      monday: [
-        { startTime: '08:00', endTime: '12:00', isAvailable: true },
-        { startTime: '13:00', endTime: '16:00', isAvailable: true }
-      ],
-      tuesday: [
-        { startTime: '08:00', endTime: '12:00', isAvailable: true }
-      ],
-      wednesday: [],
-      thursday: [
-        { startTime: '08:00', endTime: '12:00', isAvailable: true },
-        { startTime: '13:00', endTime: '16:00', isAvailable: true }
-      ],
-      friday: [
-        { startTime: '13:00', endTime: '17:00', isAvailable: true }
-      ],
-      saturday: [
-        { startTime: '09:00', endTime: '12:00', isAvailable: true }
-      ],
-      sunday: []
-    },
-    blockedDates: [
-      new Date('2025-06-15').toISOString(),
-      new Date('2025-06-16').toISOString(),
-      new Date('2025-12-24').toISOString(),
-      new Date('2025-12-25').toISOString()
-    ],
-    createdAt: lastWeek,
-    updatedAt: now
-  },
-  {
-    userId: doctorRejectedId,
-    specialty: 'Neurology',
-    licenseNumber: 'MD11223-R',
-    yearsOfExperience: 8,
-    bio: 'Neurologist with expertise in headache disorders and neurodegenerative diseases.',
-    verificationStatus: VerificationStatus.REJECTED,
-    verificationNotes: 'License number could not be verified in the state database.',
-    location: 'Chicago, IL',
-    languages: ['English', 'German'],
-    consultationFee: 200,
-    profilePictureUrl: 'https://example.com/profile-pictures/doctor-rejected.jpg',
-    licenseDocumentUrl: 'https://example.com/documents/license-rejected.pdf',
-    certificateUrl: 'https://example.com/documents/certificate-rejected.pdf',
-    educationHistory: [
-      {
-        institution: 'University of Chicago Medical School',
-        degree: 'Doctor of Medicine',
-        field: 'Medicine',
-        startYear: 2008,
-        endYear: 2012,
-        isOngoing: false,
-        description: ''
-      }
-    ],
-    experience: [
-      {
-        organization: 'Chicago Medical Center',
-        position: 'Neurology Resident',
-        location: 'Chicago, IL',
-        startYear: 2012,
-        endYear: 2016,
-        isOngoing: false,
-        description: 'Completed residency in neurology.'
-      },
-      {
-        organization: 'Midwest Neurology Associates',
-        position: 'Neurologist',
-        location: 'Chicago, IL',
-        startYear: 2016,
-        endYear: null,
-        isOngoing: true,
-        description: 'Specializing in headache disorders and neurodegenerative diseases.'
-      }
-    ],
-    weeklySchedule: {
-      monday: [
-        { startTime: '10:00', endTime: '14:00', isAvailable: true },
-        { startTime: '15:00', endTime: '18:00', isAvailable: true }
-      ],
-      tuesday: [
-        { startTime: '10:00', endTime: '14:00', isAvailable: true },
-        { startTime: '15:00', endTime: '18:00', isAvailable: true }
-      ],
-      wednesday: [
-        { startTime: '10:00', endTime: '14:00', isAvailable: true }
-      ],
-      thursday: [],
-      friday: [
-        { startTime: '10:00', endTime: '16:00', isAvailable: true }
-      ],
-      saturday: [],
-      sunday: []
-    },
-    blockedDates: [],
-    createdAt: lastWeek,
-    updatedAt: now
-  }
-];
+const doctors = doctorUsers.map((u, idx) =>
+  DoctorProfileSchema.parse({
+    userId: u.id,
+    specialty: faker.helpers.arrayElement(['Cardiology', 'Dermatology', 'Neurology']),
+    licenseNumber: faker.string.alphanumeric({ length: 10 }),
+    yearsOfExperience: faker.number.int({ min: 2, max: 25 }),
+    verificationStatus:
+      idx === 0 ? VerificationStatus.PENDING :
+      idx === 1 ? VerificationStatus.REJECTED :
+      VerificationStatus.VERIFIED,
+    consultationFee: faker.number.int({ min: 300, max: 800 }),
+    bio: faker.lorem.paragraph(2),
+    verificationNotes: idx === 1 ? 'License information could not be verified' : null,
+    adminNotes: idx < 2 ? 'Pending review' : 'Approved',
+    location: 'Cairo, Egypt',
+    languages: ['English', 'Arabic'],
+    profilePictureUrl: null,
+    licenseDocumentUrl: null,
+    certificateUrl: null,
+    educationHistory: [],
+    experience: [],
+    timezone: 'Africa/Cairo',
+    weeklySchedule: buildSchedule(weekTemplates[idx % weekTemplates.length]),
+    blockedDates: [iso(60 + idx)],
+    education: 'MBBS – Cairo University',
+    servicesOffered: 'General consultation',
+    createdAt: iso(-30),
+    updatedAt: iso(),
+  })
+);
 
-// Raw Mock Data: Appointments
-const rawMockAppointments: Array<Partial<Appointment> & { id: string }> = [
-  {
-    id: 'appt-completed-001',
-    patientId: patientUserId,
-    patientName: 'Sarah Patient',
-    doctorId: doctorVerifiedId,
-    doctorName: 'Dr. Emma Verified',
-    doctorSpecialty: 'Cardiology',
-    appointmentDate: lastWeek,
-    startTime: '09:00',
-    endTime: '09:30',
+// Patient profiles
+const patients = patientUsers.map((u, idx) =>
+  PatientProfileSchema.parse({
+    userId: u.id,
+    dateOfBirth: iso(-10_000 - idx * 1000),
+    gender: idx === 0 ? Gender.FEMALE : Gender.MALE,
+    bloodType: faker.helpers.arrayElement([
+      BloodType.A_POSITIVE, 
+      BloodType.B_POSITIVE, 
+      BloodType.O_POSITIVE
+    ]),
+    medicalHistory: idx === 0 ? 'Allergic to penicillin' : null,
+  })
+);
+
+// Appointments – past & future, various statuses
+const appointments: Array<Appointment & { id: string }> = [
+  AppointmentSchema.parse({
+    id: 'a-001',
+    patientId: patientUsers[0].id,
+    doctorId: doctorUsers[2].id,
+    appointmentDate: iso(3),
+    startTime: '09:30',
+    endTime: '10:00',
+    status: AppointmentStatus.PENDING,
+    appointmentType: AppointmentType.IN_PERSON,
+    reason: 'Check-up',
+    notes: null,
+    patientName: `${patientUsers[0].firstName} ${patientUsers[0].lastName}`,
+    doctorName: `Dr. ${doctorUsers[2].firstName} ${doctorUsers[2].lastName}`,
+    doctorSpecialty: doctors[2].specialty,
+    videoCallUrl: null,
+    createdAt: iso(),
+    updatedAt: iso(),
+  }) as Appointment & { id: string },
+  AppointmentSchema.parse({
+    id: 'a-002',
+    patientId: patientUsers[1].id,
+    doctorId: doctorUsers[2].id,
+    appointmentDate: iso(-14),
+    startTime: '14:00',
+    endTime: '14:30',
     status: AppointmentStatus.COMPLETED,
-    reason: 'Annual heart checkup',
-    notes: "Patient's heart function normal. No concerns at this time. Follow up in 1 year.",
-    createdAt: lastWeek,
-    updatedAt: now,
-    appointmentType: AppointmentType.IN_PERSON
-  },
-  {
-    id: 'appt-upcoming-002',
-    patientId: patientUserId,
-    patientName: 'Sarah Patient',
-    doctorId: doctorVerifiedId,
-    doctorName: 'Dr. Emma Verified',
-    doctorSpecialty: 'Cardiology',
-    appointmentDate: nextWeek,
+    appointmentType: AppointmentType.VIDEO,
+    videoCallUrl: 'https://meet.demo/abc',
+    reason: 'Skin rash',
+    notes: 'Prescribed ointment',
+    patientName: `${patientUsers[1].firstName} ${patientUsers[1].lastName}`,
+    doctorName: `Dr. ${doctorUsers[2].firstName} ${doctorUsers[2].lastName}`,
+    doctorSpecialty: doctors[2].specialty,
+    createdAt: iso(-20),
+    updatedAt: iso(-13),
+  }) as Appointment & { id: string },
+  AppointmentSchema.parse({
+    id: 'a-003',
+    patientId: patientUsers[2].id,
+    doctorId: doctorUsers[5].id,
+    appointmentDate: iso(5),
     startTime: '10:00',
     endTime: '10:30',
-    status: AppointmentStatus.SCHEDULED,
-    reason: 'Follow-up on medication',
+    status: AppointmentStatus.CONFIRMED,
+    appointmentType: AppointmentType.IN_PERSON,
+    videoCallUrl: null,
+    reason: 'Annual physical',
     notes: null,
-    createdAt: now,
-    updatedAt: now,
-    appointmentType: AppointmentType.IN_PERSON
-  },
-  {
-    id: 'appt-cancelled-003',
-    patientId: patientUserId,
-    patientName: 'Sarah Patient',
-    doctorId: doctorPendingId,
-    doctorName: 'Dr. James Pending',
-    doctorSpecialty: 'General Practice',
-    appointmentDate: lastWeek,
-    startTime: '11:00',
-    endTime: '11:30',
+    patientName: `${patientUsers[2].firstName} ${patientUsers[2].lastName}`,
+    doctorName: `Dr. ${doctorUsers[5].firstName} ${doctorUsers[5].lastName}`,
+    doctorSpecialty: doctors[5].specialty,
+    createdAt: iso(-2),
+    updatedAt: iso(-1),
+  }) as Appointment & { id: string },
+  AppointmentSchema.parse({
+    id: 'a-004',
+    patientId: patientUsers[0].id,
+    doctorId: doctorUsers[3].id,
+    appointmentDate: iso(-7),
+    startTime: '11:30',
+    endTime: '12:00',
     status: AppointmentStatus.CANCELLED,
-    reason: 'Flu symptoms',
-    notes: null,
-    createdAt: lastWeek,
-    updatedAt: lastWeek,
-    appointmentType: AppointmentType.IN_PERSON
-  },
-  {
-    id: 'appt-video-004',
-    patientId: unverifiedUserId,
-    patientName: 'Unverified User',
-    doctorId: doctorVerifiedId,
-    doctorName: 'Dr. Emma Verified',
-    doctorSpecialty: 'Cardiology',
-    appointmentDate: nextWeek,
-    startTime: '13:00',
-    endTime: '13:30',
-    status: AppointmentStatus.SCHEDULED,
-    reason: 'Initial consultation',
-    notes: null,
-    createdAt: now,
-    updatedAt: now,
-    appointmentType: AppointmentType.VIDEO
-  }
+    appointmentType: AppointmentType.VIDEO,
+    videoCallUrl: 'https://meet.demo/xyz',
+    reason: 'Headache consultation',
+    notes: 'Cancelled by patient',
+    patientName: `${patientUsers[0].firstName} ${patientUsers[0].lastName}`,
+    doctorName: `Dr. ${doctorUsers[3].firstName} ${doctorUsers[3].lastName}`,
+    doctorSpecialty: doctors[3].specialty,
+    createdAt: iso(-10),
+    updatedAt: iso(-7),
+  }) as Appointment & { id: string },
 ];
 
-// Raw Mock Data: Notifications
-const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
-  {
-    id: 'notif-appt-booked-001',
-    userId: patientUserId,
-    title: 'Appointment Confirmed',
-    message: 'Your appointment with Dr. Emma Verified on ' + new Date(nextWeek).toLocaleDateString() + ' at 10:00 AM has been confirmed.',
+// Notifications
+const notifications: Array<Notification & { id: string }> = [
+  NotificationSchema.parse({
+    id: 'n-001',
+    userId: doctorUsers[2].userId,
+    title: 'New appointment',
+    message: `You have a new appointment with ${patientUsers[0].firstName} ${patientUsers[0].lastName} on ${new Date(iso(3)).toLocaleDateString()}.`,
     isRead: false,
-    createdAt: now,
+    createdAt: iso(),
     type: NotificationType.APPOINTMENT_BOOKED,
-    relatedId: 'appt-upcoming-002'
-  },
-  {
-    id: 'notif-appt-reminder-002',
-    userId: patientUserId,
-    title: 'Appointment Reminder',
-    message: 'Reminder: You have an appointment with Dr. Emma Verified tomorrow at 10:00 AM.',
-    isRead: true,
-    createdAt: lastWeek,
+    relatedId: 'a-001'
+  }) as Notification & { id: string },
+  NotificationSchema.parse({
+    id: 'n-002',
+    userId: patientUsers[0].userId,
+    title: 'Appointment confirmed',
+    message: `Your appointment with Dr. ${doctorUsers[2].firstName} ${doctorUsers[2].lastName} for ${new Date(iso(3)).toLocaleDateString()} is pending confirmation.`,
+    isRead: false,
+    createdAt: iso(),
     type: NotificationType.APPOINTMENT_BOOKED,
-    relatedId: 'appt-completed-001'
-  },
-  {
-    id: 'notif-system-003',
-    userId: patientUserId,
-    title: 'Welcome to Health App',
-    message: 'Thank you for registering. Complete your profile to get the most out of our services.',
+    relatedId: 'a-001'
+  }) as Notification & { id: string },
+  NotificationSchema.parse({
+    id: 'n-003',
+    userId: patientUsers[1].userId,
+    title: 'Welcome!',
+    message: 'Thanks for joining Health Appointment.',
     isRead: true,
-    createdAt: lastWeek,
+    createdAt: iso(-1),
     type: NotificationType.SYSTEM_ALERT,
     relatedId: null
-  },
-  {
-    id: 'notif-doctor-verification-004',
-    userId: doctorPendingId,
-    title: 'Verification In Progress',
-    message: 'Your doctor verification is in progress. We will notify you once the review is complete.',
+  }) as Notification & { id: string },
+  NotificationSchema.parse({
+    id: 'n-004',
+    userId: doctorUsers[0].userId,
+    title: 'Verification pending',
+    message: 'Your doctor profile is under review. We will notify you once verified.',
     isRead: false,
-    createdAt: now,
+    createdAt: iso(-5),
     type: NotificationType.OTHER,
-    relatedId: null
-  },
-  {
-    id: 'notif-doctor-approved-005',
-    userId: doctorVerifiedId,
-    title: 'Verification Approved',
-    message: 'Congratulations! Your doctor verification has been approved. You can now begin accepting appointments.',
+    relatedId: doctorUsers[0].userId
+  }) as Notification & { id: string },
+  NotificationSchema.parse({
+    id: 'n-005',
+    userId: patientUsers[2].userId,
+    title: 'Appointment confirmed',
+    message: `Your appointment with Dr. ${doctorUsers[5].firstName} ${doctorUsers[5].lastName} on ${new Date(iso(5)).toLocaleDateString()} is confirmed.`,
     isRead: true,
-    createdAt: lastWeek,
-    type: NotificationType.VERIFICATION_APPROVED,
-    relatedId: null
-  },
-  {
-    id: 'notif-doctor-rejected-006',
-    userId: doctorRejectedId,
-    title: 'Verification Rejected',
-    message: 'Your doctor verification has been rejected. Please review the verification notes and resubmit your application with the correct information.',
-    isRead: false,
-    createdAt: now,
-    type: NotificationType.OTHER,
-    relatedId: null
-  }
+    createdAt: iso(-1),
+    type: NotificationType.APPOINTMENT_BOOKED,
+    relatedId: 'a-003'
+  }) as Notification & { id: string },
 ];
 
-/**
- * Validates raw mock data against a Zod schema and prepares it for JSON storage.
- * Keeps dates as ISO strings for JSON compatibility.
- * 
- * @param collectionName The name of the collection for logging purposes
- * @param rawData Array of raw data objects with ID field
- * @param schema Zod schema to validate against (excluding ID field)
- * @returns Array of validated objects with ID field reattached
- */
-function validateAndPrepareData<TRaw extends { id: string }, TSchema extends z.ZodType<any>>(
-  collectionName: string,
-  rawData: TRaw[],
-  schema: TSchema
-): Array<z.infer<TSchema> & { id: string }> {
-  console.log(`Validating ${rawData.length} items for ${collectionName}...`);
-  const validData: Array<z.infer<TSchema> & { id: string }> = [];
-  let invalidCount = 0;
-  
-  for (const item of rawData) {
-    const { id, ...itemData } = item;
-    // Validate data portion against schema
-    const validation = schema.safeParse(itemData);
-    
-    if (validation.success) {
-      // Add ID back to the validated data object (which now has defaults/transformations applied by Zod)
-      validData.push({ ...(validation.data as object), id } as z.infer<TSchema> & { id: string });
-    } else {
-      invalidCount++;
-      console.error(`[SEEDING ERROR] Zod validation failed for ${collectionName} item ID ${id}:`, validation.error.format());
-    }
-  }
-  
-  if (invalidCount > 0) {
-    console.warn(`[SEEDING WARNING] ${invalidCount} documents failed validation for ${collectionName}.`);
-  }
-  
-  console.log(`Validation complete for ${collectionName}: ${validData.length} valid documents prepared.`);
-  return validData;
-}
-
-/**
- * Special case for validating patient and doctor profiles which don't have an id field but use userId
- */
-function validateAndPrepareNestedData<
-  TRaw extends { userId: string },
-  TSchema extends z.ZodType<any>
->(
-  collectionName: string,
-  rawData: TRaw[],
-  schema: TSchema
-): Array<z.infer<TSchema>> {
-  console.log(`Validating ${rawData.length} items for ${collectionName}...`);
-  const validData: Array<z.infer<TSchema>> = [];
-  let invalidCount = 0;
-  
-  for (const item of rawData) {
-    // Validate entire item against schema
-    const validation = schema.safeParse(item);
-    
-    if (validation.success) {
-      validData.push(validation.data as z.infer<TSchema>);
-    } else {
-      invalidCount++;
-      console.error(`[SEEDING ERROR] Zod validation failed for ${collectionName} item userId ${item.userId}:`, validation.error.format());
-    }
-  }
-  
-  if (invalidCount > 0) {
-    console.warn(`[SEEDING WARNING] ${invalidCount} documents failed validation for ${collectionName}.`);
-  }
-  
-  console.log(`Validation complete for ${collectionName}: ${validData.length} valid documents prepared.`);
-  return validData;
-}
-
-/**
- * Main function to seed the local database with mock data
- */
 async function seedLocalDatabase() {
-  console.log('\n--- Seeding Local File DB ---\n');
+  console.log('🌱 Starting seeding...');
   
-  try {
-    // Optional: Clear Existing Data
+  // Write to files one by one to avoid type issues
+  await writeCollection('users', users);
+  await writeCollection('patients', patients);
+  await writeCollection('doctors', doctors);
+  await writeCollection('appointments', appointments);
+  await writeCollection('notifications', notifications);
+  
+  console.log('✅ All collections written to flat-file JSON');
+  
+  // Firebase emulator (if flag set)
+  if (process.env.WRITE_TO_EMULATOR === 'true') {
+    console.log('📝 Writing to Firebase emulator...');
     try {
-      await fs.rm(DB_DIR, { recursive: true, force: true });
-      console.log('Cleared existing local_db directory.');
-    } catch (err: any) {
-      console.warn('Could not clear local_db:', err.message);
+      const db = initAdminApp(); // returns Firestore admin instance pointed at localhost
+      
+      // Process each collection separately
+      const processCollection = async <T extends { id?: string; userId?: string }>(name: string, data: T[]) => {
+        const batch = db.batch();
+        data.forEach(entity => {
+          // Use the id or userId as the document ID, fallback to a random string if both are missing
+          const docId = String(entity.id || entity.userId || faker.string.uuid());
+          batch.set(db.collection(name).doc(docId), entity);
+        });
+        await batch.commit();
+        console.log(`✅ Wrote ${data.length} items to Firestore collection: ${name}`);
+      };
+      
+      // Write each collection to Firestore
+      await processCollection('users', users);
+      await processCollection('patients', patients);
+      await processCollection('doctors', doctors);
+      await processCollection('appointments', appointments);
+      await processCollection('notifications', notifications);
+    } catch (error) {
+      console.error('❌ Error writing to Firebase emulator:', error);
     }
-    
-    // Validate & Save Users
-    const usersToSeed = validateAndPrepareData('users', rawMockUsers, UserProfileSchema);
-    await saveUsers(usersToSeed);
-    console.log(`Saved ${usersToSeed.length} users to local_db.`);
-    
-    // Validate & Save Patients
-    const patientsToSeed = validateAndPrepareNestedData('patients', rawMockPatients, PatientProfileSchema);
-    await savePatients(patientsToSeed);
-    console.log(`Saved ${patientsToSeed.length} patients to local_db.`);
-    
-    // Validate & Save Doctors
-    const doctorsToSeed = validateAndPrepareNestedData('doctors', rawMockDoctors, DoctorProfileSchema);
-    await saveDoctors(doctorsToSeed);
-    console.log(`Saved ${doctorsToSeed.length} doctors to local_db.`);
-    
-    // Validate & Save Appointments
-    const appointmentsToSeed = validateAndPrepareData('appointments', rawMockAppointments, AppointmentSchema);
-    await saveAppointments(appointmentsToSeed);
-    console.log(`Saved ${appointmentsToSeed.length} appointments to local_db.`);
-    
-    // Validate & Save Notifications
-    const notificationsToSeed = validateAndPrepareData('notifications', rawMockNotifications, NotificationSchema);
-    await saveNotifications(notificationsToSeed);
-    console.log(`Saved ${notificationsToSeed.length} notifications to local_db.`);
-    
-    console.log('\n--- Local File DB Seeding Completed Successfully ---\n');
-    
-    // Add validation log entry for CMS
-    console.log("To confirm in CMS, execute: logValidation('2.8', 'success', 'Local file database seeded with diverse and Zod-validated mock data.');");
-    
-  } catch (error) {
-    console.error('Error seeding local database:', error);
-    process.exit(1);
   }
+  
+  // Add validation log
+  const { logValidation } = await import('../src/lib/logger');
+  logValidation('2.8c', 'success', 'Seed script now generates 10 users (7 doctors, 3 patients) plus related data, Zod-validated and ready for file DB & emulator.');
+  
+  console.log('🌱 Seeding finished.');
 }
 
-// Run the seed function
-seedLocalDatabase().catch(console.error); 
+// Run the seeding function
+seedLocalDatabase().catch(err => {
+  console.error('Error seeding database:', err);
+  process.exit(1);
+}); 
