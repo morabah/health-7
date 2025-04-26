@@ -21,7 +21,6 @@ module.exports = {
           700: '#0369a1',
           800: '#075985',
           900: '#0c4a6e',
-          950: '#082f49',
         },
         // Secondary accent colors
         secondary: {
@@ -35,7 +34,6 @@ module.exports = {
           700: '#6d28d9',
           800: '#5b21b6',
           900: '#4c1d95',
-          950: '#2e1065',
         },
         // Health-specific semantic colors
         health: {

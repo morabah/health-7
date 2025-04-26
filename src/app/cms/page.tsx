@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { logInfo, logDebug } from '@/lib/logger';
+import { logInfo } from '@/lib/logger';
 import { appEventBus, LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
 import { API_MODE, IS_MOCK_MODE } from '@/config/appConfig';
 
@@ -24,13 +24,11 @@ export default function CMSPage() {
     // Handler for validation events
     const handleValidation = (payload: ValidationEventPayload) => {
       setValidationSteps(prev => [payload, ...prev]);
-      logDebug('Validation event received', payload);
     };
     
     // Handler for log events
     const handleLog = (payload: LogEventPayload) => {
       setLogs(prev => [payload, ...prev].slice(0, 100)); // Limit to last 100 logs
-      logDebug('Log event captured in CMS', { level: payload.level });
     };
     
     // Subscribe to events
@@ -38,7 +36,7 @@ export default function CMSPage() {
     appEventBus.on('log_event', handleLog);
     
     // Log initial state
-    logInfo('CMS Validation page mounted', { mode: API_MODE });
+    logInfo('CMS Validation page mounted');
     
     // Cleanup subscriptions on unmount
     return () => {
@@ -50,107 +48,63 @@ export default function CMSPage() {
   // Clear logs handler
   const handleClearLogs = () => {
     setLogs([]);
-    logInfo('Logs cleared from CMS');
   };
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header Section */}
+    <div className="p-8">
       <header className="mb-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">CMS Portal</h1>
-          <Link href="/" className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md">
-            Back to Site
-          </Link>
-        </div>
-        <div className="mt-2 flex items-center gap-4">
-          <p className="text-gray-600">
-            Mode: <span className="font-semibold">{IS_MOCK_MODE ? 'Mock (Hardcoded)' : 'Local File DB'}</span>
-          </p>
-          <Link 
-            href="/"
-            className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-          >
+        <h1 className="text-3xl font-bold mb-4">CMS Portal</h1>
+        <div className="flex gap-4">
+          <p>Mode: {IS_MOCK_MODE ? 'Mock' : 'Live'}</p>
+          <Link href="/" className="px-4 py-2 bg-blue-600 text-white rounded">
             Launch App
           </Link>
         </div>
       </header>
       
-      {/* Main Content with Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Validation Steps */}
-        <div className="lg:col-span-1">
-          <div className="card mb-6">
-            <h2 className="text-xl font-semibold mb-4">Validation Steps</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Validation Steps</h2>
+          <div className="border p-4 rounded bg-gray-50 min-h-[200px]">
             {validationSteps.length === 0 ? (
-              <p className="text-gray-500">No validation steps recorded yet</p>
+              <p>No validation steps recorded</p>
             ) : (
-              <div className="space-y-3">
+              <ul>
                 {validationSteps.map((step, index) => (
-                  <div 
-                    key={`${step.taskId}-${index}`}
-                    className={`p-3 rounded-md border ${
-                      step.status === 'success' ? 'border-health-success bg-green-50' : 'border-health-danger bg-red-50'
-                    }`}
-                  >
-                    <div className="flex justify-between">
-                      <span className="font-medium">Task {step.taskId}</span>
-                      <span className={
-                        step.status === 'success' ? 'text-health-success' : 'text-health-danger'
-                      }>
-                        {step.status.toUpperCase()}
-                      </span>
-                    </div>
-                    {step.message && <p className="text-sm mt-1">{step.message}</p>}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(step.timestamp).toLocaleString()}
-                    </p>
-                  </div>
+                  <li key={index} className="mb-2 p-2 border rounded">
+                    <div>Task {step.taskId}: {step.status}</div>
+                    {step.message && <div>{step.message}</div>}
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>
         
-        {/* Right Column - Logs */}
-        <div className="lg:col-span-2">
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Logs</h2>
-              <button 
-                onClick={handleClearLogs}
-                className="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm"
-              >
-                Clear Logs
-              </button>
-            </div>
-            
+        <div>
+          <div className="flex justify-between mb-4">
+            <h2 className="text-xl font-semibold">Logs</h2>
+            <button 
+              onClick={handleClearLogs}
+              className="px-3 py-1 bg-gray-200 rounded text-sm"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="border p-4 rounded bg-gray-50 min-h-[200px]">
             {logs.length === 0 ? (
-              <p className="text-gray-500">No logs recorded yet</p>
+              <p>No logs recorded</p>
             ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              <ul>
                 {logs.map((log, index) => (
-                  <div 
-                    key={`log-${index}-${log.timestamp}`}
-                    className={`p-2 rounded border text-sm font-mono ${getLogStyles(log.level)}`}
-                  >
-                    <div className="flex gap-2 items-start">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-xs uppercase font-semibold whitespace-nowrap">
-                        {log.level}
-                      </span>
-                      <span className="flex-grow">{log.message}</span>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </span>
+                  <li key={index} className="mb-2 p-2 border rounded text-sm">
+                    <div className="flex justify-between">
+                      <span>{log.level}</span>
+                      <span>{log.message}</span>
                     </div>
-                    {log.data && (
-                      <pre className="mt-1 text-xs overflow-x-auto">
-                        {JSON.stringify(log.data, null, 2)}
-                      </pre>
-                    )}
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>
@@ -205,22 +159,4 @@ export default function CMSPage() {
       </div>
     </div>
   );
-}
-
-/**
- * Helper function to get Tailwind CSS classes based on log level
- */
-function getLogStyles(level: string): string {
-  switch (level) {
-    case 'error':
-      return 'border-health-danger bg-red-50';
-    case 'warn':
-      return 'border-health-warning bg-amber-50';
-    case 'info':
-      return 'border-health-info bg-blue-50';
-    case 'debug':
-      return 'border-gray-300 bg-gray-50';
-    default:
-      return 'border-gray-300 bg-gray-50';
-  }
 } 
