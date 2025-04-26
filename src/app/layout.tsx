@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
+// Import app configuration early for initialization
+import '@/config/appConfig';
 // Import global styles (includes Tailwind CSS directives)
 import '@/styles/globals.css';
 
