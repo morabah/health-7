@@ -1,8 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-# Run linting first (commented out temporarily)
-# npm run lint || exit 1
-
 # Run Jest tests only (not e2e tests)
 npm test
