@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { Gender, UserType, VerificationStatus, DocumentType } from './enums';
+import { Gender, UserType, VerificationStatus, DocumentType, AppointmentStatus, AppointmentType } from './enums';
 // Note: Firestore Timestamps require custom handling or z.instanceof later
 
 /**
@@ -383,10 +383,71 @@ export const VerificationDocumentSchema = z.object({
          .describe("Admin notes regarding this document"),
 });
 
+/** 
+ * Zod schema for the data stored within an Appointment Firestore document (collection 'appointments').
+ * Contains PHI. Linked to users via Auth UIDs.
+ */
+export const AppointmentSchema = z.object({
+  /** The Firebase Auth UID of the patient who booked. Required. */
+  patientId: z.string().min(1),
+  
+  /** Denormalized patient name for display purposes. Optional. */
+  patientName: z.string().optional(),
+  
+  /** The Firebase Auth UID of the doctor for the appointment. Required. */
+  doctorId: z.string().min(1),
+  
+  /** Denormalized doctor name for display purposes. Optional. */
+  doctorName: z.string().optional(),
+  
+  /** Denormalized doctor specialty for display purposes. Optional. */
+  doctorSpecialty: z.string().optional(),
+  
+  /** The specific date of the appointment (stored as ISO string). Required. */
+  appointmentDate: isoDateTimeStringSchema,
+  
+  /** The start time of the appointment slot (HH:MM format). Required. */
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid start time format (HH:MM)"),
+  
+  /** The end time of the appointment slot (HH:MM format). Required. */
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid end time format (HH:MM)"),
+  
+  /** The current status of the appointment. Required, defaults handled by backend logic. */
+  status: z.nativeEnum(AppointmentStatus),
+  
+  /** @PHI The reason for the visit provided by the patient. Optional. */
+  reason: z.string()
+          .max(1000, "Reason exceeds maximum length")
+          .nullable()
+          .optional()
+          .describe("@PHI"),
+  
+  /** @PHI Notes added by the doctor upon completion. Optional. */
+  notes: z.string()
+         .max(2000, "Notes exceed maximum length")
+         .nullable()
+         .optional()
+         .describe("@PHI"),
+  
+  /** Timestamp string when the appointment document was created (server-set). Required. */
+  createdAt: isoDateTimeStringSchema,
+  
+  /** Timestamp string when the appointment document was last updated (server-set). Required. */
+  updatedAt: isoDateTimeStringSchema,
+  
+  /** The type of appointment (e.g., in-person or video). Optional. */
+  appointmentType: z.nativeEnum(AppointmentType)
+                   .optional()
+                   .default(AppointmentType.InPerson),
+});
+
 // Inferred TypeScript types
 export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
 export type TimeSlot = z.infer<typeof TimeSlotSchema>; // No separate ID usually
 export type WeeklySchedule = z.infer<typeof WeeklyScheduleSchema>;
 export type DoctorProfile = z.infer<typeof DoctorProfileSchema>; // ID comes from UserProfile
-export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & { id?: string }; 
+export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & { id?: string };
+
+/** TypeScript type inferred from AppointmentSchema. Represents an appointment record. */
+export type Appointment = z.infer<typeof AppointmentSchema> & { id: string }; // Add Firestore document ID 
