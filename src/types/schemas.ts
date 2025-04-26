@@ -441,6 +441,47 @@ export const AppointmentSchema = z.object({
                    .default(AppointmentType.InPerson),
 });
 
+/** 
+ * Zod schema for the data stored within a Notification Firestore document (collection 'notifications').
+ * Targeted to a specific user via their Auth UID.
+ */
+export const NotificationSchema = z.object({
+  /** The Firebase Auth UID of the user receiving the notification. Required. */
+  userId: z.string().min(1),
+  
+  /** The title of the notification. Required. */
+  title: z.string()
+        .min(1, "Notification title is required.")
+        .max(100, "Title too long")
+        .describe("The main heading of the notification"),
+  
+  /** The main content/body of the notification message. Required. */
+  message: z.string()
+          .min(1, "Notification message is required.")
+          .max(500, "Message too long")
+          .describe("The detailed content of the notification"),
+  
+  /** Flag indicating if the user has marked the notification as read. Defaults to false. */
+  isRead: z.boolean()
+         .default(false)
+         .describe("Tracking if notification has been viewed by user"),
+  
+  /** Timestamp string when the notification was created (server-set). Required. */
+  createdAt: isoDateTimeStringSchema
+             .describe("When the notification was generated"),
+  
+  /** Category type for the notification (e.g., appointment update, system alert, verification status). Defaults to 'system'. */
+  type: z.string()
+       .default('system')
+       .describe("e.g., 'appointment_booked', 'verification_approved', 'system'"),
+  
+  /** Optional ID of a related Firestore document (e.g., the appointment ID). */
+  relatedId: z.string()
+            .nullable()
+            .optional()
+            .describe("e.g., Appointment ID"),
+});
+
 // Inferred TypeScript types
 export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
@@ -450,4 +491,7 @@ export type DoctorProfile = z.infer<typeof DoctorProfileSchema>; // ID comes fro
 export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & { id?: string };
 
 /** TypeScript type inferred from AppointmentSchema. Represents an appointment record. */
-export type Appointment = z.infer<typeof AppointmentSchema> & { id: string }; // Add Firestore document ID 
+export type Appointment = z.infer<typeof AppointmentSchema> & { id: string }; // Add Firestore document ID
+
+/** TypeScript type inferred from NotificationSchema. Represents a notification record. */
+export type Notification = z.infer<typeof NotificationSchema> & { id: string }; // Add Firestore document ID 
