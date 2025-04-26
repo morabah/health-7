@@ -556,6 +556,35 @@ export const AdminDoctorListEntrySchema = BaseUserInfoForDoctorList
     id: z.string().describe("Auth UID / Document ID")
   });
 
+/**
+ * Zod schema for data displayed on Doctor Cards in search results (public view).
+ */
+// Base user info needed
+const UserInfoForPublicCard = UserProfileSchema.pick({
+  firstName: true,
+  lastName: true,
+});
+
+// Public doctor info needed
+const DoctorInfoForPublicCard = DoctorProfileSchema.pick({
+  userId: true, // Needed for linking
+  specialty: true,
+  yearsOfExperience: true,
+  location: true,
+  languages: true,
+  consultationFee: true,
+  profilePictureUrl: true,
+  // Add a field for calculated availability indicator if backend provides it
+  // isAvailableSoon: z.boolean().optional().describe('Indicates recent availability')
+});
+
+// Combine - DO NOT include sensitive fields like verificationNotes, adminNotes
+export const PublicDoctorCardSchema = UserInfoForPublicCard
+  .merge(DoctorInfoForPublicCard)
+  .extend({
+    id: z.string().describe("Auth UID / Document ID") // Same as userId, represents the document ID / Auth UID
+  });
+
 // Inferred TypeScript types
 export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
@@ -577,4 +606,111 @@ export type DoctorAvailabilitySlot = z.infer<typeof DoctorAvailabilitySlotSchema
 export type AdminUserListEntry = z.infer<typeof AdminUserListEntrySchema>;
 
 /** TS type for Admin Doctor List entries. */
-export type AdminDoctorListEntry = z.infer<typeof AdminDoctorListEntrySchema>; 
+export type AdminDoctorListEntry = z.infer<typeof AdminDoctorListEntrySchema>;
+
+/** TS type for data displayed on public Doctor Card results. */
+export type PublicDoctorCard = z.infer<typeof PublicDoctorCardSchema>; 
+
+/**
+ * Zod schema for tracking changes to a doctor's verification status ('verificationHistory' collection).
+ * Provides a full audit trail of verification status changes, who made them, and why.
+ */
+export const VerificationHistoryEntrySchema = z.object({
+  /** Reference to the doctor whose verification status changed. Required. */
+  doctorId: z.string()
+            .min(1, "Doctor ID is required")
+            .describe("The doctor whose verification status was changed"),
+  
+  /** The verification status before the change. Required. */
+  previousStatus: z.nativeEnum(VerificationStatus)
+                  .describe("The verification status before the change"),
+  
+  /** The new verification status after the change. Required. */
+  newStatus: z.nativeEnum(VerificationStatus)
+             .describe("The verification status after the change"),
+  
+  /** The admin who changed the verification status. Required. */
+  changedByAdminId: z.string()
+                    .min(1, "Admin ID is required")
+                    .describe("The admin who performed the verification status change"),
+  
+  /** Timestamp when the change occurred. Required. */
+  timestamp: isoDateTimeStringSchema
+             .describe("When the verification status change occurred"),
+  
+  /** Optional notes explaining the reason for the change. */
+  notes: z.string()
+         .max(1000, "Notes are too long (max 1000 characters)")
+         .optional()
+         .describe("Explanation for why the verification status was changed"),
+});
+
+/** Generic action types for system log entries */
+export enum SystemLogActionType {
+  VERIFICATION_STATUS_CHANGE = "verification_status_change",
+  USER_CREATED = "user_created",
+  USER_UPDATED = "user_updated",
+  USER_DEACTIVATED = "user_deactivated",
+  USER_REACTIVATED = "user_reactivated",
+  PASSWORD_RESET_TRIGGERED = "password_reset_triggered",
+  LOGIN_SUCCESS = "login_success",
+  LOGIN_FAILURE = "login_failure",
+  APPOINTMENT_CREATED = "appointment_created",
+  APPOINTMENT_CANCELLED = "appointment_cancelled",
+  APPOINTMENT_COMPLETED = "appointment_completed",
+  SYSTEM_ERROR = "system_error",
+  DATA_EXPORT = "data_export"
+}
+
+/**
+ * Zod schema for general system audit logs ('systemLogs' collection).
+ * Provides a comprehensive audit trail of all significant system actions.
+ */
+export const SystemLogSchema = z.object({
+  /** The type of action that occurred. Required. */
+  action: z.nativeEnum(SystemLogActionType)
+          .describe("Type of system action that occurred"),
+  
+  /** The user who performed the action. Required. */
+  actorId: z.string()
+           .min(1, "Actor ID is required")
+           .describe("The user who performed the action (often an admin)"),
+  
+  /** The user who was the target of the action, if applicable. */
+  targetUserId: z.string()
+                .optional()
+                .describe("The user that was the subject of the action, if applicable"),
+  
+  /** Timestamp when the action occurred. Required. */
+  timestamp: isoDateTimeStringSchema
+             .describe("When the action occurred"),
+  
+  /** Application module where the action occurred. */
+  module: z.string()
+          .optional()
+          .describe("System module where the action occurred (e.g., 'verification', 'appointments')"),
+  
+  /** IP address of the actor, for security audit purposes. */
+  ipAddress: z.string()
+             .optional()
+             .describe("IP address of the actor (for security audit purposes)"),
+  
+  /** Browser/client information, for security audit purposes. */
+  userAgent: z.string()
+             .optional()
+             .describe("Browser/client information (for security audit purposes)"),
+  
+  /** Additional context about the action in either string format or as a structured object. */
+  details: z.union([
+    z.string().max(5000, "Details are too long (max 5000 characters)"),
+    z.record(z.unknown())
+  ])
+  .optional()
+  .describe("Additional context about the action (structured data or text)")
+});
+
+/** TypeScript type inferred from VerificationHistoryEntrySchema. Represents a verification status change record. */
+export type VerificationHistoryEntry = z.infer<typeof VerificationHistoryEntrySchema> & { id: string }; // Add Firestore document ID
+
+/** TypeScript type inferred from SystemLogSchema. Represents a system audit log entry. */
+export type SystemLog = z.infer<typeof SystemLogSchema> & { id: string }; // Add Firestore document ID 

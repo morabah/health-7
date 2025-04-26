@@ -52,4 +52,13 @@ logValidation('2.6', 'success', 'Appointment Zod schema defined, TS type inferre
 logValidation('2.7', 'success', 'Notification Zod schema defined, TS type inferred.');
 
 // Call the validation function to confirm completion of task 2.8
-logValidation('2.8', 'success', 'Admin list view Zod schemas defined, TS types inferred.');
+logValidation('2.8', 'success', 'Local file database seeded with diverse and Zod-validated mock data.');
+
+// Call the validation function to confirm completion of task 2.9
+logValidation('2.9', 'success', 'Public Doctor Card Zod schema defined, TS type inferred.');
+
+// Call the validation function to confirm completion of task 2.10
+logValidation('2.10', 'success', 'Optional Verification History / System Log Zod schemas defined.');
+
+// Call the validation function to confirm completion of task 2.11
+logValidation('2.11', 'success', 'Zod schemas for all function inputs defined/reviewed.');
