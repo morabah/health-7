@@ -482,6 +482,39 @@ export const NotificationSchema = z.object({
             .describe("e.g., Appointment ID"),
 });
 
+/** 
+ * Zod schema for a document in the 'doctors/{doctorId}/availability' subcollection, 
+ * representing a specific block of time a doctor is available during the week.
+ */
+export const DoctorAvailabilitySlotSchema = z.object({
+  /** Links to the DoctorProfile document/Auth UID. Required. */
+  doctorId: z.string()
+          .min(1)
+          .describe("Reference to the doctor this availability slot belongs to"),
+  
+  /** Day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday - adjust if 0=Monday). Required. */
+  dayOfWeek: z.number()
+            .int()
+            .min(0)
+            .max(6)
+            .describe("Day of week (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday)"),
+  
+  /** Start time of the slot (HH:MM format). Required. */
+  startTime: z.string()
+             .regex(/^\d{2}:\d{2}$/, "Invalid start time format (HH:MM)")
+             .describe("Start time in 24-hour format (HH:MM)"),
+  
+  /** End time of the slot (HH:MM format). Required. */
+  endTime: z.string()
+           .regex(/^\d{2}:\d{2}$/, "Invalid end time format (HH:MM)")
+           .describe("End time in 24-hour format (HH:MM)"),
+  
+  /** Whether this specific slot is available (can be used to override weekly schedule). Defaults true. */
+  isAvailable: z.boolean()
+               .default(true)
+               .describe("Whether this specific timeslot is available for booking"),
+});
+
 // Inferred TypeScript types
 export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
@@ -494,4 +527,7 @@ export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & 
 export type Appointment = z.infer<typeof AppointmentSchema> & { id: string }; // Add Firestore document ID
 
 /** TypeScript type inferred from NotificationSchema. Represents a notification record. */
-export type Notification = z.infer<typeof NotificationSchema> & { id: string }; // Add Firestore document ID 
+export type Notification = z.infer<typeof NotificationSchema> & { id: string }; // Add Firestore document ID
+
+/** TypeScript type inferred from DoctorAvailabilitySlotSchema. */
+export type DoctorAvailabilitySlot = z.infer<typeof DoctorAvailabilitySlotSchema> & { id?: string }; // Add optional Firestore document ID 

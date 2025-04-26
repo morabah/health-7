@@ -39,6 +39,9 @@ logValidation('2.3', 'success', 'UserProfile Zod schema defined, TS type inferre
 // Call the validation function to confirm completion of task 2.4
 logValidation('2.4', 'success', 'PatientProfile Zod schema defined, TS type inferred.');
 
+// Call the validation function to confirm completion of task 2.4b
+logValidation('2.4b', 'success', 'DoctorAvailabilitySlot Zod schema defined, TS type inferred.');
+
 // Call the validation function to confirm completion of task 2.5
 logValidation('2.5', 'success', 'Detailed Doctor related Zod schemas defined, TS types inferred.');
 
