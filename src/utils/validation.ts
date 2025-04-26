@@ -32,3 +32,6 @@ logValidation('2.1', 'success', 'Core enums defined with string values and TSDoc
 
 // Call the validation function to confirm completion of task 2.2
 logValidation('2.2', 'success', 'Shared Zod utility schemas (isoDateTimeStringSchema, genderSchema) defined.');
+
+// Call the validation function to confirm completion of task 2.3
+logValidation('2.3', 'success', 'UserProfile Zod schema defined, TS type inferred.');
