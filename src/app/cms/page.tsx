@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { logInfo } from '@/lib/logger';
-import { appEventBus, LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
+import type { LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
+import { appEventBus } from '@/lib/eventBus';
 import { API_MODE, IS_MOCK_MODE } from '@/config/appConfig';
 
 /**
@@ -153,6 +154,21 @@ export default function CMSPage() {
               className="btn-primary"
             >
               Verification Queue
+            </Link>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl font-semibold mb-3">Data Validation</h2>
+          <p className="text-gray-600 mb-4">
+            Validate data integrity against schema definitions
+          </p>
+          <div className="mt-auto">
+            <Link 
+              href="/cms-validation" 
+              className="btn-primary"
+            >
+              Validate Data
             </Link>
           </div>
         </div>

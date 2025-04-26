@@ -4,9 +4,21 @@
  * Gender enum for user profiles
  */
 export enum Gender {
-  Male = 'Male',
-  Female = 'Female',
-  Other = 'Other' // Includes prefer not to say / non-binary etc.
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER' // Includes prefer not to say / non-binary etc.
+}
+
+/** Common blood types for patient profiles */
+export enum BloodType {
+  A_POSITIVE = 'A+',
+  A_NEGATIVE = 'A-',
+  B_POSITIVE = 'B+',
+  B_NEGATIVE = 'B-',
+  AB_POSITIVE = 'AB+',
+  AB_NEGATIVE = 'AB-',
+  O_POSITIVE = 'O+',
+  O_NEGATIVE = 'O-'
 }
 
 /** Represents the distinct roles users can have within the system. */
@@ -36,14 +48,23 @@ export enum AppointmentStatus {
 
 /** Types of documents uploaded by Doctors for verification purposes. */
 export enum DocumentType {
-  License = 'License',           // Professional license
-  Certificate = 'Certificate',   // Specialization certificates, diplomas etc.
-  Identification = 'Identification', // Government-issued ID
-  Other = 'Other'                // For miscellaneous documents
+  LICENSE = 'LICENSE',           // Professional license
+  CERTIFICATE = 'CERTIFICATE',   // Specialization certificates, diplomas etc.
+  IDENTIFICATION = 'IDENTIFICATION', // Government-issued ID
+  OTHER = 'OTHER'                // For miscellaneous documents
 }
 
 /** Defines the modality of the appointment. */
 export enum AppointmentType {
-  InPerson = 'In-person', // Physical visit
-  Video = 'Video'         // Telemedicine video call
+  IN_PERSON = 'IN_PERSON', // Physical visit
+  VIDEO = 'VIDEO'         // Telemedicine video call
+}
+
+/** Types of notifications users can receive. */
+export enum NotificationType {
+  APPOINTMENT_BOOKED = 'appointment_booked',
+  APPOINTMENT_CANCELLED = 'appointment_cancelled',
+  VERIFICATION_APPROVED = 'verification_approved',
+  SYSTEM_ALERT = 'system_alert',
+  OTHER = 'other'
 } 

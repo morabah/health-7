@@ -1,4 +1,5 @@
-import { appEventBus, LogLevel, LogEventPayload, ValidationEventPayload } from './eventBus';
+import type { LogEventPayload, ValidationEventPayload } from './eventBus';
+import { appEventBus, LogLevel } from './eventBus';
 
 /**
  * Base logging function that handles both console output and event emission

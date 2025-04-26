@@ -152,7 +152,7 @@ export const BookAppointmentSchema = z.object({
   
   appointmentType: z.nativeEnum(AppointmentType)
                    .optional()
-                   .default(AppointmentType.InPerson)
+                   .default(AppointmentType.IN_PERSON)
                    .describe("Type of appointment (in-person or video)"),
 });
 

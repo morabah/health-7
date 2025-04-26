@@ -1,0 +1,7 @@
+# UI modules
+/src/components/patient/ @ui-team
+/src/components/doctor/  @ui-team
+# API & libs
+/src/lib/                @backend-team
+# E2E tests
+/e2e/                    @qa-team 

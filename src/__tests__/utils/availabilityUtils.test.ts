@@ -8,7 +8,7 @@ import {
   hasAppointmentConflict,
   getAvailableSlotsForDate
 } from '@/utils/availabilityUtils';
-import { DoctorProfile, Appointment, TimeSlot } from '@/types/schemas';
+import type { DoctorProfile, Appointment, TimeSlot } from '@/types/schemas';
 import { AppointmentStatus, AppointmentType, VerificationStatus } from '@/types/enums';
 
 describe('availabilityUtils', () => {
@@ -126,6 +126,9 @@ describe('availabilityUtils', () => {
       certificateUrl: null,
       educationHistory: [],
       experience: [],
+      education: 'MD from Harvard Medical School',
+      servicesOffered: 'Cardiac Consultation, ECG, Stress Test',
+      timezone: 'America/New_York',
       weeklySchedule: {
         monday: [
           { startTime: '09:00', endTime: '12:00', isAvailable: true },
@@ -215,11 +218,12 @@ describe('availabilityUtils', () => {
         notes: 'Regular checkup',
         createdAt: '2023-05-10T00:00:00Z',
         updatedAt: '2023-05-10T00:00:00Z',
-        appointmentType: AppointmentType.InPerson,
+        appointmentType: AppointmentType.IN_PERSON,
         patientName: 'John Doe',
         doctorName: 'Dr. Smith',
         doctorSpecialty: 'Cardiology',
-        reason: 'Annual checkup'
+        reason: 'Annual checkup',
+        videoCallUrl: null
       },
       {
         id: 'appt2',
@@ -232,11 +236,12 @@ describe('availabilityUtils', () => {
         notes: 'Follow-up',
         createdAt: '2023-05-11T00:00:00Z',
         updatedAt: '2023-05-11T00:00:00Z',
-        appointmentType: AppointmentType.InPerson,
+        appointmentType: AppointmentType.IN_PERSON,
         patientName: 'Jane Doe',
         doctorName: 'Dr. Smith',
         doctorSpecialty: 'Cardiology',
-        reason: 'Follow-up visit'
+        reason: 'Follow-up visit',
+        videoCallUrl: null
       },
       {
         id: 'appt3',
@@ -249,11 +254,12 @@ describe('availabilityUtils', () => {
         notes: 'Consultation',
         createdAt: '2023-05-12T00:00:00Z',
         updatedAt: '2023-05-12T00:00:00Z',
-        appointmentType: AppointmentType.Video,
+        appointmentType: AppointmentType.VIDEO,
         patientName: 'Sam Johnson',
         doctorName: 'Dr. Jones',
         doctorSpecialty: 'Dermatology',
-        reason: 'Skin consultation'
+        reason: 'Skin consultation',
+        videoCallUrl: 'https://video.example.com/consultation/appt3'
       }
     ];
 
@@ -334,6 +340,9 @@ describe('availabilityUtils', () => {
       certificateUrl: null,
       educationHistory: [],
       experience: [],
+      education: 'MD from Harvard Medical School',
+      servicesOffered: 'Cardiac Consultation, ECG, Stress Test',
+      timezone: 'America/New_York',
       weeklySchedule: {
         monday: [
           { startTime: '09:00', endTime: '12:00', isAvailable: true },
@@ -363,11 +372,12 @@ describe('availabilityUtils', () => {
         notes: 'Regular checkup',
         createdAt: '2023-05-10T00:00:00Z',
         updatedAt: '2023-05-10T00:00:00Z',
-        appointmentType: AppointmentType.InPerson,
+        appointmentType: AppointmentType.IN_PERSON,
         patientName: 'John Doe',
         doctorName: 'Dr. Smith',
         doctorSpecialty: 'Cardiology',
-        reason: 'Regular checkup'
+        reason: 'Regular checkup',
+        videoCallUrl: null
       }
     ];
 

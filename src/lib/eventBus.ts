@@ -1,4 +1,5 @@
-import mitt, { Emitter } from 'mitt';
+import type { Emitter } from 'mitt';
+import mitt from 'mitt';
 
 /**
  * Log level enum for typed log events

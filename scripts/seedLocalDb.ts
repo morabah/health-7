@@ -4,8 +4,7 @@
  */
 
 import fs from 'fs/promises';
-import path from 'path';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 // Local DB Utils
 import { 
@@ -13,9 +12,9 @@ import {
   savePatients, 
   saveDoctors, 
   saveAppointments, 
-  saveNotifications, 
-  DB_DIR 
+  saveNotifications 
 } from '../src/lib/localDb';
+import { DB_DIR } from '../src/lib/serverLocalDb';
 
 // All Zod Schemas 
 import { 
@@ -23,24 +22,16 @@ import {
   PatientProfileSchema, 
   DoctorProfileSchema, 
   AppointmentSchema, 
-  NotificationSchema, 
-  EducationEntrySchema, 
-  ExperienceEntrySchema, 
-  WeeklyScheduleSchema, 
-  TimeSlotSchema 
+  NotificationSchema 
 } from '../src/types/schemas';
 
 // TypeScript Types
-import { 
+import type { 
   UserProfile, 
   PatientProfile, 
   DoctorProfile, 
   Appointment, 
-  Notification, 
-  EducationEntry, 
-  ExperienceEntry, 
-  TimeSlot, 
-  WeeklySchedule 
+  Notification
 } from '../src/types/schemas';
 
 // Enums
@@ -49,8 +40,9 @@ import {
   VerificationStatus, 
   AppointmentStatus, 
   AppointmentType, 
-  Gender, 
-  DocumentType 
+  Gender,
+  BloodType,
+  NotificationType
 } from '../src/types/enums';
 
 // Define User IDs for consistent references
@@ -167,22 +159,22 @@ const rawMockPatients: Array<Partial<PatientProfile> & { userId: string }> = [
   {
     userId: patientUserId,
     dateOfBirth: new Date('1985-05-15').toISOString(),
-    gender: Gender.Female,
-    bloodType: 'A+',
+    gender: Gender.FEMALE,
+    bloodType: BloodType.A_POSITIVE,
     medicalHistory: 'No significant medical history. Allergic to penicillin.'
   },
   {
     userId: unverifiedUserId,
     dateOfBirth: new Date('1990-10-20').toISOString(),
-    gender: Gender.Male,
-    bloodType: 'O-',
+    gender: Gender.MALE,
+    bloodType: BloodType.O_NEGATIVE,
     medicalHistory: null
   },
   {
     userId: inactiveUserId,
     dateOfBirth: new Date('1978-03-03').toISOString(),
-    gender: Gender.Other,
-    bloodType: 'B+',
+    gender: Gender.OTHER,
+    bloodType: BloodType.B_POSITIVE,
     medicalHistory: 'Hypertension. Regular medication: Lisinopril 10mg daily.'
   }
 ];
@@ -442,7 +434,7 @@ const rawMockAppointments: Array<Partial<Appointment> & { id: string }> = [
     notes: "Patient's heart function normal. No concerns at this time. Follow up in 1 year.",
     createdAt: lastWeek,
     updatedAt: now,
-    appointmentType: AppointmentType.InPerson
+    appointmentType: AppointmentType.IN_PERSON
   },
   {
     id: 'appt-upcoming-002',
@@ -459,7 +451,7 @@ const rawMockAppointments: Array<Partial<Appointment> & { id: string }> = [
     notes: null,
     createdAt: now,
     updatedAt: now,
-    appointmentType: AppointmentType.InPerson
+    appointmentType: AppointmentType.IN_PERSON
   },
   {
     id: 'appt-cancelled-003',
@@ -476,7 +468,7 @@ const rawMockAppointments: Array<Partial<Appointment> & { id: string }> = [
     notes: null,
     createdAt: lastWeek,
     updatedAt: lastWeek,
-    appointmentType: AppointmentType.InPerson
+    appointmentType: AppointmentType.IN_PERSON
   },
   {
     id: 'appt-video-004',
@@ -493,7 +485,7 @@ const rawMockAppointments: Array<Partial<Appointment> & { id: string }> = [
     notes: null,
     createdAt: now,
     updatedAt: now,
-    appointmentType: AppointmentType.Video
+    appointmentType: AppointmentType.VIDEO
   }
 ];
 
@@ -506,7 +498,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Your appointment with Dr. Emma Verified on ' + new Date(nextWeek).toLocaleDateString() + ' at 10:00 AM has been confirmed.',
     isRead: false,
     createdAt: now,
-    type: 'appointment_booked',
+    type: NotificationType.APPOINTMENT_BOOKED,
     relatedId: 'appt-upcoming-002'
   },
   {
@@ -516,7 +508,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Reminder: You have an appointment with Dr. Emma Verified tomorrow at 10:00 AM.',
     isRead: true,
     createdAt: lastWeek,
-    type: 'appointment_reminder',
+    type: NotificationType.APPOINTMENT_BOOKED,
     relatedId: 'appt-completed-001'
   },
   {
@@ -526,7 +518,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Thank you for registering. Complete your profile to get the most out of our services.',
     isRead: true,
     createdAt: lastWeek,
-    type: 'system',
+    type: NotificationType.SYSTEM_ALERT,
     relatedId: null
   },
   {
@@ -536,7 +528,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Your doctor verification is in progress. We will notify you once the review is complete.',
     isRead: false,
     createdAt: now,
-    type: 'verification_status',
+    type: NotificationType.OTHER,
     relatedId: null
   },
   {
@@ -546,7 +538,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Congratulations! Your doctor verification has been approved. You can now begin accepting appointments.',
     isRead: true,
     createdAt: lastWeek,
-    type: 'verification_status',
+    type: NotificationType.VERIFICATION_APPROVED,
     relatedId: null
   },
   {
@@ -556,7 +548,7 @@ const rawMockNotifications: Array<Partial<Notification> & { id: string }> = [
     message: 'Your doctor verification has been rejected. Please review the verification notes and resubmit your application with the correct information.',
     isRead: false,
     createdAt: now,
-    type: 'verification_status',
+    type: NotificationType.OTHER,
     relatedId: null
   }
 ];

@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { Gender, UserType, VerificationStatus, DocumentType, AppointmentStatus, AppointmentType } from './enums';
+import { Gender, UserType, VerificationStatus, DocumentType, AppointmentStatus, AppointmentType, BloodType, NotificationType } from './enums';
 // Note: Firestore Timestamps require custom handling or z.instanceof later
 
 /**
@@ -19,8 +19,8 @@ export const isoDateTimeStringSchema = z.string()
 /**
  * Zod schema for Gender enum.
  * Accepts common variations (case-insensitive 'm'/'f'/etc.) and normalizes them
- * to the standard 'Male', 'Female', or 'Other' enum values.
- * Defaults null/empty input to 'Other'.
+ * to the standard 'MALE', 'FEMALE', or 'OTHER' enum values.
+ * Defaults null/empty input to 'OTHER'.
  */
 export const genderSchema = z.string()
   .nullable() // Handles null input gracefully
@@ -29,17 +29,17 @@ export const genderSchema = z.string()
     // Normalize input: lowercase and trim whitespace
     const normalized = val?.toLowerCase().trim();
 
-    if (!normalized) return Gender.Other; // Default for null/undefined/empty string
-    if (['male', 'm'].includes(normalized)) return Gender.Male;
-    if (['female', 'f', 'fem'].includes(normalized)) return Gender.Female;
+    if (!normalized) return Gender.OTHER; // Default for null/undefined/empty string
+    if (["male", "m"].includes(normalized)) return Gender.MALE;
+    if (["female", "f", "fem"].includes(normalized)) return Gender.FEMALE;
     // Catches variations like 'prefer_not_to_say' or just 'other'
-    if (normalized.includes('other') || normalized.includes('prefer')) return Gender.Other;
+    if (normalized.includes("other") || normalized.includes("prefer")) return Gender.OTHER;
 
     // Fallback if input is non-empty but unrecognized
-    return Gender.Other;
+    return Gender.OTHER;
   })
   .pipe(z.nativeEnum(Gender)) // Final check: ensures output is a valid Gender enum member
-  .describe("User's self-identified gender (Male, Female, Other)");
+  .describe("User's self-identified gender (MALE, FEMALE, OTHER)");
 
 /** 
  * Zod schema for the data stored within a UserProfile Firestore document (collection 'users').
@@ -71,10 +71,26 @@ export const UserProfileSchema = z.object({
   phoneVerified: z.boolean()
                 .default(false)
                 .describe("Indicates if the user's phone is verified (requires separate flow)."),
+  phoneVerificationCode: z.string()
+                        .optional()
+                        .nullable()
+                        .describe("Verification code sent via SMS"),
+  phoneVerificationSentAt: isoDateTimeStringSchema
+                          .optional()
+                          .nullable()
+                          .describe("Timestamp when the phone verification code was last sent"),
+  emailVerificationToken: z.string()
+                         .optional()
+                         .nullable()
+                         .describe("Token sent to user's email for verification purposes"),
+  emailVerificationSentAt: isoDateTimeStringSchema
+                          .optional()
+                          .nullable()
+                          .describe("Timestamp when email verification token was last sent"),
   createdAt: isoDateTimeStringSchema
-            .describe("Timestamp string when the user profile was created (server-set)."),
+            .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
   updatedAt: isoDateTimeStringSchema
-            .describe("Timestamp string when the user profile was last updated (server-set)."),
+            .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
 });
 
 /** TypeScript type inferred from UserProfileSchema, adding the 'id' field (Auth UID). */
@@ -100,18 +116,16 @@ export const PatientProfileSchema = z.object({
           .describe("@PHI - Patient's gender."),
 
   /** @PHI Patient's blood type (e.g., 'A+', 'O-'). Max 5 chars. */
-  bloodType: z.string()
-             .max(5, "Blood type too long")
+  bloodType: z.nativeEnum(BloodType)
              .nullable()
              .optional() // Optional field
              .describe("@PHI - Patient's blood type."),
 
-  /** @PHI Brief summary of patient's relevant medical history or allergies. Max 2000 chars. */
+  /** @PHI Detailed patient medical history. Max 4000 chars. */
   medicalHistory: z.string()
-                  .max(2000, "Medical history exceeds maximum length")
+                  .max(4000, "Medical history is too long (max 4000 characters)")
                   .nullable()
-                  .optional() // Optional field
-                  .describe("@PHI - Patient's medical history summary."),
+                  .describe("@PHI – Optional free-text medical history"),
 });
 
 /** TypeScript type inferred from PatientProfileSchema. Represents patient-specific data. */
@@ -300,6 +314,16 @@ export const DoctorProfileSchema = z.object({
             .nullable()
             .describe("Primary practice location"),
   
+  education: z.string()
+            .max(2000, "Education section is too long")
+            .nullable()
+            .describe("Doctor's education & training details"),
+  
+  servicesOffered: z.string()
+                  .max(2000, "Services section is too long")
+                  .nullable()
+                  .describe("Short description of services the doctor provides"),
+  
   languages: z.array(z.string())
              .nullable()
              .describe("Languages spoken by the doctor"),
@@ -312,17 +336,32 @@ export const DoctorProfileSchema = z.object({
   profilePictureUrl: z.string()
                      .url("Invalid profile picture URL")
                      .nullable()
-                     .describe("URL to doctor's profile picture"),
+                     .describe("Primary URL (Firebase Storage). Use when image is publicly hosted."),
+  
+  profilePicturePath: z.string()
+                     .optional()
+                     .nullable()
+                     .describe("Alternative local file path, if local storage is preferred during certain operations."),
   
   licenseDocumentUrl: z.string()
                       .url("Invalid license document URL")
                       .nullable()
-                      .describe("URL to doctor's license document"),
+                      .describe("Primary URL (Firebase Storage). Use when document is securely stored in cloud."),
+  
+  licenseDocumentPath: z.string()
+                      .optional()
+                      .nullable()
+                      .describe("Alternative local file path, if local storage is preferred during certain operations."),
   
   certificateUrl: z.string()
                   .url("Invalid certificate URL")
                   .nullable()
-                  .describe("URL to doctor's certificate"),
+                  .describe("Primary URL (Firebase Storage). Use when certificate is securely stored in cloud."),
+  
+  certificatePath: z.string()
+                  .optional()
+                  .nullable()
+                  .describe("Alternative local file path, if local storage is preferred during certain operations."),
   
   educationHistory: z.array(EducationEntrySchema)
                     .optional()
@@ -338,16 +377,20 @@ export const DoctorProfileSchema = z.object({
                   .optional()
                   .describe("Optional recurring schedule"),
   
+  timezone: z.string()
+          .default('UTC')
+          .describe("IANA timezone identifier used to interpret weeklySchedule and blockedDates"),
+  
   blockedDates: z.array(isoDateTimeStringSchema)
                 .optional()
                 .default([])
                 .describe("@PHI - Specific dates doctor is unavailable (stored as ISO strings)"),
   
   createdAt: isoDateTimeStringSchema
-             .describe("Timestamp when the doctor profile was created"),
+             .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
   
   updatedAt: isoDateTimeStringSchema
-             .describe("Timestamp when the doctor profile was last updated"),
+             .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
 });
 
 /**
@@ -438,7 +481,12 @@ export const AppointmentSchema = z.object({
   /** The type of appointment (e.g., in-person or video). Optional. */
   appointmentType: z.nativeEnum(AppointmentType)
                    .optional()
-                   .default(AppointmentType.InPerson),
+                   .default(AppointmentType.IN_PERSON),
+  
+  videoCallUrl: z.string()
+               .url("Invalid video call URL")
+               .nullable()
+               .describe("Video consultation link (required when appointmentType = VIDEO)"),
 });
 
 /** 
@@ -471,9 +519,9 @@ export const NotificationSchema = z.object({
              .describe("When the notification was generated"),
   
   /** Category type for the notification (e.g., appointment update, system alert, verification status). Defaults to 'system'. */
-  type: z.string()
-       .default('system')
-       .describe("e.g., 'appointment_booked', 'verification_approved', 'system'"),
+  type: z.nativeEnum(NotificationType)
+       .default(NotificationType.OTHER)
+       .describe("Type/category of notification"),
   
   /** Optional ID of a related Firestore document (e.g., the appointment ID). */
   relatedId: z.string()

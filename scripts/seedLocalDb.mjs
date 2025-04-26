@@ -1,6 +1,8 @@
 /**
  * Script to seed the local file database with diverse and Zod-validated mock data.
  * Populates the local_db directory with JSON files for all major entity types.
+ * 
+ * IMPORTANT: This script must be run directly with Node.js, not in the browser.
  */
 
 import fs from 'fs/promises';
@@ -16,6 +18,9 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 // Create a simple version of the localDb utilities for the script
 const DB_DIR = path.join(PROJECT_ROOT, 'local_db');
+
+// Add a note that these functions are for server-side use only
+console.log('IMPORTANT: This script is for server-side use only and cannot be run in the browser.');
 
 /**
  * Ensures the local_db directory exists
@@ -339,7 +344,7 @@ const rawMockPatients = [
   }
 ];
 
-// Raw Mock Data: Doctors - simplified for MJS version
+// Updated Raw Mock Data: Doctors - with more detailed and realistic weekly schedules
 const rawMockDoctors = [
   {
     userId: doctorPendingId,
@@ -367,21 +372,44 @@ const rawMockDoctors = [
       }
     ],
     weeklySchedule: {
+      // Full day on Monday
       monday: [
         { startTime: '09:00', endTime: '12:00', isAvailable: true },
         { startTime: '13:00', endTime: '17:00', isAvailable: true }
       ],
+      // Half day on Tuesday
       tuesday: [
         { startTime: '09:00', endTime: '12:00', isAvailable: true }
       ],
-      wednesday: [],
-      thursday: [],
+      // Half day on Wednesday
+      wednesday: [
+        { startTime: '13:00', endTime: '17:00', isAvailable: true }
+      ],
+      // Full day on Thursday with lunch break
+      thursday: [
+        { startTime: '09:00', endTime: '12:00', isAvailable: true },
+        { startTime: '13:00', endTime: '17:00', isAvailable: true }
+      ],
+      // Not available on Friday (day off)
       friday: [],
-      saturday: [],
+      // Weekend hours on Saturday morning
+      saturday: [
+        { startTime: '09:00', endTime: '12:00', isAvailable: true }
+      ],
+      // Not available on Sunday (day off)
       sunday: []
     },
+    // More realistic blocked dates (upcoming holidays, vacation, conferences)
     blockedDates: [
-      new Date('2025-07-04').toISOString()
+      // Next month vacation (5 days)
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 10).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 11).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 12).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 13).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 14).toISOString(),
+      // Medical conference
+      new Date(new Date().getFullYear(), new Date().getMonth() + 2, 15).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 2, 16).toISOString()
     ],
     createdAt: now,
     updatedAt: now
@@ -412,17 +440,39 @@ const rawMockDoctors = [
       }
     ],
     weeklySchedule: {
+      // Mornings only on Monday, Wednesday, Friday
       monday: [
         { startTime: '08:00', endTime: '12:00', isAvailable: true }
       ],
-      tuesday: [],
-      wednesday: [],
-      thursday: [],
-      friday: [],
+      // Full day on Tuesday
+      tuesday: [
+        { startTime: '08:00', endTime: '12:00', isAvailable: true },
+        { startTime: '13:00', endTime: '17:00', isAvailable: true }
+      ],
+      wednesday: [
+        { startTime: '08:00', endTime: '12:00', isAvailable: true }
+      ],
+      // Full day on Thursday with a different schedule
+      thursday: [
+        { startTime: '08:00', endTime: '12:00', isAvailable: true },
+        { startTime: '13:00', endTime: '17:00', isAvailable: true }
+      ],
+      friday: [
+        { startTime: '08:00', endTime: '12:00', isAvailable: true }
+      ],
+      // Not available on weekends
       saturday: [],
       sunday: []
     },
-    blockedDates: [],
+    // A few blocked dates
+    blockedDates: [
+      // Next week conference
+      new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 7).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 8).toISOString(),
+      new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 9).toISOString(),
+      // Some random day off next month
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toISOString()
+    ],
     createdAt: lastWeek,
     updatedAt: now
   },
@@ -441,6 +491,7 @@ const rawMockDoctors = [
     licenseDocumentUrl: 'https://example.com/documents/license-rejected.pdf',
     certificateUrl: 'https://example.com/documents/certificate-rejected.pdf',
     educationHistory: [],
+    // Since this doctor is rejected, they shouldn't have any available slots
     weeklySchedule: {
       monday: [],
       tuesday: [],
@@ -456,7 +507,53 @@ const rawMockDoctors = [
   }
 ];
 
-// Raw Mock Data: Appointments
+// Helper function to get day of week from a date
+function getDayOfWeek(dateString) {
+  return new Date(dateString).getDay(); // 0 = Sunday, 1 = Monday, etc.
+}
+
+// Helper function to check if a date is in blockedDates
+function isDateBlocked(dateString, blockedDates) {
+  // Convert the date string to YYYY-MM-DD format for comparison
+  const dateToCheck = dateString.split('T')[0];
+  
+  return blockedDates.some(blockedDate => {
+    const blockedDateFormatted = blockedDate.split('T')[0];
+    return dateToCheck === blockedDateFormatted;
+  });
+}
+
+// Helper function to check if a slot is available in the doctor's schedule
+function isSlotAvailable(doctorId, appointmentDate, startTime, endTime) {
+  const doctor = rawMockDoctors.find(d => d.userId === doctorId);
+  
+  if (!doctor) return false;
+  
+  // Check if the date is blocked
+  if (isDateBlocked(appointmentDate, doctor.blockedDates)) {
+    return false;
+  }
+  
+  // Get day of week (0 = Sunday, 1 = Monday, etc.)
+  const dayOfWeek = getDayOfWeek(appointmentDate);
+  
+  // Map day number to day name in weeklySchedule
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayName = dayNames[dayOfWeek];
+  
+  // Get available slots for that day
+  const availableSlots = doctor.weeklySchedule[dayName] || [];
+  
+  // Check if the requested time slot falls within any available slot
+  return availableSlots.some(slot => {
+    return slot.isAvailable && 
+           startTime >= slot.startTime && 
+           endTime <= slot.endTime;
+  });
+}
+
+// Updated Raw Mock Data: Appointments
+// Now we ensure all appointments align with doctor's availability
 const rawMockAppointments = [
   {
     id: 'appt-completed-001',
@@ -465,7 +562,12 @@ const rawMockAppointments = [
     doctorId: doctorVerifiedId,
     doctorName: 'Dr. Emma Verified',
     doctorSpecialty: 'Cardiology',
-    appointmentDate: lastWeek,
+    // Last week Monday morning (should match doctor's Monday availability)
+    appointmentDate: new Date(
+      new Date(lastWeek).getFullYear(),
+      new Date(lastWeek).getMonth(),
+      new Date(lastWeek).getDate() - new Date(lastWeek).getDay() + 1 // Monday of last week
+    ).toISOString(),
     startTime: '09:00',
     endTime: '09:30',
     status: AppointmentStatus.COMPLETED,
@@ -482,7 +584,12 @@ const rawMockAppointments = [
     doctorId: doctorVerifiedId,
     doctorName: 'Dr. Emma Verified',
     doctorSpecialty: 'Cardiology',
-    appointmentDate: nextWeek,
+    // Next week Tuesday morning (should match doctor's Tuesday availability)
+    appointmentDate: new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      new Date().getDate() - new Date().getDay() + 9 // Next Tuesday
+    ).toISOString(),
     startTime: '10:00',
     endTime: '10:30',
     status: AppointmentStatus.SCHEDULED,
@@ -491,8 +598,44 @@ const rawMockAppointments = [
     createdAt: now,
     updatedAt: now,
     appointmentType: AppointmentType.InPerson
+  },
+  {
+    id: 'appt-upcoming-003',
+    patientId: patientUserId,
+    patientName: 'Sarah Patient',
+    doctorId: doctorPendingId, // Using the pending doctor
+    doctorName: 'Dr. James Pending',
+    doctorSpecialty: 'General Practice',
+    // Next week Thursday (should match doctor's Thursday availability)
+    appointmentDate: new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      new Date().getDate() - new Date().getDay() + 11 // Next Thursday
+    ).toISOString(),
+    startTime: '14:00',
+    endTime: '14:30',
+    status: AppointmentStatus.SCHEDULED,
+    reason: 'Seasonal allergies',
+    notes: null,
+    createdAt: now,
+    updatedAt: now,
+    appointmentType: AppointmentType.Video
   }
 ];
+
+// Verify all appointments match doctor availability
+rawMockAppointments.forEach(appointment => {
+  const isAvailable = isSlotAvailable(
+    appointment.doctorId,
+    appointment.appointmentDate,
+    appointment.startTime,
+    appointment.endTime
+  );
+  
+  if (!isAvailable) {
+    console.warn(`[SEEDING WARNING] Appointment ${appointment.id} scheduled at a time when doctor ${appointment.doctorId} is not available.`);
+  }
+});
 
 // Raw Mock Data: Notifications
 const rawMockNotifications = [

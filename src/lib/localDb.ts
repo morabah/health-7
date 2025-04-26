@@ -1,127 +1,131 @@
+'use client';
+
 /**
  * Local file database utilities for development mode.
- * Provides functions to save/read JSON data to/from the local_db directory.
+ * Provides functions to fetch JSON data from the local_db API endpoint.
  */
 
-import fs from 'fs/promises';
-import path from 'path';
-import { 
+import type { 
   UserProfile, 
   PatientProfile, 
   DoctorProfile, 
   Appointment, 
   Notification 
 } from '../types/schemas';
-
-// Constants
-export const DB_DIR = path.join(process.cwd(), 'local_db');
+import { logError, logInfo } from '@/lib/logger';
 
 /**
- * Ensures the local_db directory exists
+ * Generic function to fetch collection data from the local DB API
  */
-async function ensureDbDirExists() {
+async function fetchCollectionData<T>(collection: string): Promise<T[]> {
   try {
-    await fs.mkdir(DB_DIR, { recursive: true });
-  } catch (err) {
-    console.error('Error creating local_db directory:', err);
-    throw err;
-  }
-}
-
-/**
- * Saves data to a JSON file in the local_db directory
- */
-async function saveToJson<T>(filename: string, data: T): Promise<void> {
-  await ensureDbDirExists();
-  const filePath = path.join(DB_DIR, filename);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  console.log(`Data saved to ${filePath}`);
-}
-
-/**
- * Reads data from a JSON file in the local_db directory
- */
-export async function readFromJson<T>(filename: string): Promise<T | null> {
-  try {
-    const filePath = path.join(DB_DIR, filename);
-    const data = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(data) as T;
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
-      console.warn(`File not found: ${filename}`);
-      return null;
+    const response = await fetch(`/api/localDb?collection=${collection}`);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Error fetching ${collection}`);
     }
-    console.error(`Error reading ${filename}:`, err);
-    throw err;
+    
+    const result = await response.json();
+    return result.data || [];
+  } catch (error) {
+    logError(`Error fetching ${collection}:`, error);
+    return [];
   }
 }
 
 /**
- * Saves user profiles to users.json
+ * Generic function to save collection data through API
  */
-export async function saveUsers(users: UserProfile[]): Promise<void> {
-  await saveToJson('users.json', users);
-}
-
-/**
- * Saves patient profiles to patients.json
- */
-export async function savePatients(patients: PatientProfile[]): Promise<void> {
-  await saveToJson('patients.json', patients);
-}
-
-/**
- * Saves doctor profiles to doctors.json
- */
-export async function saveDoctors(doctors: DoctorProfile[]): Promise<void> {
-  await saveToJson('doctors.json', doctors);
-}
-
-/**
- * Saves appointments to appointments.json
- */
-export async function saveAppointments(appointments: Appointment[]): Promise<void> {
-  await saveToJson('appointments.json', appointments);
-}
-
-/**
- * Saves notifications to notifications.json
- */
-export async function saveNotifications(notifications: Notification[]): Promise<void> {
-  await saveToJson('notifications.json', notifications);
+async function saveCollectionData<T>(collection: string, data: T[]): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/localDb?collection=${collection}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Error saving ${collection}`);
+    }
+    
+    logInfo(`Saved ${data.length} items to ${collection}`);
+    return true;
+  } catch (error) {
+    logError(`Error saving ${collection}:`, error);
+    return false;
+  }
 }
 
 /**
  * Reads user profiles from users.json
  */
 export async function getUsers(): Promise<UserProfile[]> {
-  return await readFromJson<UserProfile[]>('users.json') || [];
+  return await fetchCollectionData<UserProfile>('users');
+}
+
+/**
+ * Saves user profiles to users.json
+ */
+export async function saveUsers(users: UserProfile[]): Promise<boolean> {
+  return await saveCollectionData<UserProfile>('users', users);
 }
 
 /**
  * Reads patient profiles from patients.json
  */
 export async function getPatients(): Promise<PatientProfile[]> {
-  return await readFromJson<PatientProfile[]>('patients.json') || [];
+  return await fetchCollectionData<PatientProfile>('patients');
+}
+
+/**
+ * Saves patient profiles to patients.json
+ */
+export async function savePatients(patients: PatientProfile[]): Promise<boolean> {
+  return await saveCollectionData<PatientProfile>('patients', patients);
 }
 
 /**
  * Reads doctor profiles from doctors.json
  */
 export async function getDoctors(): Promise<DoctorProfile[]> {
-  return await readFromJson<DoctorProfile[]>('doctors.json') || [];
+  return await fetchCollectionData<DoctorProfile>('doctors');
+}
+
+/**
+ * Saves doctor profiles to doctors.json
+ */
+export async function saveDoctors(doctors: DoctorProfile[]): Promise<boolean> {
+  return await saveCollectionData<DoctorProfile>('doctors', doctors);
 }
 
 /**
  * Reads appointments from appointments.json
  */
 export async function getAppointments(): Promise<Appointment[]> {
-  return await readFromJson<Appointment[]>('appointments.json') || [];
+  return await fetchCollectionData<Appointment>('appointments');
+}
+
+/**
+ * Saves appointments to appointments.json
+ */
+export async function saveAppointments(appointments: Appointment[]): Promise<boolean> {
+  return await saveCollectionData<Appointment>('appointments', appointments);
 }
 
 /**
  * Reads notifications from notifications.json
  */
 export async function getNotifications(): Promise<Notification[]> {
-  return await readFromJson<Notification[]>('notifications.json') || [];
+  return await fetchCollectionData<Notification>('notifications');
+}
+
+/**
+ * Saves notifications to notifications.json
+ */
+export async function saveNotifications(notifications: Notification[]): Promise<boolean> {
+  return await saveCollectionData<Notification>('notifications', notifications);
 } 
