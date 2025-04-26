@@ -1,22 +1,11 @@
-import type { Config } from 'tailwindcss';
-
-/**
- * Tailwind CSS Configuration
- * 
- * Defines content paths, dark mode strategy, and theme customizations
- * for the Health Appointment System application
- */
-const config: Config = {
-  // Content paths for all files that use Tailwind classes
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  
-  // Enable class-based dark mode
   darkMode: 'class',
-  
   theme: {
     extend: {
       colors: {
@@ -68,8 +57,6 @@ const config: Config = {
       },
     },
   },
-  
   plugins: [],
-};
+}
 
-export default config;
