@@ -515,6 +515,47 @@ export const DoctorAvailabilitySlotSchema = z.object({
                .describe("Whether this specific timeslot is available for booking"),
 });
 
+/**
+ * Zod schema for a single entry in the Admin User List.
+ * Contains essential fields for display and actions.
+ */
+export const AdminUserListEntrySchema = UserProfileSchema.pick({
+  // id is implicitly the doc ID, but needed in the TS type
+  email: true,
+  firstName: true,
+  lastName: true,
+  userType: true,
+  isActive: true,
+  createdAt: true // Keep createdAt for 'Joined Date' column
+}).extend({
+  id: z.string().describe("Auth UID / Document ID") // Explicitly add ID needed for frontend keys/actions
+});
+
+/**
+ * Zod schema for a single entry in the Admin Doctor List.
+ * Combines user and doctor profile info.
+ */
+// Select necessary fields from UserProfile for the doctor list
+const BaseUserInfoForDoctorList = UserProfileSchema.pick({
+  email: true,
+  firstName: true,
+  lastName: true,
+  createdAt: true // 'Joined Date'
+});
+
+// Select necessary fields from DoctorProfile
+const DoctorInfoForList = DoctorProfileSchema.pick({
+  specialty: true,
+  verificationStatus: true
+});
+
+// Combine and add ID
+export const AdminDoctorListEntrySchema = BaseUserInfoForDoctorList
+  .merge(DoctorInfoForList)
+  .extend({
+    id: z.string().describe("Auth UID / Document ID")
+  });
+
 // Inferred TypeScript types
 export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
@@ -530,4 +571,10 @@ export type Appointment = z.infer<typeof AppointmentSchema> & { id: string }; //
 export type Notification = z.infer<typeof NotificationSchema> & { id: string }; // Add Firestore document ID
 
 /** TypeScript type inferred from DoctorAvailabilitySlotSchema. */
-export type DoctorAvailabilitySlot = z.infer<typeof DoctorAvailabilitySlotSchema> & { id?: string }; // Add optional Firestore document ID 
+export type DoctorAvailabilitySlot = z.infer<typeof DoctorAvailabilitySlotSchema> & { id?: string }; // Add optional Firestore document ID
+
+/** TS type for Admin User List entries. */
+export type AdminUserListEntry = z.infer<typeof AdminUserListEntrySchema>;
+
+/** TS type for Admin Doctor List entries. */
+export type AdminDoctorListEntry = z.infer<typeof AdminDoctorListEntrySchema>; 

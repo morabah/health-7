@@ -50,3 +50,6 @@ logValidation('2.6', 'success', 'Appointment Zod schema defined, TS type inferre
 
 // Call the validation function to confirm completion of task 2.7
 logValidation('2.7', 'success', 'Notification Zod schema defined, TS type inferred.');
+
+// Call the validation function to confirm completion of task 2.8
+logValidation('2.8', 'success', 'Admin list view Zod schemas defined, TS types inferred.');
