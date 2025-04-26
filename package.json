@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "db:seed:local": "node ./scripts/seedLocalDb.mjs",
     "test": "jest --coverage",
+    "test:ci": "jest --bail --silent",
     "test:e2e": "playwright test --headed=false",
     "prepare": "husky"
   },

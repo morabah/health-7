@@ -1,2 +1,7 @@
+# Run lint-staged to lint/format only changed files
+echo "Running lint-staged on changed files..."
+npx lint-staged || { echo "❌ Linting failed. Please fix the issues before committing."; exit 1; }
+
 # Run Jest tests only (not e2e tests)
-npm test
+echo "Running Jest tests..."
+npm run test:ci || { echo "❌ Tests failed. Please fix the failing tests before committing."; exit 1; }
