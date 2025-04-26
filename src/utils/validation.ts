@@ -11,3 +11,6 @@ logValidation('1.3', 'success');
 
 // Call the validation function to confirm completion of task 1.5
 logValidation('1.5', 'success');
+
+// Call the validation function to confirm completion of task 1.6
+logValidation('1.6', 'success');
