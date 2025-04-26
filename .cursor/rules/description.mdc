@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+always refer to [APPLICATION_BLUEPRINT.md](mdc:APPLICATION_BLUEPRINT.md) and [README.md](mdc:README.md)
