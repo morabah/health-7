@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { Gender, UserType } from './enums';
+import { Gender, UserType, VerificationStatus, DocumentType } from './enums';
 // Note: Firestore Timestamps require custom handling or z.instanceof later
 
 /**
@@ -115,4 +115,278 @@ export const PatientProfileSchema = z.object({
 });
 
 /** TypeScript type inferred from PatientProfileSchema. Represents patient-specific data. */
-export type PatientProfile = z.infer<typeof PatientProfileSchema>; 
+export type PatientProfile = z.infer<typeof PatientProfileSchema>;
+
+/**
+ * Zod schema for a single education entry in DoctorProfile.educationHistory.
+ */
+export const EducationEntrySchema = z.object({
+  institution: z.string()
+               .min(1, "Institution name is required")
+               .describe("Name of the educational institution"),
+  
+  degree: z.string()
+          .min(1, "Degree is required")
+          .describe("Degree or certification obtained"),
+  
+  field: z.string()
+         .min(1, "Field of study is required")
+         .describe("Field or specialty of study"),
+  
+  startYear: z.number()
+             .int("Start year must be an integer")
+             .min(1900, "Start year must be after 1900")
+             .max(new Date().getFullYear(), "Start year cannot be in the future")
+             .describe("Year education began"),
+  
+  endYear: z.number()
+           .int("End year must be an integer")
+           .min(1900, "End year must be after 1900")
+           .max(new Date().getFullYear() + 10, "End year cannot be too far in the future")
+           .optional()
+           .nullable()
+           .describe("Year education completed (null if ongoing)"),
+  
+  isOngoing: z.boolean()
+             .optional()
+             .default(false)
+             .describe("Indicates if this education is currently in progress"),
+  
+  description: z.string()
+               .max(500, "Description is too long (max 500 characters)")
+               .optional()
+               .describe("Additional details about the education"),
+});
+
+/**
+ * Zod schema for a single experience entry in DoctorProfile.experience.
+ */
+export const ExperienceEntrySchema = z.object({
+  organization: z.string()
+                .min(1, "Organization name is required")
+                .describe("Name of the organization or employer"),
+  
+  position: z.string()
+            .min(1, "Position title is required")
+            .describe("Job title or position held"),
+  
+  location: z.string()
+            .optional()
+            .describe("Geographic location of the position"),
+  
+  startYear: z.number()
+             .int("Start year must be an integer")
+             .min(1900, "Start year must be after 1900")
+             .max(new Date().getFullYear(), "Start year cannot be in the future")
+             .describe("Year experience began"),
+  
+  endYear: z.number()
+           .int("End year must be an integer")
+           .min(1900, "End year must be after 1900")
+           .max(new Date().getFullYear() + 10, "End year cannot be too far in the future")
+           .optional()
+           .nullable()
+           .describe("Year experience ended (null if ongoing)"),
+  
+  isOngoing: z.boolean()
+             .optional()
+             .default(false)
+             .describe("Indicates if this position is currently held"),
+  
+  description: z.string()
+               .max(1000, "Description is too long (max 1000 characters)")
+               .optional()
+               .describe("Responsibilities and achievements in this position"),
+});
+
+/**
+ * Zod schema for a time slot within a weekly schedule.
+ */
+export const TimeSlotSchema = z.object({
+  startTime: z.string()
+             .regex(/^\d{2}:\d{2}$/, "Invalid start time format (HH:MM)")
+             .describe("Start time in 24-hour format (HH:MM)"),
+  
+  endTime: z.string()
+           .regex(/^\d{2}:\d{2}$/, "Invalid end time format (HH:MM)")
+           .describe("End time in 24-hour format (HH:MM)"),
+  
+  isAvailable: z.boolean()
+               .default(true)
+               .describe("Whether this time slot is available for booking"),
+});
+
+/**
+ * Zod schema for the recurring weekly availability schedule.
+ */
+export const WeeklyScheduleSchema = z.object({
+  monday: z.array(TimeSlotSchema)
+          .optional()
+          .default([])
+          .describe("Available time slots for Monday"),
+  
+  tuesday: z.array(TimeSlotSchema)
+           .optional()
+           .default([])
+           .describe("Available time slots for Tuesday"),
+  
+  wednesday: z.array(TimeSlotSchema)
+             .optional()
+             .default([])
+             .describe("Available time slots for Wednesday"),
+  
+  thursday: z.array(TimeSlotSchema)
+            .optional()
+            .default([])
+            .describe("Available time slots for Thursday"),
+  
+  friday: z.array(TimeSlotSchema)
+          .optional()
+          .default([])
+          .describe("Available time slots for Friday"),
+  
+  saturday: z.array(TimeSlotSchema)
+            .optional()
+            .default([])
+            .describe("Available time slots for Saturday"),
+  
+  sunday: z.array(TimeSlotSchema)
+          .optional()
+          .default([])
+          .describe("Available time slots for Sunday"),
+});
+
+/**
+ * Zod schema for DoctorProfile data ('doctors' collection, ID=UID).
+ */
+export const DoctorProfileSchema = z.object({
+  userId: z.string()
+          .min(1, "User ID linkage is required")
+          .describe("Auth UID / FK"),
+  
+  specialty: z.string()
+             .min(1, "Specialty is required")
+             .default("General Practice")
+             .describe("Doctor's medical specialty"),
+  
+  licenseNumber: z.string()
+                 .min(1, "License number is required")
+                 .describe("Professional license number"),
+  
+  yearsOfExperience: z.number()
+                     .int("Years of experience must be an integer")
+                     .min(0, "Years of experience cannot be negative")
+                     .default(0)
+                     .describe("Total years of professional experience"),
+  
+  bio: z.string()
+       .max(2000, "Biography is too long (max 2000 characters)")
+       .nullable()
+       .describe("@PHI - Doctor biography/summary"),
+  
+  verificationStatus: z.nativeEnum(VerificationStatus)
+                       .default(VerificationStatus.PENDING)
+                       .describe("Current verification status of the doctor"),
+  
+  verificationNotes: z.string()
+                      .nullable()
+                      .describe("Notes from admin regarding verification"),
+  
+  adminNotes: z.string()
+              .optional()
+              .describe("Internal admin notes"),
+  
+  location: z.string()
+            .nullable()
+            .describe("Primary practice location"),
+  
+  languages: z.array(z.string())
+             .nullable()
+             .describe("Languages spoken by the doctor"),
+  
+  consultationFee: z.number()
+                   .min(0, "Consultation fee cannot be negative")
+                   .nullable()
+                   .describe("Standard consultation fee"),
+  
+  profilePictureUrl: z.string()
+                     .url("Invalid profile picture URL")
+                     .nullable()
+                     .describe("URL to doctor's profile picture"),
+  
+  licenseDocumentUrl: z.string()
+                      .url("Invalid license document URL")
+                      .nullable()
+                      .describe("URL to doctor's license document"),
+  
+  certificateUrl: z.string()
+                  .url("Invalid certificate URL")
+                  .nullable()
+                  .describe("URL to doctor's certificate"),
+  
+  educationHistory: z.array(EducationEntrySchema)
+                    .optional()
+                    .default([])
+                    .describe("Doctor's educational background"),
+  
+  experience: z.array(ExperienceEntrySchema)
+              .optional()
+              .default([])
+              .describe("Doctor's professional experience"),
+  
+  weeklySchedule: WeeklyScheduleSchema
+                  .optional()
+                  .describe("Optional recurring schedule"),
+  
+  blockedDates: z.array(isoDateTimeStringSchema)
+                .optional()
+                .default([])
+                .describe("@PHI - Specific dates doctor is unavailable (stored as ISO strings)"),
+  
+  createdAt: isoDateTimeStringSchema
+             .describe("Timestamp when the doctor profile was created"),
+  
+  updatedAt: isoDateTimeStringSchema
+             .describe("Timestamp when the doctor profile was last updated"),
+});
+
+/**
+ * Zod schema for VerificationDocument data (subcollection 'doctors/{docId}/verificationDocuments').
+ */
+export const VerificationDocumentSchema = z.object({
+  doctorId: z.string()
+            .min(1, "Doctor ID is required")
+            .describe("Reference to the doctor this document belongs to"),
+  
+  documentType: z.nativeEnum(DocumentType)
+                .describe("Type of verification document"),
+  
+  fileUrl: z.string()
+           .url("Invalid file URL")
+           .describe("URL to the uploaded document file"),
+  
+  uploadedAt: isoDateTimeStringSchema
+              .describe("Timestamp when the document was uploaded"),
+  
+  description: z.string()
+               .max(500, "Description is too long (max 500 characters)")
+               .optional()
+               .describe("Additional details about the document"),
+  
+  status: z.nativeEnum(VerificationStatus)
+          .optional()
+          .default(VerificationStatus.PENDING)
+          .describe("Verification status of this specific document"),
+  
+  notes: z.string()
+         .optional()
+         .describe("Admin notes regarding this document"),
+});
+
+// Inferred TypeScript types
+export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: string };
+export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
+export type TimeSlot = z.infer<typeof TimeSlotSchema>; // No separate ID usually
+export type WeeklySchedule = z.infer<typeof WeeklyScheduleSchema>;
+export type DoctorProfile = z.infer<typeof DoctorProfileSchema>; // ID comes from UserProfile
+export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & { id?: string }; 
