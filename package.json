@@ -26,6 +26,9 @@
     "typescript": "~5.4.0"
   },
   "devDependencies": {
-    "prettier": "^3.5.3"
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "tailwindcss": "^4.1.4"
   }
 }

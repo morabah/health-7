@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+// Import global styles (includes Tailwind CSS directives)
 import '@/styles/globals.css';
 
 /**
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 /**
  * Root layout component
  * This layout wraps all pages in the application
+ * Uses Tailwind CSS for styling
  * 
  * @param props - Contains children components
  * @returns Root layout with children
@@ -24,8 +26,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <main>{children}</main>
+      {/* Add className to enable future dark mode toggling */}
+      <body className="min-h-screen bg-gray-50">
+        <main className="container mx-auto">{children}</main>
       </body>
     </html>
   );
