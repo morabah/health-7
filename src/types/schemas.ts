@@ -78,4 +78,41 @@ export const UserProfileSchema = z.object({
 });
 
 /** TypeScript type inferred from UserProfileSchema, adding the 'id' field (Auth UID). */
-export type UserProfile = z.infer<typeof UserProfileSchema> & { id: string }; 
+export type UserProfile = z.infer<typeof UserProfileSchema> & { id: string };
+
+/** 
+ * Zod schema for the data stored within a PatientProfile Firestore document (collection 'patients').
+ * Document ID MUST match the UserProfile ID (Auth UID). Contains PHI.
+ */
+export const PatientProfileSchema = z.object({
+  /** Links to the UserProfile document/Auth UID. Required. */
+  userId: z.string()
+          .min(1, "User ID linkage is required."), // Should match UserProfile['id'] type conceptually
+
+  /** @PHI Patient's date of birth. Stored as ISO string locally. */
+  dateOfBirth: isoDateTimeStringSchema
+               .nullable()
+               .optional() // Allow optional input, handle default/requirement elsewhere if needed
+               .describe("@PHI - Patient's date of birth."),
+
+  /** @PHI Patient's self-identified gender. Uses custom schema for normalization. */
+  gender: genderSchema // Apply the transforming gender schema directly
+          .describe("@PHI - Patient's gender."),
+
+  /** @PHI Patient's blood type (e.g., 'A+', 'O-'). Max 5 chars. */
+  bloodType: z.string()
+             .max(5, "Blood type too long")
+             .nullable()
+             .optional() // Optional field
+             .describe("@PHI - Patient's blood type."),
+
+  /** @PHI Brief summary of patient's relevant medical history or allergies. Max 2000 chars. */
+  medicalHistory: z.string()
+                  .max(2000, "Medical history exceeds maximum length")
+                  .nullable()
+                  .optional() // Optional field
+                  .describe("@PHI - Patient's medical history summary."),
+});
+
+/** TypeScript type inferred from PatientProfileSchema. Represents patient-specific data. */
+export type PatientProfile = z.infer<typeof PatientProfileSchema>; 

@@ -35,3 +35,6 @@ logValidation('2.2', 'success', 'Shared Zod utility schemas (isoDateTimeStringSc
 
 // Call the validation function to confirm completion of task 2.3
 logValidation('2.3', 'success', 'UserProfile Zod schema defined, TS type inferred.');
+
+// Call the validation function to confirm completion of task 2.4
+logValidation('2.4', 'success', 'PatientProfile Zod schema defined, TS type inferred.');
