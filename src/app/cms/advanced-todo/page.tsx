@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import TodoList from '@/components/cms/TodoList';
 import { logInfo } from '@/lib/logger';
-import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+
+// Define the type for todo items
+type TodoPriority = 'low' | 'medium' | 'high';
 
 type TodoItem = {
   id: string;
   text: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority: TodoPriority;
   dueDate?: string;
   category?: string;
   notes?: string;
@@ -17,117 +21,119 @@ type TodoItem = {
 
 /**
  * Advanced Todo Management Page for CMS
- * Allows admins to manage tasks and to-do lists with enhanced features
- * 
+ * Provides enhanced task management with priorities, categories, due dates, and filtering
+ *
  * @returns Advanced Todo Management component
  */
 export default function AdvancedTodoPage() {
-  // Initial sample todos with enhanced properties
-  const initialTodos = [
-    { 
-      id: '1', 
-      text: 'Review new doctor applications', 
-      completed: false,
-      priority: 'high',
-      category: 'Doctor',
-      dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
-      notes: 'Focus on verifying credentials and checking licenses'
-    },
-    { 
-      id: '2', 
-      text: 'Update privacy policy document', 
-      completed: true,
-      priority: 'medium',
-      category: 'Content',
-      dueDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // yesterday
-      notes: 'Include new GDPR compliance sections'
-    },
-    { 
-      id: '3', 
-      text: 'Check system performance reports', 
-      completed: false,
-      priority: 'low',
-      category: 'Admin',
-      dueDate: new Date(Date.now() + 172800000).toISOString().split('T')[0], // day after tomorrow
-    },
-    { 
-      id: '4', 
-      text: 'Contact patients about appointment confirmations', 
-      completed: false,
-      priority: 'medium',
-      category: 'Patient',
-    },
-  ] as TodoItem[];
+  const [loading, setLoading] = useState(true);
+  const [initialTodos, setInitialTodos] = useState<TodoItem[]>([]);
 
-  // State for todos
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Wrap sampleTodos in useMemo with explicit typing
+  const sampleTodos = useMemo<TodoItem[]>(
+    () => [
+      {
+        id: '1',
+        text: 'Review and approve new doctor applications',
+        completed: false,
+        priority: 'high',
+        category: 'Admin',
+        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+        notes: 'Focus on cardiologists and pediatricians applications first',
+      },
+      {
+        id: '2',
+        text: 'Update patient privacy policy document',
+        completed: true,
+        priority: 'medium',
+        category: 'Content',
+        dueDate: new Date(Date.now() - 172800000).toISOString().split('T')[0], // 2 days ago
+        notes: 'Include new HIPAA compliance requirements',
+      },
+      {
+        id: '3',
+        text: 'Follow up with patients who missed appointments',
+        completed: false,
+        priority: 'medium',
+        category: 'Patient',
+        dueDate: new Date(Date.now()).toISOString().split('T')[0], // Today
+      },
+      {
+        id: '4',
+        text: 'Schedule maintenance for the appointment booking system',
+        completed: false,
+        priority: 'low',
+        category: 'Admin',
+        dueDate: new Date(Date.now() + 604800000).toISOString().split('T')[0], // Next week
+        notes: 'Coordinate with IT department for minimal disruption',
+      },
+      {
+        id: '5',
+        text: 'Prepare monthly report on appointment statistics',
+        completed: false,
+        priority: 'high',
+        category: 'Admin',
+        dueDate: new Date(Date.now() + 259200000).toISOString().split('T')[0], // 3 days later
+      },
+    ],
+    []
+  ); // Empty dependency array ensures it's created only once
 
-  // Simulate loading from a database or API
+  // Simulate loading data - remove sampleTodos from dependency array
   useEffect(() => {
-    const loadTodos = async () => {
-      // In a real app, you would fetch todos from API/Firebase here
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
-      setTodos(initialTodos);
-      setIsLoading(false);
-    };
-
-    loadTodos();
     logInfo('Advanced Todo page mounted in CMS');
-  }, []);
 
-  // Handle saving todos (in a real app, this would save to a backend)
-  const handleSaveTodos = (updatedTodos: TodoItem[]) => {
-    console.log('Todos updated:', updatedTodos);
-    // In a real app: callApi('updateTodos', { todos: updatedTodos });
+    // Simulate API call
+    const timer = setTimeout(() => {
+      setInitialTodos(sampleTodos);
+      setLoading(false);
+      logInfo('Todo data loaded successfully');
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [sampleTodos]); // Keep sampleTodos here as we set it in the effect
+
+  const handleSave = (todos: TodoItem[]) => {
+    logInfo(`Saved ${todos.length} todo items`);
+    // In a real app, this would call an API to save the todos
   };
-
-  // Custom categories relevant to the health appointment system
-  const categories = [
-    'General', 
-    'Patient', 
-    'Doctor', 
-    'Admin', 
-    'Content', 
-    'Technical', 
-    'Compliance',
-    'Marketing'
-  ];
 
   return (
     <div className="p-8">
       <header className="mb-8">
-        <div className="flex flex-wrap items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold">Advanced Task Management</h1>
-          <div className="flex gap-3 mt-2 sm:mt-0">
-            <Link href="/cms" className="px-4 py-2 bg-secondary-600 text-white rounded-md hover:bg-secondary-700">
-              Back to CMS
-            </Link>
-            <Link href="/cms/todo" className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
-              Simple Todo
-            </Link>
-          </div>
+        <div className="flex items-center mb-4">
+          <Link href="/cms" className="mr-4 text-blue-600 hover:text-blue-800 flex items-center">
+            <ArrowLeft size={16} className="mr-1" />
+            Back to CMS
+          </Link>
+          <Link href="/cms/todo" className="text-blue-600 hover:text-blue-800">
+            Simple Todo
+          </Link>
         </div>
+        <h1 className="text-3xl font-bold mb-2">Advanced Task Management</h1>
         <p className="text-gray-600">
-          Manage administrative tasks with priorities, categories, due dates, and notes
+          Manage tasks with priorities, categories, due dates, and more
         </p>
       </header>
-      
+
       <div className="max-w-4xl mx-auto">
-        {isLoading ? (
-          <div className="text-center py-8">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-            <p className="mt-2 text-gray-600">Loading tasks...</p>
+        {loading ? (
+          <div className="bg-white rounded-lg shadow p-6 flex justify-center items-center h-64">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-blue-200 mb-4"></div>
+              <div className="h-4 w-32 bg-gray-200 rounded mb-4"></div>
+              <div className="h-2 w-48 bg-gray-200 rounded"></div>
+            </div>
           </div>
         ) : (
-          <TodoList 
-            title="Administrative Tasks" 
-            initialTodos={todos}
-            onSave={handleSaveTodos}
-            categories={categories}
+          <TodoList
+            title="Health System Tasks"
+            initialTodos={initialTodos}
+            onSave={handleSave}
+            categories={['Admin', 'Doctor', 'Patient', 'Content', 'Technical']}
           />
         )}
       </div>
     </div>
   );
-} 
+}

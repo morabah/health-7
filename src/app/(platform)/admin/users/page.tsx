@@ -1,32 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import Badge from '@/components/ui/Badge';
-import { 
-  Eye, 
-  Pencil, 
-  RotateCw, 
-  Key, 
-  UserPlus,
-  Search
-} from 'lucide-react';
+import { UserPlus, Search } from 'lucide-react';
 
 export default function AdminUsersPage() {
-  useEffect(() => {
+  React.useEffect(() => {
     console.info('admin-users rendered (static)');
   }, []);
-  
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold dark:text-white">User Management</h1>
       </div>
-      
+
       <Card className="p-4">
         {/* Search & Filter Toolbar */}
         <div className="flex flex-wrap gap-3 mb-4">
@@ -36,7 +28,7 @@ export default function AdminUsersPage() {
               <Search className="h-4 w-4" />
             </div>
           </div>
-          
+
           <Select className="w-32 sm:w-40">
             <option value="">User Type</option>
             <option value="all">All Users</option>
@@ -44,14 +36,14 @@ export default function AdminUsersPage() {
             <option value="doctor">Doctors</option>
             <option value="admin">Admins</option>
           </Select>
-          
+
           <Select className="w-32 sm:w-40">
             <option value="">Status</option>
             <option value="all">All</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </Select>
-          
+
           <Link href="/admin/create-user">
             <Button>
               <UserPlus className="h-4 w-4 mr-2" />
@@ -59,7 +51,7 @@ export default function AdminUsersPage() {
             </Button>
           </Link>
         </div>
-        
+
         {/* Users Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -84,7 +76,7 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </Card>
-      
+
       {/* Preview of a future row (commented out for now) */}
       {/* 
       <tr className="hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -116,4 +108,4 @@ export default function AdminUsersPage() {
       */}
     </div>
   );
-} 
+}

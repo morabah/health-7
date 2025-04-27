@@ -5,16 +5,15 @@ import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import { 
-  CalendarCheck, 
-  ClipboardList, 
-  Bell, 
-  Users, 
+import {
+  CalendarCheck,
+  ClipboardList,
+  Bell,
+  Users,
   Clock,
   Calendar,
   UserCheck,
   Stethoscope,
-  Plus
 } from 'lucide-react';
 
 export default function DoctorDashboardPage() {
@@ -81,21 +80,14 @@ export default function DoctorDashboardPage() {
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <div className="flex items-center">
               <Clock className="h-5 w-5 mr-2 text-primary" />
-              <h2 className="text-lg font-medium">Today's Schedule</h2>
+              <h2 className="text-lg font-medium">Today&apos;s Schedule</h2>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              as={Link} 
-              href="/doctor/appointments"
-            >
+            <Button variant="ghost" size="sm" as={Link} href="/doctor/appointments">
               View all
             </Button>
           </div>
           <div className="p-4">
-            <p className="text-slate-500 dark:text-slate-400 text-center py-8">
-              Loading...
-            </p>
+            <p className="text-slate-500 dark:text-slate-400 text-center py-8">Loading...</p>
           </div>
         </Card>
 
@@ -107,8 +99,8 @@ export default function DoctorDashboardPage() {
               <h2 className="text-lg font-medium">Quick Actions</h2>
             </div>
             <div className="p-4 space-y-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 as={Link}
                 href="/doctor/appointments"
@@ -116,8 +108,8 @@ export default function DoctorDashboardPage() {
                 <CalendarCheck className="h-4 w-4 mr-2" />
                 View Appointments
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 as={Link}
                 href="/doctor/availability"
@@ -125,8 +117,8 @@ export default function DoctorDashboardPage() {
                 <Calendar className="h-4 w-4 mr-2" />
                 Update Availability
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 as={Link}
                 href="/doctor/profile"
@@ -134,8 +126,8 @@ export default function DoctorDashboardPage() {
                 <UserCheck className="h-4 w-4 mr-2" />
                 Edit Profile
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 as={Link}
                 href="/notifications"
@@ -165,9 +157,9 @@ export default function DoctorDashboardPage() {
                 <Badge variant="info">80%</Badge>
               </div>
               <div className="mt-4">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="w-full"
                   as={Link}
                   href="/doctor/profile"
@@ -186,23 +178,16 @@ export default function DoctorDashboardPage() {
                 <CalendarCheck className="h-5 w-5 mr-2 text-primary" />
                 <h2 className="text-lg font-medium">Upcoming</h2>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                as={Link}
-                href="/doctor/appointments"
-              >
+              <Button variant="ghost" size="sm" as={Link} href="/doctor/appointments">
                 View all
               </Button>
             </div>
             <div className="p-4">
-              <p className="text-slate-500 dark:text-slate-400 text-center py-4">
-                Loading...
-              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-center py-4">Loading...</p>
             </div>
           </Card>
         </div>
       </div>
     </div>
   );
-} 
+}

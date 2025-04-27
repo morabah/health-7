@@ -27,7 +27,7 @@ const sampleAppointments = [
     id: 'appt-124',
     doctorId: 'doc-456',
     doctorName: 'Dr. Michael Chen',
-    doctorPhoto: '/placeholder-doctor.jpg', 
+    doctorPhoto: '/placeholder-doctor.jpg',
     specialty: 'Dermatologist',
     date: '2023-12-18T00:00:00.000Z',
     time: '2:00 PM',
@@ -44,12 +44,14 @@ const sampleAppointments = [
     time: '9:15 AM',
     address: '789 Brain Center, Building A',
     status: 'past',
-  }
+  },
 ];
 
 export default function PatientAppointmentsPage() {
   const [appointments, setAppointments] = useState(sampleAppointments);
-  const [selectedAppointment, setSelectedAppointment] = useState<null | typeof sampleAppointments[0]>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<
+    null | (typeof sampleAppointments)[0]
+  >(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Filter appointments into upcoming and past
@@ -61,11 +63,11 @@ export default function PatientAppointmentsPage() {
     try {
       // In a real app, this would call an API endpoint
       console.log(`Cancelling appointment ${id} with reason: ${reason}`);
-      
+
       // Update local state to remove the appointment
       setAppointments(appointments.filter(appt => appt.id !== id));
       setShowCancelModal(false);
-      
+
       // Would show a success toast in a real implementation
     } catch (error) {
       console.error('Error cancelling appointment:', error);
@@ -74,7 +76,7 @@ export default function PatientAppointmentsPage() {
   };
 
   // Open cancel modal with the selected appointment
-  const openCancelModal = (appointment: typeof sampleAppointments[0]) => {
+  const openCancelModal = (appointment: (typeof sampleAppointments)[0]) => {
     setSelectedAppointment(appointment);
     setShowCancelModal(true);
   };
@@ -86,11 +88,11 @@ export default function PatientAppointmentsPage() {
       {/* Upcoming Appointments Section */}
       <section>
         <h2 className="text-xl font-semibold mb-4">Upcoming Appointments</h2>
-        
+
         {upcomingAppointments.length === 0 ? (
           <Card className="p-6 text-center">
             <p className="text-slate-500 dark:text-slate-400">
-              You don't have any upcoming appointments.
+              You don&apos;t have any upcoming appointments.
             </p>
             <Button variant="primary" className="mt-4">
               Book an Appointment
@@ -98,8 +100,8 @@ export default function PatientAppointmentsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {upcomingAppointments.map((appointment) => (
-              <AppointmentCard 
+            {upcomingAppointments.map(appointment => (
+              <AppointmentCard
                 key={appointment.id}
                 appointment={appointment}
                 onCancelClick={() => openCancelModal(appointment)}
@@ -114,19 +116,15 @@ export default function PatientAppointmentsPage() {
         <section>
           <h2 className="text-xl font-semibold mb-4">Past Appointments</h2>
           <div className="space-y-4">
-            {pastAppointments.map((appointment) => (
-              <AppointmentCard 
-                key={appointment.id}
-                appointment={appointment}
-                isPast
-              />
+            {pastAppointments.map(appointment => (
+              <AppointmentCard key={appointment.id} appointment={appointment} isPast />
             ))}
           </div>
         </section>
       )}
 
       {/* Cancel Appointment Modal */}
-      <CancelAppointmentModal 
+      <CancelAppointmentModal
         isOpen={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         appt={selectedAppointment}
@@ -137,12 +135,12 @@ export default function PatientAppointmentsPage() {
 }
 
 // Appointment Card Component
-function AppointmentCard({ 
-  appointment, 
+function AppointmentCard({
+  appointment,
   isPast = false,
   onCancelClick,
-}: { 
-  appointment: typeof sampleAppointments[0];
+}: {
+  appointment: (typeof sampleAppointments)[0];
   isPast?: boolean;
   onCancelClick?: () => void;
 }) {
@@ -154,8 +152,8 @@ function AppointmentCard({
         {/* Doctor Info */}
         <div className="flex space-x-4">
           <div className="relative h-16 w-16 rounded-full overflow-hidden">
-            <Image 
-              src={appointment.doctorPhoto} 
+            <Image
+              src={appointment.doctorPhoto}
               alt={appointment.doctorName}
               fill
               className="object-cover"
@@ -163,21 +161,19 @@ function AppointmentCard({
           </div>
           <div>
             <h3 className="font-medium">{appointment.doctorName}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {appointment.specialty}
-            </p>
-            
+            <p className="text-sm text-slate-500 dark:text-slate-400">{appointment.specialty}</p>
+
             <div className="mt-2 space-y-1">
               <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <Calendar className="h-4 w-4 mr-2" /> 
+                <Calendar className="h-4 w-4 mr-2" />
                 {formattedDate}
               </div>
               <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <Clock className="h-4 w-4 mr-2" /> 
+                <Clock className="h-4 w-4 mr-2" />
                 {appointment.time}
               </div>
               <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-                <MapPin className="h-4 w-4 mr-2" /> 
+                <MapPin className="h-4 w-4 mr-2" />
                 {appointment.address}
               </div>
             </div>
@@ -186,10 +182,8 @@ function AppointmentCard({
 
         {/* Status Badge and Actions */}
         <div className="flex flex-col items-end space-y-2">
-          <Badge 
-            variant={isPast ? "secondary" : "success"}
-          >
-            {isPast ? "Completed" : "Confirmed"}
+          <Badge variant={isPast ? 'default' : 'success'}>
+            {isPast ? 'Completed' : 'Confirmed'}
           </Badge>
 
           {!isPast && (
@@ -203,11 +197,11 @@ function AppointmentCard({
                     {({ active }) => (
                       <button
                         className={`${
-                          active 
-                            ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white' 
+                          active
+                            ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white'
                             : 'text-slate-700 dark:text-slate-200'
                         } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
-                        onClick={() => window.location.href = `/doctor/${appointment.doctorId}`}
+                        onClick={() => (window.location.href = `/doctor/${appointment.doctorId}`)}
                       >
                         <ChevronRight className="mr-2 h-4 w-4" />
                         View Doctor Profile
@@ -218,8 +212,8 @@ function AppointmentCard({
                     {({ active }) => (
                       <button
                         className={`${
-                          active 
-                            ? 'bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200' 
+                          active
+                            ? 'bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200'
                             : 'text-red-500 dark:text-red-400'
                         } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                         onClick={onCancelClick}
@@ -237,4 +231,4 @@ function AppointmentCard({
       </div>
     </Card>
   );
-} 
+}

@@ -5,15 +5,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
-import { 
-  Calendar, 
-  Clock, 
-  Copy, 
-  Plus, 
-  Save, 
-  Trash2,
-  Info
-} from 'lucide-react';
+import { Calendar, Clock, Copy, Plus, Save, Trash2, Info } from 'lucide-react';
 
 // Sample blocked dates
 const initialBlockedDates = [
@@ -22,45 +14,60 @@ const initialBlockedDates = [
 ];
 
 // Days of the week
-const weekdays = [
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-];
+const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Time slots (simplified for demo)
 const timeSlots = [
-  '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', 
-  '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
+  '8:00 AM',
+  '9:00 AM',
+  '10:00 AM',
+  '11:00 AM',
+  '12:00 PM',
+  '1:00 PM',
+  '2:00 PM',
+  '3:00 PM',
+  '4:00 PM',
+  '5:00 PM',
 ];
 
 export default function DoctorAvailabilityPage() {
   const [blockedDates, setBlockedDates] = useState(initialBlockedDates);
   const [newBlockDate, setNewBlockDate] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
-  
+
   // In a real app, this would have state for each checkbox
   // Simplified for demo purposes with predetermined availability
   const isAvailable = (day: string, time: string) => {
     // Saturday and Sunday only available in mornings
-    if ((day === 'Saturday' || day === 'Sunday') && 
-        (time === '12:00 PM' || time === '1:00 PM' || 
-         time === '2:00 PM' || time === '3:00 PM' || 
-         time === '4:00 PM' || time === '5:00 PM')) {
+    if (
+      (day === 'Saturday' || day === 'Sunday') &&
+      (time === '12:00 PM' ||
+        time === '1:00 PM' ||
+        time === '2:00 PM' ||
+        time === '3:00 PM' ||
+        time === '4:00 PM' ||
+        time === '5:00 PM')
+    ) {
       return false;
     }
-    
+
     // No availability on Friday afternoons
-    if (day === 'Friday' && 
-        (time === '1:00 PM' || time === '2:00 PM' || 
-         time === '3:00 PM' || time === '4:00 PM' || 
-         time === '5:00 PM')) {
+    if (
+      day === 'Friday' &&
+      (time === '1:00 PM' ||
+        time === '2:00 PM' ||
+        time === '3:00 PM' ||
+        time === '4:00 PM' ||
+        time === '5:00 PM')
+    ) {
       return false;
     }
-    
+
     // Lunch break at noon
     if (time === '12:00 PM') {
       return false;
     }
-    
+
     return true;
   };
 
@@ -73,13 +80,13 @@ export default function DoctorAvailabilityPage() {
   // Handle adding a blocked date
   const handleAddBlockedDate = () => {
     if (!newBlockDate) return;
-    
+
     const newDate = {
       id: Date.now().toString(),
       date: newBlockDate,
       reason: newBlockReason || 'Unavailable',
     };
-    
+
     setBlockedDates([...blockedDates, newDate]);
     setNewBlockDate('');
     setNewBlockReason('');
@@ -107,10 +114,7 @@ export default function DoctorAvailabilityPage() {
             <Clock className="h-5 w-5 mr-2 text-primary" />
             <h2 className="text-lg font-medium">Weekly Schedule</h2>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-          >
+          <Button variant="outline" size="sm">
             <Copy className="h-4 w-4 mr-2" />
             Copy to All Weeks
           </Button>
@@ -124,8 +128,8 @@ export default function DoctorAvailabilityPage() {
                     Time / Day
                   </th>
                   {weekdays.map(day => (
-                    <th 
-                      key={day} 
+                    <th
+                      key={day}
                       className="py-3 px-4 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider"
                     >
                       {day}
@@ -140,12 +144,9 @@ export default function DoctorAvailabilityPage() {
                       {time}
                     </td>
                     {weekdays.map(day => (
-                      <td 
-                        key={`${day}-${time}`}
-                        className="py-2 px-2 text-center"
-                      >
+                      <td key={`${day}-${time}`} className="py-2 px-2 text-center">
                         <div className="flex justify-center">
-                          <input 
+                          <input
                             type="checkbox"
                             checked={isAvailable(day, time)}
                             className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-slate-300 dark:border-slate-600 rounded"
@@ -162,7 +163,8 @@ export default function DoctorAvailabilityPage() {
           </div>
           <div className="mt-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300">
             <Info className="h-4 w-4 inline mr-1 text-info" />
-            Check the boxes for times when you're regularly available. This schedule will repeat every week.
+            Check the boxes for times when you&apos;re regularly available. This schedule will
+            repeat every week.
           </div>
         </div>
       </Card>
@@ -183,7 +185,7 @@ export default function DoctorAvailabilityPage() {
                 type="date"
                 label="Date to Block"
                 value={newBlockDate}
-                onChange={(e) => setNewBlockDate(e.target.value)}
+                onChange={e => setNewBlockDate(e.target.value)}
               />
             </div>
             <div className="flex-grow">
@@ -192,14 +194,11 @@ export default function DoctorAvailabilityPage() {
                 label="Reason (Optional)"
                 placeholder="Vacation, Conference, etc."
                 value={newBlockReason}
-                onChange={(e) => setNewBlockReason(e.target.value)}
+                onChange={e => setNewBlockReason(e.target.value)}
               />
             </div>
             <div className="flex-shrink-0 flex items-end">
-              <Button 
-                onClick={handleAddBlockedDate}
-                disabled={!newBlockDate}
-              >
+              <Button onClick={handleAddBlockedDate} disabled={!newBlockDate}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Date
               </Button>
@@ -213,7 +212,7 @@ export default function DoctorAvailabilityPage() {
                 Currently Blocked Dates:
               </h3>
               {blockedDates.map(item => (
-                <div 
+                <div
                   key={item.id}
                   className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-md"
                 >
@@ -223,15 +222,15 @@ export default function DoctorAvailabilityPage() {
                         weekday: 'short',
                         month: 'short',
                         day: 'numeric',
-                        year: 'numeric'
+                        year: 'numeric',
                       })}
                     </Badge>
                     <span className="text-sm text-slate-600 dark:text-slate-300">
                       {item.reason}
                     </span>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveBlockedDate(item.id)}
                   >
@@ -248,6 +247,11 @@ export default function DoctorAvailabilityPage() {
           )}
         </div>
       </Card>
+
+      <p className="text-gray-600 mb-4">
+        Here you can set your regular working hours and block specific dates when you&apos;re
+        unavailable.
+      </p>
     </div>
   );
-} 
+}

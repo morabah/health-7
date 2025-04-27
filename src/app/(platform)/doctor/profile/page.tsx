@@ -5,25 +5,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
-import Select from '@/components/ui/Select';
-import Badge from '@/components/ui/Badge';
-import Alert from '@/components/ui/Alert';
-import { 
-  Pencil, 
-  Save, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Stethoscope,
-  Award, 
-  Clock, 
-  Languages, 
-  DollarSign,
-  Upload,
-  FileText,
-  AlertCircle
-} from 'lucide-react';
+import { User, Save, Upload, GraduationCap, Stethoscope } from 'lucide-react';
 
 // Sample initial profile data
 const initialProfile = {
@@ -40,10 +22,11 @@ const initialProfile = {
   bio: 'Board-certified cardiologist with 8 years of experience specializing in preventive cardiology and heart disease management.',
   education: [
     { institution: 'Johns Hopkins School of Medicine', degree: 'MD', year: '2010' },
-    { institution: 'University of Michigan', degree: 'BS in Biology', year: '2006' }
+    { institution: 'University of Michigan', degree: 'BS in Biology', year: '2006' },
   ],
-  services: 'Cardiac consultation, ECG, stress tests, heart disease management, preventive cardiology',
-  verificationStatus: 'pending'
+  services:
+    'Cardiac consultation, ECG, stress tests, heart disease management, preventive cardiology',
+  verificationStatus: 'pending',
 };
 
 export default function DoctorProfilePage() {
@@ -51,7 +34,9 @@ export default function DoctorProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
 
   // Handle input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setProfile(prev => ({ ...prev, [name]: value }));
   };
@@ -69,14 +54,14 @@ export default function DoctorProfilePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Doctor Profile</h1>
         <Button
-          variant={isEditing ? "secondary" : "primary"}
+          variant={isEditing ? 'secondary' : 'primary'}
           onClick={() => setIsEditing(!isEditing)}
         >
           {isEditing ? (
             <>Cancel</>
           ) : (
             <>
-              <Pencil className="h-4 w-4 mr-2" />
+              <User className="h-4 w-4 mr-2" />
               Edit Profile
             </>
           )}
@@ -84,14 +69,14 @@ export default function DoctorProfilePage() {
       </div>
 
       {profile.verificationStatus === 'pending' && (
-        <Alert variant="warning" className="mb-6">
+        <div className="flex items-center justify-between p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2" />
+            <User className="h-5 w-5 mr-2 text-warning" />
             <span>
               Your profile is pending verification. Our team will review your credentials shortly.
             </span>
           </div>
-        </Alert>
+        </div>
       )}
 
       <form onSubmit={handleSubmit}>
@@ -133,9 +118,6 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <Mail className="h-4 w-4" />
-                </div>
               </div>
               <div className="relative">
                 <Input
@@ -148,9 +130,6 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <Phone className="h-4 w-4" />
-                </div>
               </div>
             </div>
           </Card>
@@ -162,20 +141,14 @@ export default function DoctorProfilePage() {
               <h2 className="text-lg font-medium">Professional Information</h2>
             </div>
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select
+              <Input
                 id="specialty"
                 name="specialty"
                 label="Specialty"
                 value={profile.specialty}
                 onChange={handleChange}
                 disabled={!isEditing}
-              >
-                <option value="cardiology">Cardiology</option>
-                <option value="dermatology">Dermatology</option>
-                <option value="neurology">Neurology</option>
-                <option value="orthopedics">Orthopedics</option>
-                <option value="pediatrics">Pediatrics</option>
-              </Select>
+              />
               <div className="relative">
                 <Input
                   id="licenseNumber"
@@ -187,9 +160,6 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <Award className="h-4 w-4" />
-                </div>
               </div>
               <div className="relative">
                 <Input
@@ -203,9 +173,6 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <Clock className="h-4 w-4" />
-                </div>
               </div>
               <div className="relative">
                 <Input
@@ -218,24 +185,15 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <MapPin className="h-4 w-4" />
-                </div>
               </div>
-              <Select
+              <Input
                 id="languages"
                 name="languages"
                 label="Languages Spoken"
-                value={profile.languages[0]} // Simplified for demo
+                value={profile.languages.join(', ')}
                 onChange={handleChange}
                 disabled={!isEditing}
-              >
-                <option value="english">English</option>
-                <option value="spanish">Spanish</option>
-                <option value="french">French</option>
-                <option value="mandarin">Mandarin</option>
-                <option value="arabic">Arabic</option>
-              </Select>
+              />
               <div className="relative">
                 <Input
                   id="consultationFee"
@@ -248,9 +206,6 @@ export default function DoctorProfilePage() {
                   disabled={!isEditing}
                   className="pl-10"
                 />
-                <div className="absolute bottom-2.5 left-3 text-slate-400">
-                  <DollarSign className="h-4 w-4" />
-                </div>
               </div>
             </div>
           </Card>
@@ -258,7 +213,7 @@ export default function DoctorProfilePage() {
           {/* Biography & Services */}
           <Card>
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-primary" />
+              <GraduationCap className="h-5 w-5 mr-2 text-primary" />
               <h2 className="text-lg font-medium">Biography & Services</h2>
             </div>
             <div className="p-4 space-y-4">
@@ -294,17 +249,13 @@ export default function DoctorProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-4 flex flex-col items-center justify-center">
                   <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 mb-2">
-                    <FileText className="h-6 w-6 text-slate-400" />
+                    <Upload className="h-6 w-6 text-slate-400" />
                   </div>
                   <p className="font-medium">Medical License</p>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
                     license_scan.pdf
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    disabled={!isEditing}
-                  >
+                  <Button variant="outline" size="sm" disabled={!isEditing}>
                     <Upload className="h-4 w-4 mr-2" />
                     Replace Document
                   </Button>
@@ -318,11 +269,7 @@ export default function DoctorProfilePage() {
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
                     profile_photo.jpg
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    disabled={!isEditing}
-                  >
+                  <Button variant="outline" size="sm" disabled={!isEditing}>
                     <Upload className="h-4 w-4 mr-2" />
                     Update Photo
                   </Button>
@@ -331,9 +278,9 @@ export default function DoctorProfilePage() {
 
               <div className="mt-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800">
                 <p className="text-sm text-slate-600 dark:text-slate-300">
-                  <AlertCircle className="h-4 w-4 inline mr-1 text-warning" />
-                  Documents are reviewed by our team during the verification process. 
-                  Please ensure all uploads are clear and current.
+                  <User className="h-4 w-4 inline mr-1 text-warning" />
+                  Documents are reviewed by our team during the verification process. Please ensure
+                  all uploads are clear and current.
                 </p>
               </div>
             </div>
@@ -342,10 +289,7 @@ export default function DoctorProfilePage() {
           {/* Submit Button */}
           {isEditing && (
             <div className="flex justify-end">
-              <Button 
-                type="submit" 
-                variant="primary"
-              >
+              <Button type="submit" variant="primary">
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
               </Button>
@@ -355,4 +299,4 @@ export default function DoctorProfilePage() {
       </form>
     </div>
   );
-} 
+}

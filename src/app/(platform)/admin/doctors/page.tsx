@@ -1,31 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
-import Link from 'next/link';
+import React from 'react';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
-import Badge from '@/components/ui/Badge';
-import {
-  Eye,
-  Pencil,
-  RotateCw,
-  CheckCircle,
-  XCircle,
-  Hourglass
-} from 'lucide-react';
 
 export default function AdminDoctorsPage() {
-  useEffect(() => {
-    console.info('admin-doctors rendered (static)');
-  }, []);
-  
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold dark:text-white">Doctor Management</h1>
       </div>
-      
+
       <Card className="p-4">
         {/* Status Filter */}
         <div className="flex flex-wrap gap-3 mb-4">
@@ -35,14 +20,15 @@ export default function AdminDoctorsPage() {
             <option value="VERIFIED">Verified</option>
             <option value="REJECTED">Rejected</option>
           </Select>
-          
+
           <div className="flex-grow"></div>
-          
+
           <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center">
-            <span className="hidden sm:inline">Total:</span> <span className="font-medium ml-1">—</span>
+            <span className="hidden sm:inline">Total:</span>{' '}
+            <span className="font-medium ml-1">—</span>
           </div>
         </div>
-        
+
         {/* Doctors Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -66,7 +52,7 @@ export default function AdminDoctorsPage() {
           </table>
         </div>
       </Card>
-      
+
       {/* Preview of future rows (commented out for now) */}
       {/* 
       <tr className="hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -149,4 +135,4 @@ export default function AdminDoctorsPage() {
       */}
     </div>
   );
-} 
+}

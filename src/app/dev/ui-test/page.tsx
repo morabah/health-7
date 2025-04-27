@@ -32,7 +32,7 @@ export default function UITestPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [inputError, setInputError] = useState('');
-  
+
   // Handle theme parameter from URL
   useEffect(() => {
     if (searchParams) {
@@ -47,12 +47,12 @@ export default function UITestPage() {
   useEffect(() => {
     logValidation('3.1', 'success', 'UI primitives + tokens ready');
   }, []);
-  
+
   // Don't show in production unless explicitly enabled
   if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SHOW_DEV !== 'true') {
     return null;
   }
-  
+
   return (
     <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900 dark:text-white">
       <header className="flex justify-between items-center mb-8">
@@ -65,7 +65,7 @@ export default function UITestPage() {
           >
             {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </Button>
-          
+
           {user && (
             <Badge variant="success" className="px-3 py-1">
               {user.role}
@@ -73,7 +73,7 @@ export default function UITestPage() {
           )}
         </div>
       </header>
-      
+
       {/* Auth Testing */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Auth Testing</h2>
@@ -83,12 +83,14 @@ export default function UITestPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Use these buttons to simulate different user roles for testing.
             </p>
-            
+
             {user ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Current User:</span>
-                  <span>{user.firstName} {user.lastName}</span>
+                  <span>
+                    {user.firstName} {user.lastName}
+                  </span>
                   <Badge variant="info">{user.role}</Badge>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -111,21 +113,21 @@ export default function UITestPage() {
               </div>
             )}
           </div>
-          
+
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               You can also use the following in the browser console:
             </p>
             <code className="block p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono whitespace-pre overflow-x-auto">
-              window.__mockLogin('PATIENT'); // For patient role
-              window.__mockLogin('DOCTOR');  // For doctor role
-              window.__mockLogin('ADMIN');   // For admin role
-              window.__mockLogin(null);      // To log out
+              window.__mockLogin(&apos;PATIENT&apos;); // For patient role
+              window.__mockLogin(&apos;DOCTOR&apos;); // For doctor role
+              window.__mockLogin(&apos;ADMIN&apos;); // For admin role window.__mockLogin(null); //
+              To log out
             </code>
           </div>
         </Card>
       </section>
-      
+
       {/* Buttons */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Buttons</h2>
@@ -140,7 +142,7 @@ export default function UITestPage() {
               <Button variant="ghost">Ghost</Button>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-lg font-medium">Sizes</h3>
             <div className="flex flex-wrap gap-4 items-center">
@@ -149,7 +151,7 @@ export default function UITestPage() {
               <Button size="lg">Large</Button>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-lg font-medium">States</h3>
             <div className="flex flex-wrap gap-4">
@@ -159,7 +161,7 @@ export default function UITestPage() {
           </div>
         </Card>
       </section>
-      
+
       {/* Form Controls */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Form Controls</h2>
@@ -167,52 +169,40 @@ export default function UITestPage() {
           <div className="space-y-2">
             <h3 className="text-lg font-medium">Input</h3>
             <div className="max-w-md">
-              <Input 
-                id="email" 
-                label="Email Address" 
-                type="email" 
+              <Input
+                id="email"
+                label="Email Address"
+                type="email"
                 placeholder="Enter your email"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={e => setInputValue(e.target.value)}
                 error={inputError}
               />
               <div className="mt-2 flex gap-2">
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => setInputError('Please enter a valid email address')}
                 >
                   Show Error
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setInputError('')}
-                >
+                <Button size="sm" variant="outline" onClick={() => setInputError('')}>
                   Clear Error
                 </Button>
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-lg font-medium">Textarea</h3>
             <div className="max-w-md">
-              <Textarea 
-                id="message" 
-                label="Message" 
-                placeholder="Enter your message"
-                rows={4}
-              />
+              <Textarea id="message" label="Message" placeholder="Enter your message" rows={4} />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-lg font-medium">Select</h3>
             <div className="max-w-md">
-              <Select
-                id="country"
-                label="Country"
-              >
+              <Select id="country" label="Country">
                 <option value="">Select a country</option>
                 <option value="us">United States</option>
                 <option value="ca">Canada</option>
@@ -223,7 +213,7 @@ export default function UITestPage() {
           </div>
         </Card>
       </section>
-      
+
       {/* Alerts */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Alerts</h2>
@@ -242,7 +232,7 @@ export default function UITestPage() {
           </Alert>
         </Card>
       </section>
-      
+
       {/* Badges */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Badges</h2>
@@ -257,48 +247,32 @@ export default function UITestPage() {
           </div>
         </Card>
       </section>
-      
+
       {/* Stats Card */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Stats Card</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <StatsCard
-            title="Total Patients"
-            value={2543}
-            icon={User}
-          />
-          <StatsCard
-            title="Appointments Today"
-            value={18}
-            icon={Activity}
-          />
-          <StatsCard
-            title="Active Doctors"
-            value={42}
-            icon={Heart}
-          />
+          <StatsCard title="Total Patients" value={2543} icon={User} />
+          <StatsCard title="Appointments Today" value={18} icon={Activity} />
+          <StatsCard title="Active Doctors" value={42} icon={Heart} />
         </div>
       </section>
-      
+
       {/* Modal */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Modal</h2>
         <Card>
           <Button onClick={() => setIsModalOpen(true)}>Open Modal</Button>
-          
-          <Modal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            title="Example Modal"
-          >
+
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Example Modal">
             <div className="space-y-4">
-              <p>This is an example modal dialog. You can close it by clicking the X button, clicking outside the modal, or using the button below.</p>
-              
+              <p>
+                This is an example modal dialog. You can close it by clicking the X button, clicking
+                outside the modal, or using the button below.
+              </p>
+
               <div className="flex justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsModalOpen(false)}
-                >
+                <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                   Close Modal
                 </Button>
               </div>
@@ -308,4 +282,4 @@ export default function UITestPage() {
       </section>
     </div>
   );
-} 
+}

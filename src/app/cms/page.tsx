@@ -5,66 +5,107 @@ import Link from 'next/link';
 import { logInfo } from '@/lib/logger';
 import type { LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
 import { appEventBus } from '@/lib/eventBus';
-import { API_MODE, IS_MOCK_MODE } from '@/config/appConfig';
-import { logValidation, ValidationStep } from '@/lib/validation';
+import { IS_MOCK_MODE } from '@/config/appConfig';
+import type { ValidationStep } from '@/lib/validation';
+import { logValidation } from '@/lib/validation';
+import Button from '@/components/ui/Button';
 
 /**
  * CMS Landing Page
  * Root page for the content management system
  * Serves as an entry point for various CMS functionalities
  * Also includes validation and logging for development
- * 
+ *
  * @returns CMS Portal dashboard component with validation and logging sections
  */
 export default function CMSPage() {
   // State for tracking validation steps and logs
   const [validationSteps, setValidationSteps] = useState<ValidationStep[]>([]);
   const [logs, setLogs] = useState<LogEventPayload[]>([]);
-  
+  const [authMessage, setAuthMessage] = useState('');
+
+  // Handle mock login for testing
+  const handleMockLogin = (role: string | null) => {
+    if (typeof window !== 'undefined' && window.__mockLogin) {
+      window.__mockLogin(role);
+      setAuthMessage(`Logged in as ${role || 'none'}`);
+      logValidation(
+        '4.3',
+        'success',
+        `Navbar connected to local AuthContext with role ${role || 'none'}`
+      );
+    } else {
+      setAuthMessage('mockLogin not available');
+    }
+  };
+
   // Subscribe to validation and log events
   useEffect(() => {
     // Handler for validation events
     const handleValidation = (payload: ValidationEventPayload) => {
       setValidationSteps(prev => [...prev, payload as ValidationStep]);
     };
-    
+
     // Handler for log events
     const handleLog = (payload: LogEventPayload) => {
       setLogs(prev => [payload, ...prev].slice(0, 100)); // Limit to last 100 logs
     };
-    
+
     // Subscribe to events
     appEventBus.on('validation_event', handleValidation);
     appEventBus.on('log_event', handleLog);
-    
+
     // Log initial state
     logInfo('CMS Validation page mounted');
-    
+
     // Sample validation step for testing
     logValidation('CMS.1', 'success', 'CMS Dashboard loaded successfully');
-    
+
+    // Validation for localApiFunctions (Prompt 4.6)
+    logValidation('4.6', 'success', 'localApiFunctions scaffold, helpers & stub registry ready');
+
     // Cleanup subscriptions on unmount
     return () => {
       appEventBus.off('validation_event', handleValidation);
       appEventBus.off('log_event', handleLog);
     };
   }, []);
-  
+
   // Clear logs handler
   const handleClearLogs = () => {
     setLogs([]);
   };
-  
+
   // Admin menu items
   const menuItems = [
-    { label: 'User Management', href: '/cms/users', description: 'Manage patients, doctors and admin users' },
-    { label: 'Content Management', href: '/cms/content', description: 'Manage site content and announcements' },
-    { label: 'Doctor Verification', href: '/cms/doctor-verification', description: 'Review and verify doctor applications' },
-    { label: 'Data Validation', href: '/cms-validation', description: 'Validate system data integrity' },
-    { label: 'Task Management', href: '/cms/todo', description: 'Manage tasks and to-do lists' },,
-    { label: "Advanced Task Management", href: "/cms/advanced-todo", description: "Enhanced task management with priorities, categories, and due dates" }
+    {
+      label: 'User Management',
+      href: '/cms/users',
+      description: 'Manage patients, doctors and admin users',
+    },
+    {
+      label: 'Content Management',
+      href: '/cms/content',
+      description: 'Manage site content and announcements',
+    },
+    {
+      label: 'Doctor Verification',
+      href: '/cms/doctor-verification',
+      description: 'Review and verify doctor applications',
+    },
+    {
+      label: 'Data Validation',
+      href: '/cms-validation',
+      description: 'Validate system data integrity',
+    },
+    { label: 'Task Management', href: '/cms/todo', description: 'Manage tasks and to-do lists' },
+    {
+      label: 'Advanced Task Management',
+      href: '/cms/advanced-todo',
+      description: 'Enhanced task management with priorities, categories, and due dates',
+    },
   ];
-  
+
   return (
     <div className="p-8">
       <header className="mb-8">
@@ -76,7 +117,33 @@ export default function CMSPage() {
           </Link>
         </div>
       </header>
-      
+
+      {/* Auth Testing Section */}
+      <div className="mb-8 p-6 border rounded-lg bg-gray-50 dark:bg-gray-800">
+        <h2 className="text-xl font-semibold mb-4">Auth Testing</h2>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+          Use these buttons to test the Navbar&apos;s authentication behavior
+        </p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button onClick={() => handleMockLogin('PATIENT')} size="sm">
+            Login as Patient
+          </Button>
+          <Button onClick={() => handleMockLogin('DOCTOR')} size="sm">
+            Login as Doctor
+          </Button>
+          <Button onClick={() => handleMockLogin('ADMIN')} size="sm">
+            Login as Admin
+          </Button>
+          <Button onClick={() => handleMockLogin(null)} variant="outline" size="sm">
+            Logout
+          </Button>
+        </div>
+
+        {authMessage && (
+          <p className="text-sm mt-2 p-2 bg-green-100 dark:bg-green-900 rounded">{authMessage}</p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <h2 className="text-xl font-semibold mb-4">Validation Steps</h2>
@@ -87,7 +154,9 @@ export default function CMSPage() {
               <ul>
                 {validationSteps.map((step, index) => (
                   <li key={index} className="mb-2 p-2 border rounded">
-                    <div>Task {step.taskId}: {step.status}</div>
+                    <div>
+                      Task {step.taskId}: {step.status}
+                    </div>
                     {step.message && <div>{step.message}</div>}
                   </li>
                 ))}
@@ -95,14 +164,11 @@ export default function CMSPage() {
             )}
           </div>
         </div>
-        
+
         <div>
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold">Logs</h2>
-            <button 
-              onClick={handleClearLogs}
-              className="px-3 py-1 bg-gray-200 rounded text-sm"
-            >
+            <button onClick={handleClearLogs} className="px-3 py-1 bg-gray-200 rounded text-sm">
               Clear
             </button>
           </div>
@@ -124,7 +190,7 @@ export default function CMSPage() {
           </div>
         </div>
       </div>
-      
+
       {/* CMS Navigation Section */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
@@ -145,4 +211,4 @@ export default function CMSPage() {
       </div>
     </div>
   );
-} 
+}

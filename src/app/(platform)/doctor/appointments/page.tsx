@@ -2,22 +2,21 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Tab } from '@headlessui/react';
+// import { Tab } from '@headlessui/react'; // Removed unused import
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
-import { 
-  CalendarCheck, 
-  Calendar, 
-  ClipboardList, 
-  Clock, 
-  User, 
-  CheckCircle, 
+import {
+  Calendar,
+  ClipboardList,
+  Clock,
+  User,
+  CheckCircle,
   XCircle,
   ChevronRight,
-  Filter
+  Filter,
 } from 'lucide-react';
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
 
@@ -47,7 +46,9 @@ export default function DoctorAppointmentsPage() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [dateFilter, setDateFilter] = useState('today');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedAppointment, setSelectedAppointment] = useState<null | typeof sampleAppointments[0]>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<
+    null | (typeof sampleAppointments)[0]
+  >(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   // Handle appointment completion
@@ -55,10 +56,10 @@ export default function DoctorAppointmentsPage() {
     try {
       // In a real app, this would call an API endpoint
       console.log(`Completing appointment ${id} with notes: ${notes}`);
-      
+
       // Would update local state in a real implementation
       setShowCompleteModal(false);
-      
+
       // Would show a success toast in a real implementation
     } catch (error) {
       console.error('Error completing appointment:', error);
@@ -67,7 +68,7 @@ export default function DoctorAppointmentsPage() {
   };
 
   // Open complete modal with the selected appointment
-  const openCompleteModal = (appointment: typeof sampleAppointments[0]) => {
+  const openCompleteModal = (appointment: (typeof sampleAppointments)[0]) => {
     setSelectedAppointment(appointment);
     setShowCompleteModal(true);
   };
@@ -76,15 +77,15 @@ export default function DoctorAppointmentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Appointments</h1>
-        
+
         {/* View Toggle */}
         <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
           <button
             className={clsx(
-              "px-3 py-1.5 rounded-md flex items-center text-sm font-medium",
-              view === 'list' 
-                ? "bg-white dark:bg-slate-700 shadow-sm" 
-                : "text-slate-500 dark:text-slate-400"
+              'px-3 py-1.5 rounded-md flex items-center text-sm font-medium',
+              view === 'list'
+                ? 'bg-white dark:bg-slate-700 shadow-sm'
+                : 'text-slate-500 dark:text-slate-400'
             )}
             onClick={() => setView('list')}
           >
@@ -93,10 +94,10 @@ export default function DoctorAppointmentsPage() {
           </button>
           <button
             className={clsx(
-              "px-3 py-1.5 rounded-md flex items-center text-sm font-medium",
-              view === 'calendar' 
-                ? "bg-white dark:bg-slate-700 shadow-sm" 
-                : "text-slate-500 dark:text-slate-400"
+              'px-3 py-1.5 rounded-md flex items-center text-sm font-medium',
+              view === 'calendar'
+                ? 'bg-white dark:bg-slate-700 shadow-sm'
+                : 'text-slate-500 dark:text-slate-400'
             )}
             onClick={() => setView('calendar')}
           >
@@ -114,7 +115,7 @@ export default function DoctorAppointmentsPage() {
               id="date-filter"
               label="Date"
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={e => setDateFilter(e.target.value)}
               className="w-full sm:w-40"
             >
               <option value="today">Today</option>
@@ -128,7 +129,7 @@ export default function DoctorAppointmentsPage() {
               id="status-filter"
               label="Status"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={e => setStatusFilter(e.target.value)}
               className="w-full sm:w-40"
             >
               <option value="all">All Statuses</option>
@@ -148,8 +149,8 @@ export default function DoctorAppointmentsPage() {
       {/* List View */}
       {view === 'list' && (
         <div className="space-y-4">
-          {sampleAppointments.map((appointment) => (
-            <AppointmentCard 
+          {sampleAppointments.map(appointment => (
+            <AppointmentCard
               key={appointment.id}
               appointment={appointment}
               onCompleteClick={() => openCompleteModal(appointment)}
@@ -172,7 +173,7 @@ export default function DoctorAppointmentsPage() {
       )}
 
       {/* Complete Appointment Modal */}
-      <CompleteAppointmentModal 
+      <CompleteAppointmentModal
         isOpen={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
         appt={selectedAppointment}
@@ -183,11 +184,11 @@ export default function DoctorAppointmentsPage() {
 }
 
 // Appointment Card Component
-function AppointmentCard({ 
-  appointment, 
+function AppointmentCard({
+  appointment,
   onCompleteClick,
-}: { 
-  appointment: typeof sampleAppointments[0];
+}: {
+  appointment: (typeof sampleAppointments)[0];
   onCompleteClick: () => void;
 }) {
   // Format date nicely
@@ -209,7 +210,7 @@ function AppointmentCard({
             </div>
             <div>
               <h3 className="font-medium">{appointment.patientName}</h3>
-              <Link 
+              <Link
                 href={`/patient/${appointment.patientId}`}
                 className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
               >
@@ -233,7 +234,7 @@ function AppointmentCard({
         {/* Status Badge and Actions */}
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant="info">Scheduled</Badge>
-          
+
           <div className="flex items-center space-x-2">
             <Button size="sm" variant="outline">
               <ChevronRight className="h-4 w-4 mr-1" />
@@ -252,4 +253,4 @@ function AppointmentCard({
       </div>
     </Card>
   );
-} 
+}

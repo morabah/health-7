@@ -10,17 +10,18 @@ import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import { logInfo } from '@/lib/logger';
+import { useAuth } from '@/context/AuthContext';
+import { UserType } from '@/types/enums';
 
 /**
  * Patient Registration Page
  * Allows users to register as a patient
- * 
+ *
  * @returns Patient registration form component
  */
 export default function PatientRegistrationPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { registerPatient, loading, error } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -28,43 +29,57 @@ export default function PatientRegistrationPage() {
     phone: '',
     password: '',
     confirmPassword: '',
-    dob: '',
+    dateOfBirth: '',
     gender: '',
-    bloodType: ''
+    bloodType: '',
+    medicalHistory: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
+      return; // Input component should show validation error
     }
-    
-    setError('');
-    setIsLoading(true);
-    
+
     // Log registration attempt
     logInfo('auth-event', {
       action: 'patient-register-attempt',
       email: formData.email,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
-    // Simulate API call with setTimeout
-    setTimeout(() => {
-      setIsLoading(false);
+
+    // Prepare registration payload
+    const registrationPayload = {
+      email: formData.email,
+      password: formData.password,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      userType: UserType.PATIENT,
+      dateOfBirth: formData.dateOfBirth || undefined,
+      gender: formData.gender || undefined,
+      bloodType: formData.bloodType || undefined,
+      medicalHistory: formData.medicalHistory || undefined,
+    } as const;
+
+    // Attempt registration
+    const result = await registerPatient(registrationPayload);
+
+    if (result.success) {
+      // Registration successful, redirect to pending verification
       router.push('/auth/pending-verification');
-    }, 700);
+    }
   };
 
   return (
@@ -78,13 +93,9 @@ export default function PatientRegistrationPage() {
           </div>
           <p className="text-slate-600 dark:text-slate-400 mt-2">Create your patient account</p>
         </div>
-        
-        {error && (
-          <Alert variant="error">
-            {error}
-          </Alert>
-        )}
-        
+
+        {error && <Alert variant="error">{error}</Alert>}
+
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -96,7 +107,7 @@ export default function PatientRegistrationPage() {
               value={formData.firstName}
               onChange={handleChange}
             />
-            
+
             <Input
               id="lastName"
               name="lastName"
@@ -107,7 +118,7 @@ export default function PatientRegistrationPage() {
               onChange={handleChange}
             />
           </div>
-          
+
           <Input
             id="email"
             name="email"
@@ -118,7 +129,7 @@ export default function PatientRegistrationPage() {
             value={formData.email}
             onChange={handleChange}
           />
-          
+
           <Input
             id="phone"
             name="phone"
@@ -128,7 +139,7 @@ export default function PatientRegistrationPage() {
             value={formData.phone}
             onChange={handleChange}
           />
-          
+
           <Input
             id="password"
             name="password"
@@ -139,7 +150,7 @@ export default function PatientRegistrationPage() {
             value={formData.password}
             onChange={handleChange}
           />
-          
+
           <Input
             id="confirmPassword"
             name="confirmPassword"
@@ -149,19 +160,23 @@ export default function PatientRegistrationPage() {
             placeholder="Confirm your password"
             value={formData.confirmPassword}
             onChange={handleChange}
-            error={formData.confirmPassword && formData.password !== formData.confirmPassword ? 'Passwords do not match' : ''}
+            error={
+              formData.confirmPassword && formData.password !== formData.confirmPassword
+                ? 'Passwords do not match'
+                : ''
+            }
           />
-          
+
           <Input
-            id="dob"
-            name="dob"
+            id="dateOfBirth"
+            name="dateOfBirth"
             type="date"
             label="Date of Birth"
             required
-            value={formData.dob}
+            value={formData.dateOfBirth}
             onChange={handleChange}
           />
-          
+
           <Select
             id="gender"
             name="gender"
@@ -175,7 +190,7 @@ export default function PatientRegistrationPage() {
             <option value="FEMALE">Female</option>
             <option value="OTHER">Other</option>
           </Select>
-          
+
           <Select
             id="bloodType"
             name="bloodType"
@@ -184,25 +199,30 @@ export default function PatientRegistrationPage() {
             onChange={handleChange}
           >
             <option value="">Select blood type</option>
-            <option value="A+">A+</option>
-            <option value="A-">A-</option>
-            <option value="B+">B+</option>
-            <option value="B-">B-</option>
-            <option value="AB+">AB+</option>
-            <option value="AB-">AB-</option>
-            <option value="O+">O+</option>
-            <option value="O-">O-</option>
+            <option value="A_POSITIVE">A+</option>
+            <option value="A_NEGATIVE">A-</option>
+            <option value="B_POSITIVE">B+</option>
+            <option value="B_NEGATIVE">B-</option>
+            <option value="AB_POSITIVE">AB+</option>
+            <option value="AB_NEGATIVE">AB-</option>
+            <option value="O_POSITIVE">O+</option>
+            <option value="O_NEGATIVE">O-</option>
           </Select>
-          
-          <Button 
-            type="submit" 
-            className="w-full" 
-            isLoading={isLoading}
-          >
+
+          <Input
+            id="medicalHistory"
+            name="medicalHistory"
+            label="Medical History (optional)"
+            placeholder="Brief medical history, allergies, etc."
+            value={formData.medicalHistory}
+            onChange={handleChange}
+          />
+
+          <Button type="submit" className="w-full" isLoading={loading}>
             Register
           </Button>
         </form>
-        
+
         <div className="text-center">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Already have an account?{' '}
@@ -214,4 +234,4 @@ export default function PatientRegistrationPage() {
       </Card>
     </div>
   );
-} 
+}
