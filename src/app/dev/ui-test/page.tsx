@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Moon, Sun, Activity, User, Heart } from 'lucide-react';
 import { logValidation } from '@/lib/logger';
+import { useAuth } from '@/context/AuthContext';
 
 // Import UI components
 import Button from '@/components/ui/Button';
@@ -26,6 +27,7 @@ import useDarkMode from '@/hooks/useDarkMode';
  */
 export default function UITestPage() {
   const [theme, toggleTheme] = useDarkMode();
+  const { user, login, logout } = useAuth();
   const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -55,14 +57,74 @@ export default function UITestPage() {
     <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900 dark:text-white">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">UI Component Library</h1>
-        <Button
-          variant="ghost"
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </Button>
+          
+          {user && (
+            <Badge variant="success" className="px-3 py-1">
+              {user.role}
+            </Badge>
+          )}
+        </div>
       </header>
+      
+      {/* Auth Testing */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-semibold mb-4">Auth Testing</h2>
+        <Card className="p-4">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium mb-2">Mock Authentication</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Use these buttons to simulate different user roles for testing.
+            </p>
+            
+            {user ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Current User:</span>
+                  <span>{user.firstName} {user.lastName}</span>
+                  <Badge variant="info">{user.role}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="danger" onClick={() => logout()}>
+                    Log Out
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" onClick={() => login('PATIENT')}>
+                  Login as Patient
+                </Button>
+                <Button variant="primary" onClick={() => login('DOCTOR')}>
+                  Login as Doctor
+                </Button>
+                <Button variant="primary" onClick={() => login('ADMIN')}>
+                  Login as Admin
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              You can also use the following in the browser console:
+            </p>
+            <code className="block p-2 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono whitespace-pre overflow-x-auto">
+              window.__mockLogin('PATIENT'); // For patient role
+              window.__mockLogin('DOCTOR');  // For doctor role
+              window.__mockLogin('ADMIN');   // For admin role
+              window.__mockLogin(null);      // To log out
+            </code>
+          </div>
+        </Card>
+      </section>
       
       {/* Buttons */}
       <section className="mb-12">

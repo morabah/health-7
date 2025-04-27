@@ -61,7 +61,8 @@ export default function CMSPage() {
     { label: 'Content Management', href: '/cms/content', description: 'Manage site content and announcements' },
     { label: 'Doctor Verification', href: '/cms/doctor-verification', description: 'Review and verify doctor applications' },
     { label: 'Data Validation', href: '/cms-validation', description: 'Validate system data integrity' },
-    { label: 'Task Management', href: '/cms/todo', description: 'Manage tasks and to-do lists' },
+    { label: 'Task Management', href: '/cms/todo', description: 'Manage tasks and to-do lists' },,
+    { label: "Advanced Task Management", href: "/cms/advanced-todo", description: "Enhanced task management with priorities, categories, and due dates" }
   ];
   
   return (

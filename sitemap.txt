@@ -49,6 +49,7 @@
 │   │   ├── new/                    →  /cms/content/new    | Create Content Form *
 │   │   └── edit/[id]/              →  /cms/content/edit/:id | Edit Content Form *
 │   ├── todo/                       →  /cms/todo           | Task Management *
+│   ├── advanced-todo/              →  /cms/advanced-todo  | Advanced Task Management *
 │   └── doctor-verification/        →  /cms/doctor-verification | Verification Queue *
 │       └── [doctorId]/             →  /cms/doctor-verification/:doctorId | Review Doctor *
 │

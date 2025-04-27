@@ -4,10 +4,10 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { Card, Button } from '@/components/ui';
 import { Stethoscope, CalendarCheck, FileText } from 'lucide-react';
-import { logger } from '@/lib/logger';
+import { logInfo } from '@/lib/logger';
 
 export default function Home() {
-  useEffect(() => logger.info('Homepage rendered static'), []);
+  useEffect(() => logInfo('Homepage rendered static'), []);
 
   return (
     <>
@@ -24,7 +24,7 @@ export default function Home() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/auth/register">
-            <Button size="lg" onClick={() => logger.info('CTA register')}>
+            <Button size="lg" onClick={() => logInfo('CTA register')}>
               Get Started
             </Button>
           </Link>
@@ -100,7 +100,7 @@ export default function Home() {
                   Register as a patient to access our healthcare platform and services.
                 </p>
                 <Link href="/auth/register">
-                  <Button variant="link" onClick={() => logger.info('How it works: Register')}>
+                  <Button variant="link" onClick={() => logInfo('How it works: Register')}>
                     Register Now &rarr;
                   </Button>
                 </Link>
@@ -117,7 +117,7 @@ export default function Home() {
                   Search our network of certified specialists based on your needs.
                 </p>
                 <Link href="/find-doctors">
-                  <Button variant="link" onClick={() => logger.info('How it works: Find Doctors')}>
+                  <Button variant="link" onClick={() => logInfo('How it works: Find Doctors')}>
                     Find Doctors &rarr;
                   </Button>
                 </Link>
@@ -161,7 +161,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card className="p-6">
               <p className="text-slate-600 dark:text-slate-400 mb-4 italic">
-                "This platform has transformed how I manage my healthcare. Finding specialists and booking appointments is now seamless and stress-free."
+                &quot;This platform has transformed how I manage my healthcare. Finding specialists and booking appointments is now seamless and stress-free.&quot;
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-full mr-3"></div>
@@ -174,7 +174,7 @@ export default function Home() {
             
             <Card className="p-6">
               <p className="text-slate-600 dark:text-slate-400 mb-4 italic">
-                "As a doctor, this system has helped me organize my schedule efficiently and connect with patients who truly need my expertise."
+                &quot;As a doctor, this system has helped me organize my schedule efficiently and connect with patients who truly need my expertise.&quot;
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-full mr-3"></div>

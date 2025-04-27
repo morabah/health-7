@@ -1,6 +1,7 @@
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
+import { Transition } from '@headlessui/react';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 
 /**
@@ -9,15 +10,18 @@ import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
  * @property {React.ReactNode} children - The content of the alert
  * @property {'success' | 'error' | 'warning' | 'info'} [variant] - Alert type
  * @property {string} [className] - Additional CSS classes
+ * @property {boolean} [show] - Whether the alert is visible (for transition)
  */
 interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   variant?: 'success' | 'error' | 'warning' | 'info';
   className?: string;
+  show?: boolean;
 }
 
 /**
  * Alert component for displaying status messages with appropriate styling
+ * Uses Headless UI Transition for smooth fade effects
  * 
  * @example
  * <Alert variant="success">
@@ -25,7 +29,7 @@ interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
  * </Alert>
  */
 const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ children, variant = 'info', className, ...props }, ref) => {
+  ({ children, variant = 'info', className, show = true, ...props }, ref) => {
     const variantStyles = {
       success: 'bg-success/10 text-success border-success/20',
       error: 'bg-danger/10 text-danger border-danger/20',
@@ -41,7 +45,15 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
     }[variant];
     
     return (
-      <div
+      <Transition
+        show={show}
+        enter="transition-opacity ease-out duration-300"
+        enterFrom="opacity-0"
+        enterTo="opacity-100"
+        leave="transition-opacity ease-in duration-200"
+        leaveFrom="opacity-100"
+        leaveTo="opacity-0"
+        as="div"
         ref={ref}
         role="alert"
         className={twMerge(
@@ -55,7 +67,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
       >
         <IconComponent className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
         <div>{children}</div>
-      </div>
+      </Transition>
     );
   }
 );

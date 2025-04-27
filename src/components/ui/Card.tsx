@@ -7,10 +7,12 @@ import { clsx } from 'clsx';
  * @interface CardProps
  * @property {React.ReactNode} children - The content of the card
  * @property {string} [className] - Additional CSS classes
+ * @property {boolean} [hoverable] - Whether the card should have hover effects
  */
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
+  hoverable?: boolean;
 }
 
 /**
@@ -21,15 +23,24 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
  *   <h3>Card Title</h3>
  *   <p>Card content</p>
  * </Card>
+ * 
+ * @example
+ * <Card hoverable>
+ *   <h3>Interactive Card</h3>
+ *   <p>This card has hover effects</p>
+ * </Card>
  */
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ children, className, ...props }, ref) => {
+  ({ children, className, hoverable = false, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={twMerge(
-          clsx('rounded-lg bg-white dark:bg-slate-800 shadow-md overflow-hidden p-4'),
-          className
+          clsx(
+            'rounded-lg bg-white dark:bg-slate-800 shadow-md overflow-hidden p-4',
+            hoverable && 'transition duration-200 hover:shadow-lg hover:-translate-y-0.5',
+            className
+          )
         )}
         {...props}
       >

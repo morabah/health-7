@@ -235,7 +235,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each user against schema
     users.forEach(user => {
-      const { id: _id, ...userData } = user;
+      const { id: _unused, ...userData } = user;
       const result = UserProfileSchema.safeParse(userData);
       
       if (!result.success) {
@@ -284,7 +284,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each appointment against schema
     appointments.forEach(appointment => {
-      const { id: _id, ...appointmentData } = appointment;
+      const { id: _unused, ...appointmentData } = appointment;
       const result = AppointmentSchema.safeParse(appointmentData);
       
       if (!result.success) {
@@ -301,7 +301,7 @@ describe('Database Schema Validation', () => {
     
     // Validate each notification against schema
     notifications.forEach(notification => {
-      const { id: _id, ...notificationData } = notification;
+      const { id: _unused, ...notificationData } = notification;
       const result = NotificationSchema.safeParse(notificationData);
       
       if (!result.success) {
@@ -327,7 +327,7 @@ describe('Database Schema Validation', () => {
     }
     
     // Test appointment validation with invalid data
-    const { id: _id, ...appointmentData } = invalidAppointment;
+    const { id: _unused, ...appointmentData } = invalidAppointment;
     const appointmentResult = AppointmentSchema.safeParse(appointmentData);
     expect(appointmentResult.success).toBe(false);
     
@@ -356,13 +356,12 @@ describe('Database Schema Validation', () => {
       
       // Validate users
       users.forEach(user => {
-        const { id: _id, ...userData } = user;
+        const { id: _unused, ...userData } = user;
         const result = UserProfileSchema.safeParse(userData);
         
         validationResults.push({
           isValid: result.success,
           entityType: 'UserProfile',
-          entityId: _id,
           errors: !result.success ? [result.error.message] : undefined,
           fieldErrors: !result.success ? formatZodErrors(result.error).fieldErrors : undefined
         });
@@ -396,7 +395,7 @@ describe('Database Schema Validation', () => {
       
       // Validate appointments
       appointments.forEach(appointment => {
-        const { id, ...appointmentData } = appointment;
+        const { id: _unused, ...appointmentData } = appointment;
         const result = AppointmentSchema.safeParse(appointmentData);
         
         validationResults.push({
@@ -410,7 +409,7 @@ describe('Database Schema Validation', () => {
       
       // Validate notifications
       notifications.forEach(notification => {
-        const { id, ...notificationData } = notification;
+        const { id: _unused, ...notificationData } = notification;
         const result = NotificationSchema.safeParse(notificationData);
         
         validationResults.push({
@@ -497,7 +496,7 @@ describe('Database Schema Validation', () => {
       
       // Validate users
       for (const user of users) {
-        const { id, ...userData } = user;
+        const { id: _unused, ...userData } = user;
         const result = UserProfileSchema.safeParse(userData);
         totalValidated++;
         if (!result.success) totalErrors++;
@@ -519,7 +518,7 @@ describe('Database Schema Validation', () => {
       
       // Validate appointments
       for (const appointment of appointments) {
-        const { id, ...appointmentData } = appointment;
+        const { id: _unused, ...appointmentData } = appointment;
         const result = AppointmentSchema.safeParse(appointmentData);
         totalValidated++;
         if (!result.success) totalErrors++;
@@ -527,7 +526,7 @@ describe('Database Schema Validation', () => {
       
       // Validate notifications
       for (const notification of notifications) {
-        const { id, ...notificationData } = notification;
+        const { id: _unused, ...notificationData } = notification;
         const result = NotificationSchema.safeParse(notificationData);
         totalValidated++;
         if (!result.success) totalErrors++;

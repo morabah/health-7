@@ -49,7 +49,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           className={twMerge(
             clsx(
-              'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/60 ring-offset-2 transition-colors',
+              'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/60 ring-offset-2 transition-colors duration-200 ease-in-out',
               error 
                 ? 'border-danger focus:border-danger' 
                 : 'border-gray-300 focus:border-primary',
