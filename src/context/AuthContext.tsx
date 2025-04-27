@@ -110,7 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         clearError();
 
-        const result = await callApi('login', { email, password });
+        // Add detailed logging before callApi
+        logInfo('AuthContext.login - received', { email, password });
+        const payloadForApi = { email, password };
+        logInfo('AuthContext.login - payload for callApi', payloadForApi);
+
+        const result = await callApi('login', payloadForApi);
 
         if (!result.success) {
           setError(result.error);
@@ -291,7 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         delete window.__mockLogin;
       }
     };
-  }, [logout, refreshProfile, router]);
+  }, [logout, router]);
 
   return (
     <AuthContext.Provider

@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 /**
  * Login Page
  * Allows users to authenticate into the application
- * 
+ *
  * @returns Login form component
  */
 export default function LoginPage() {
@@ -26,14 +26,14 @@ export default function LoginPage() {
     email: '',
     password: '',
     rememberMe: false,
-    role: 'PATIENT' // Default role
+    role: 'PATIENT', // Default role
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -41,23 +41,27 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     // Log authentication attempt
     logInfo('auth-event', {
       action: 'login-attempt',
       email: formData.email,
       role: formData.role,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
-    // Mock login with timeout to simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      try {
-        // Use the AuthContext login function
-        login(formData.role as any);
-        
+
+    // Debug log
+    console.log(
+      '[LoginPage.handleSubmit] PRE-LOGIN CALL - Email:',
+      formData.email,
+      'Password:',
+      formData.password
+    );
+
+    // Use the AuthContext login function with email and password
+    login(formData.email, formData.password)
+      .then(() => {
+        setIsLoading(false);
         // Redirect based on role
         switch (formData.role) {
           case 'PATIENT':
@@ -72,10 +76,12 @@ export default function LoginPage() {
           default:
             router.push('/dashboard');
         }
-      } catch (err) {
+      })
+      .catch(err => {
+        setIsLoading(false);
         setError('Login failed. Please try again.');
-      }
-    }, 700);
+        console.error('[LoginPage.handleSubmit] Login error:', err);
+      });
   };
 
   return (
@@ -89,13 +95,9 @@ export default function LoginPage() {
           </div>
           <p className="text-slate-600 dark:text-slate-400 mt-2">Access your health account</p>
         </div>
-        
-        {error && (
-          <Alert variant="error">
-            {error}
-          </Alert>
-        )}
-        
+
+        {error && <Alert variant="error">{error}</Alert>}
+
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
             id="email"
@@ -107,7 +109,7 @@ export default function LoginPage() {
             value={formData.email}
             onChange={handleChange}
           />
-          
+
           <Input
             id="password"
             name="password"
@@ -118,9 +120,12 @@ export default function LoginPage() {
             value={formData.password}
             onChange={handleChange}
           />
-          
+
           <div className="space-y-4">
-            <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            <label
+              htmlFor="role"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+            >
               Login As (For Testing):
             </label>
             <select
@@ -135,7 +140,7 @@ export default function LoginPage() {
               <option value="ADMIN">Administrator</option>
             </select>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
@@ -146,25 +151,24 @@ export default function LoginPage() {
                 checked={formData.rememberMe}
                 onChange={handleChange}
               />
-              <label htmlFor="rememberMe" className="ml-2 block text-sm text-slate-600 dark:text-slate-400">
+              <label
+                htmlFor="rememberMe"
+                className="ml-2 block text-sm text-slate-600 dark:text-slate-400"
+              >
                 Remember me
               </label>
             </div>
-            
+
             <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
               Forgot password?
             </Link>
           </div>
-          
-          <Button 
-            type="submit" 
-            className="w-full" 
-            isLoading={isLoading}
-          >
+
+          <Button type="submit" className="w-full" isLoading={isLoading}>
             Sign In
           </Button>
         </form>
-        
+
         <div className="text-center mt-4">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Don&apos;t have an account?{' '}
@@ -176,4 +180,4 @@ export default function LoginPage() {
       </Card>
     </div>
   );
-} 
+}
