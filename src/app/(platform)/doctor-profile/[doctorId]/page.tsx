@@ -19,22 +19,42 @@ import {
 } from 'lucide-react';
 import { logInfo, logValidation } from '@/lib/logger';
 import { useDoctorProfile } from '@/data/sharedLoaders';
+import Image from 'next/image';
+import type { DoctorProfile } from '@/types/schemas';
+
+// Define the merged doctor profile type based on API response
+interface DoctorPublicProfile extends Omit<DoctorProfile, 'servicesOffered' | 'educationHistory' | 'experience' | 'education'> {
+  id: string;
+  firstName: string;
+  lastName: string;
+  rating?: number;
+  reviewCount?: number;
+  services?: string[];
+  education?: { institution: string; degree: string; year: string }[];
+  reviews?: { patientName: string; date: string; rating: number; comment: string }[];
+}
 
 // API response interface
 interface DoctorProfileResponse {
   success: boolean;
-  doctor: any; // Using any for now, can be replaced with proper type
+  doctor: DoctorPublicProfile;
 }
 
 // Sidebar doctor info card
-function DoctorSidebar({ doctor, doctorId }: { doctor: any; doctorId: string }) {
+function DoctorSidebar({ doctor, doctorId }: { doctor: DoctorPublicProfile; doctorId: string }) {
   return (
     <Card className="h-fit sticky top-4">
       <div className="p-4 flex flex-col items-center">
         {/* Doctor Image */}
         <div className="relative w-32 h-32 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 mb-4">
           {doctor.profilePictureUrl ? (
-            <img src={doctor.profilePictureUrl} alt={`Dr. ${doctor.firstName} ${doctor.lastName}`} className="object-cover" />
+            <Image
+              src={doctor.profilePictureUrl}
+              alt={`Dr. ${doctor.firstName} ${doctor.lastName}`}
+              fill
+              className="object-cover"
+              sizes="128px"
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500">
               <Stethoscope className="h-12 w-12" />
@@ -87,12 +107,11 @@ export default function DoctorProfilePage() {
   const params = useParams();
   const doctorId = params?.doctorId as string;
   const { data, isLoading, error } = useDoctorProfile(doctorId) as {
-    data: DoctorProfileResponse | undefined, 
-    isLoading: boolean, 
-    error: unknown
+    data: DoctorProfileResponse | undefined;
+    isLoading: boolean;
+    error: unknown;
   };
-  
-  const doctor = data?.success ? data.doctor : null;
+  const doctor = data?.success ? data.doctor as DoctorPublicProfile : null;
   
   useEffect(() => {
     logInfo('doctor-profile rendered (with real data)', { doctorId });
@@ -189,8 +208,8 @@ export default function DoctorProfilePage() {
                 </Tab.Panel>
                 <Tab.Panel>
                   <div className="space-y-4">
-                    {doctor.education && doctor.education.length > 0 ? (
-                      doctor.education.map((edu: any, index: number) => (
+                    {doctor.education && Array.isArray(doctor.education) && doctor.education.length > 0 ? (
+                      doctor.education.map((edu, index: number) => (
                         <div key={index} className="border-b border-slate-200 dark:border-slate-700 pb-3 last:border-0">
                           <h3 className="font-medium">{edu.degree}</h3>
                           <p className="text-sm text-slate-500">{edu.institution}, {edu.year}</p>
@@ -232,7 +251,7 @@ export default function DoctorProfilePage() {
             </div>
             {doctor.reviews && doctor.reviews.length > 0 ? (
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {doctor.reviews.map((review: any, index: number) => (
+                {doctor.reviews.map((review, index: number) => (
                   <div key={index} className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>

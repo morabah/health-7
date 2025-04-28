@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { LogIn } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
@@ -18,7 +17,6 @@ import { useAuth } from '@/context/AuthContext';
  * @returns Login form component
  */
 export default function LoginPage() {
-  const router = useRouter();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +40,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Enhanced logging
+      console.log('[LoginPage] Login attempt started', { email: formData.email });
+      
       // Log authentication attempt
       logInfo('auth-event', {
         action: 'login-attempt',
@@ -49,25 +50,24 @@ export default function LoginPage() {
         timestamp: new Date().toISOString(),
       });
 
-      // Debug log
-      console.log(
-        '[LoginPage.handleSubmit] Login attempt with:',
-        { email: formData.email }
-      );
-
       // Use the AuthContext login function with email and password
+      console.log('[LoginPage] Calling login function');
       const success = await login(formData.email, formData.password);
+      console.log('[LoginPage] Login function returned:', success);
       
       if (success) {
         setIsLoading(false);
         logInfo('Login successful', { email: formData.email });
-        // Router redirection will be handled by AuthContext based on user role
+        console.log('[LoginPage] Login successful - AuthContext will handle redirection');
+        // Do NOT redirect here - AuthContext will handle redirection based on user role
       } else {
         setIsLoading(false);
         setError('Invalid credentials. Please try again.');
+        console.log('[LoginPage] Login failed - invalid credentials');
         logError('Login failed', { email: formData.email });
       }
     } catch (err) {
+      console.error('[LoginPage] Login error:', err);
       setIsLoading(false);
       setError('Login failed. Please try again.');
       logError('Login error', err);
@@ -149,10 +149,10 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mt-4 text-sm text-slate-500">
-          <p>Test Accounts (use with password "password"):</p>
+          <p>Test Accounts (use with password &quot;password&quot;):</p>
           <ul className="mt-2 space-y-1">
-            <li>Patient: test-patient@example.com</li>
-            <li>Doctor: test-doctor@example.com</li>
+            <li>Patient: patient@example.com</li>
+            <li>Doctor: doctor.verified@example.com</li>
             <li>Admin: admin@example.com</li>
           </ul>
         </div>

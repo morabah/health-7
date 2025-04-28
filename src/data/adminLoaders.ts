@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callApi } from '@/lib/apiClient';
 import { useAuth } from '@/context/AuthContext';
-import { UserType, VerificationStatus, AccountStatus } from '@/types/enums';
+import type { VerificationStatus, AccountStatus } from '@/types/enums';
+import { UserType } from '@/types/enums';
 
 /**
  * Hook to fetch all users

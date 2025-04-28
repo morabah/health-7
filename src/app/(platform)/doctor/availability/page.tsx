@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { Calendar, Clock, Copy, Plus, Save, Trash2, Info } from 'lucide-react';
+import { Calendar, Clock, Plus, Save, Trash2, Info } from 'lucide-react';
 import { useDoctorAvailability, useSetAvailability } from '@/data/doctorLoaders';
 import { logInfo, logValidation } from '@/lib/logger';
 import { format } from 'date-fns';
@@ -48,6 +48,7 @@ export default function DoctorAvailabilityPage() {
   
   // State for blocked dates
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const uniqueBlockedDates = Array.from(new Set(blockedDates));
   const [newBlockDate, setNewBlockDate] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
   
@@ -55,23 +56,22 @@ export default function DoctorAvailabilityPage() {
   const { data, isLoading, error, refetch } = useDoctorAvailability();
   const setAvailabilityMutation = useSetAvailability();
   
-  // Initialize state from API data
+  // Prevent re-initializing on every data update
+  const initialized = useRef(false);
+
+  // Initialize state from API data only once on first success
   useEffect(() => {
-    if (data?.success) {
-      const { availability } = data;
-      
-      // Initialize weekly schedule
-      if (availability.weeklySchedule) {
-        setWeeklySchedule({ ...createDefaultSchedule(), ...availability.weeklySchedule });
-      } else {
-        setWeeklySchedule(createDefaultSchedule());
-      }
-      
-      // Initialize blocked dates
-      if (availability.blockedDates) {
-        setBlockedDates(Array.isArray(availability.blockedDates) ? availability.blockedDates : []);
-      }
-    }
+    if (!data?.success || initialized.current) return;
+    const { availability } = data;
+    const newSchedule = availability.weeklySchedule
+      ? { ...createDefaultSchedule(), ...availability.weeklySchedule }
+      : createDefaultSchedule();
+    const dedupedDates = Array.isArray(availability.blockedDates)
+      ? Array.from(new Set(availability.blockedDates))
+      : [];
+    setWeeklySchedule(newSchedule);
+    setBlockedDates(dedupedDates);
+    initialized.current = true;
   }, [data]);
   
   // Toggle availability for a time slot
@@ -263,12 +263,12 @@ export default function DoctorAvailabilityPage() {
               </div>
 
               {/* Blocked Dates List */}
-              {blockedDates.length > 0 ? (
+              {uniqueBlockedDates.length > 0 ? (
                 <div className="space-y-2 mt-6">
                   <h3 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Currently Blocked Dates:
                   </h3>
-                  {blockedDates.map(date => (
+                  {uniqueBlockedDates.map((date: string) => (
                     <div
                       key={date}
                       className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-md"

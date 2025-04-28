@@ -6,23 +6,20 @@ import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
-import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 interface VerificationFormProps {
-  doctorId: string;
   currentStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
   onSubmit: (payload: { status: string; notes: string }) => Promise<void>;
 }
 
 export default function VerificationForm({ 
-  doctorId, 
   currentStatus, 
   onSubmit 
 }: VerificationFormProps) {
   const [status, setStatus] = useState(currentStatus);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   // Check if form can be submitted
@@ -39,7 +36,6 @@ export default function VerificationForm({
     if (!canSubmit()) return;
     
     setLoading(true);
-    setError('');
     setSuccess(false);
     
     try {
@@ -47,8 +43,9 @@ export default function VerificationForm({
       await new Promise(r => setTimeout(r, 700));
       await onSubmit({ status, notes });
       setSuccess(true);
-    } catch (err) {
-      setError('Failed to update verification status. Please try again.');
+    } catch (error: unknown) {
+      // Removed unused variable error
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -61,13 +58,6 @@ export default function VerificationForm({
       </div>
       
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        {error && (
-          <Alert variant="error" className="mb-4">
-            <AlertCircle className="h-4 w-4 mr-2" />
-            {error}
-          </Alert>
-        )}
-        
         {success && (
           <Alert variant="success" className="mb-4">
             <CheckCircle className="h-4 w-4 mr-2" />

@@ -30,7 +30,7 @@ function Stat({
 }: { 
   title: string; 
   value: number | string; 
-  Icon: React.ComponentType<any>;
+  Icon: React.ElementType;
   isLoading?: boolean;
 }) {
   return (
@@ -68,18 +68,18 @@ function HeaderWithLink({ title, href }: { title: string; href: string }) {
 }
 
 // For TypeScript
-interface User {
+type User = {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
   userType: UserType;
-}
+};
 
-interface Doctor extends User {
+type Doctor = User & {
   specialty: string;
   verificationStatus: VerificationStatus;
-}
+};
 
 export default function AdminDashboard() {
   const { data: usersData, isLoading: usersLoading } = useAllUsers() as { 
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
           </div>
         ) : recentUsers.length > 0 ? (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {recentUsers.map((user: any, idx: number) => (
+            {recentUsers.map((user: User, idx: number) => (
               <div key={user.id || user.email || idx} className="p-4 flex justify-between items-center">
                 <div>
                   <p className="font-medium">{user.firstName} {user.lastName}</p>
@@ -175,7 +175,7 @@ export default function AdminDashboard() {
           </div>
         ) : pendingDoctors.length > 0 ? (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {pendingDoctors.map((doctor: any, idx: number) => (
+            {pendingDoctors.map((doctor: Doctor, idx: number) => (
               <div key={doctor.id || doctor.email || idx} className="p-4 flex justify-between items-center">
                 <div>
                   <p className="font-medium">Dr. {doctor.firstName} {doctor.lastName}</p>

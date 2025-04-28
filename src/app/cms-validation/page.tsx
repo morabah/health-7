@@ -2,12 +2,10 @@
 
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { logInfo, logWarn, logError } from '@/lib/logger';
+import { logInfo, logError } from '@/lib/logger';
 import { 
   validateCollectionData, 
-  getSchemaForCollection,
-  type CollectionValidationResult,
-  type DocumentValidationResult
+  type CollectionValidationResult
 } from '@/lib/dataValidationUtils';
 import { 
   UserProfileSchema, 

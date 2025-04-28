@@ -1,0 +1,217 @@
+[
+  {
+    "userId": "test-doctor-pending-002",
+    "specialty": "General Practice",
+    "licenseNumber": "MD12345-P",
+    "yearsOfExperience": 5,
+    "bio": "General practitioner with focus on preventive care and family medicine.",
+    "verificationStatus": "pending",
+    "verificationNotes": "Awaiting license verification.",
+    "location": "New York, NY",
+    "languages": [
+      "English",
+      "Spanish"
+    ],
+    "consultationFee": 150,
+    "profilePictureUrl": "https://example.com/profile-pictures/doctor-pending.jpg",
+    "licenseDocumentUrl": "https://example.com/documents/license-pending.pdf",
+    "certificateUrl": "https://example.com/documents/certificate-pending.pdf",
+    "education": "University of Medicine - MD",
+    "servicesOffered": "Preventive care, family medicine, routine check-ups",
+    "educationHistory": [
+      {
+        "institution": "University of Medicine",
+        "degree": "Doctor of Medicine",
+        "field": "Medicine",
+        "startYear": 2010,
+        "endYear": 2014,
+        "isOngoing": false,
+        "description": "Graduated with honors."
+      }
+    ],
+    "experience": [],
+    "weeklySchedule": {
+      "monday": [
+        {
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "13:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "tuesday": [
+        {
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "wednesday": [
+        {
+          "startTime": "13:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "thursday": [
+        {
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "13:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "friday": [],
+      "saturday": [
+        {
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "sunday": []
+    },
+    "blockedDates": [
+      "2025-05-09T21:00:00.000Z",
+      "2025-05-10T21:00:00.000Z",
+      "2025-05-11T21:00:00.000Z",
+      "2025-05-12T21:00:00.000Z",
+      "2025-05-13T21:00:00.000Z",
+      "2025-06-14T21:00:00.000Z",
+      "2025-06-15T21:00:00.000Z"
+    ],
+    "createdAt": "2025-04-28T02:47:11.568Z",
+    "updatedAt": "2025-04-28T02:47:11.568Z"
+  },
+  {
+    "userId": "test-doctor-verified-003",
+    "specialty": "Cardiology",
+    "licenseNumber": "MD67890-V",
+    "yearsOfExperience": 12,
+    "bio": "Cardiologist specializing in preventive cardiology.",
+    "verificationStatus": "verified",
+    "verificationNotes": "All credentials verified.",
+    "location": "Boston, MA",
+    "languages": [
+      "English",
+      "French"
+    ],
+    "consultationFee": 250,
+    "profilePictureUrl": "/doctor-verified.jpg",
+    "licenseDocumentUrl": "https://example.com/documents/license-verified.pdf",
+    "certificateUrl": "https://example.com/documents/certificate-verified.pdf",
+    "education": "Harvard Medical School - Doctor of Medicine",
+    "servicesOffered": "Cardiovascular consultations, heart health evaluations, preventive cardiology",
+    "educationHistory": [
+      {
+        "institution": "Harvard Medical School",
+        "degree": "Doctor of Medicine",
+        "field": "Medicine",
+        "startYear": 2005,
+        "endYear": 2009,
+        "isOngoing": false,
+        "description": "Graduated with distinction."
+      }
+    ],
+    "experience": [],
+    "weeklySchedule": {
+      "monday": [
+        {
+          "startTime": "08:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "tuesday": [
+        {
+          "startTime": "08:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "13:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "wednesday": [
+        {
+          "startTime": "08:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "thursday": [
+        {
+          "startTime": "08:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "13:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "friday": [
+        {
+          "startTime": "08:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "saturday": [],
+      "sunday": []
+    },
+    "blockedDates": [
+      "2025-05-04T21:00:00.000Z",
+      "2025-05-05T21:00:00.000Z",
+      "2025-05-06T21:00:00.000Z",
+      "2025-05-04T21:00:00.000Z"
+    ],
+    "createdAt": "2025-04-21T02:47:11.570Z",
+    "updatedAt": "2025-04-28T02:47:11.568Z"
+  },
+  {
+    "userId": "test-doctor-rejected-004",
+    "specialty": "Neurology",
+    "licenseNumber": "MD11223-R",
+    "yearsOfExperience": 8,
+    "bio": "Neurologist with expertise in headache disorders.",
+    "verificationStatus": "rejected",
+    "verificationNotes": "License number could not be verified.",
+    "location": "Chicago, IL",
+    "languages": [
+      "English",
+      "German"
+    ],
+    "consultationFee": 200,
+    "profilePictureUrl": "https://example.com/profile-pictures/doctor-rejected.jpg",
+    "licenseDocumentUrl": "https://example.com/documents/license-rejected.pdf",
+    "certificateUrl": "https://example.com/documents/certificate-rejected.pdf",
+    "education": "Berlin Medical University - MD",
+    "servicesOffered": "Neurological evaluations, headache treatment, brain disorder diagnosis",
+    "educationHistory": [],
+    "experience": [],
+    "weeklySchedule": {
+      "monday": [],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [],
+      "friday": [],
+      "saturday": [],
+      "sunday": []
+    },
+    "blockedDates": [],
+    "createdAt": "2025-04-21T02:47:11.570Z",
+    "updatedAt": "2025-04-28T02:47:11.568Z"
+  }
+]

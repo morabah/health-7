@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
-import Alert from '@/components/ui/Alert';
+
 import type { Appointment } from '@/types/schemas';
 
 interface CompleteModalProps {
@@ -27,7 +27,6 @@ export default function CompleteAppointmentModal({
 }: CompleteModalProps) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -35,7 +34,6 @@ export default function CompleteAppointmentModal({
       // Small delay to avoid visual flickering during close animation
       const timer = setTimeout(() => {
         setNotes('');
-        setError('');
         setLoading(false);
       }, 200);
       return () => clearTimeout(timer);
@@ -47,14 +45,12 @@ export default function CompleteAppointmentModal({
     if (!appt) return;
 
     setLoading(true);
-    setError('');
 
     try {
       // Simulate network delay as specified in requirements
       await new Promise(resolve => setTimeout(resolve, 800));
       await onConfirm(appt.id, notes.trim());
-    } catch (err) {
-      setError('Failed to complete appointment. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -104,15 +100,6 @@ export default function CompleteAppointmentModal({
                   <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
                   <strong>{appt.startTime}</strong> as completed?
                 </p>
-
-                {error && (
-                  <Alert variant="error" className="mb-4">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle size={16} />
-                      <span>{error}</span>
-                    </div>
-                  </Alert>
-                )}
 
                 <Textarea
                   id="completion-notes"

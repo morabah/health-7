@@ -21,8 +21,22 @@ import { logInfo, logValidation } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import { useDoctorProfile, useDoctorAvailability } from '@/data/sharedLoaders';
 import { useBookAppointment } from '@/data/sharedLoaders';
-import { format, parseISO, addDays } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
+import Image from 'next/image';
+import type { DoctorProfile, TimeSlot } from '@/types/schemas';
+
+// Define the merged doctor profile type based on API response
+interface DoctorPublicProfile extends Omit<DoctorProfile, 'servicesOffered' | 'educationHistory' | 'experience'> {
+  id: string;
+  firstName: string;
+  lastName: string;
+  rating?: number;
+  reviewCount?: number;
+  servicesOffered?: string[];
+  educationHistory?: { institution: string; degree: string; year: string }[];
+  experience?: { position: string; hospital: string; duration: string }[];
+}
 
 export default function BookAppointmentPage() {
   const params = useParams();
@@ -31,8 +45,16 @@ export default function BookAppointmentPage() {
   const doctorId = params?.doctorId as string;
   
   // Fetch doctor profile and availability
-  const { data: doctorData, isLoading: doctorLoading, error: doctorError } = useDoctorProfile(doctorId);
-  const { data: availabilityData, isLoading: availabilityLoading, error: availabilityError } = useDoctorAvailability(doctorId);
+  const { data: doctorData, isLoading: doctorLoading, error: doctorError } = useDoctorProfile(doctorId) as {
+    data?: { success: boolean; doctor: DoctorPublicProfile };
+    isLoading: boolean;
+    error: unknown;
+  };
+  const { data: availabilityData, isLoading: availabilityLoading, error: availabilityError } = useDoctorAvailability(doctorId) as {
+    data?: { success: boolean; availability: { weeklySchedule: Record<string, TimeSlot[]>; blockedDates: string[] } };
+    isLoading: boolean;
+    error: unknown;
+  };
   const bookAppointmentMutation = useBookAppointment();
   
   // State variables
@@ -62,26 +84,26 @@ export default function BookAppointmentPage() {
   // Get available time slots for selected date
   const getAvailableTimeSlots = () => {
     if (!selectedDate || !availabilityData?.success) return [];
-    
     const { availability } = availabilityData;
     const dayOfWeek = format(selectedDate, 'EEEE').toLowerCase();
     const dateString = format(selectedDate, 'yyyy-MM-dd');
-    
     // Check if date is blocked
-    if (availability.blockedDates && availability.blockedDates.includes(dateString)) {
+    if (Array.isArray(availability.blockedDates) && availability.blockedDates.includes(dateString)) {
       return [];
     }
-    
     // Get slots for the day
-    if (availability.weeklySchedule && availability.weeklySchedule[dayOfWeek]) {
-      return availability.weeklySchedule[dayOfWeek]
-        .filter((slot: any) => slot.isAvailable)
-        .map((slot: any) => ({
+    if (
+      availability.weeklySchedule &&
+      Object.prototype.hasOwnProperty.call(availability.weeklySchedule, dayOfWeek) &&
+      Array.isArray(availability.weeklySchedule[dayOfWeek])
+    ) {
+      return (availability.weeklySchedule[dayOfWeek] as TimeSlot[])
+        .filter((slot) => slot.isAvailable)
+        .map((slot) => ({
           startTime: slot.startTime,
-          endTime: slot.endTime
+          endTime: slot.endTime,
         }));
     }
-    
     return [];
   };
   
@@ -149,7 +171,7 @@ export default function BookAppointmentPage() {
   if (doctorError || availabilityError) {
     return (
       <Alert variant="error">
-        {doctorError || availabilityError}
+        {doctorError instanceof Error ? doctorError.message : String(doctorError || availabilityError)}
       </Alert>
     );
   }
@@ -181,20 +203,23 @@ export default function BookAppointmentPage() {
                 <div className="flex items-center space-x-4 mb-4">
                   <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
                     {doctor.profilePictureUrl ? (
-                      <img 
-                        src={doctor.profilePictureUrl} 
+                      <Image
+                        src={doctor.profilePictureUrl as string}
                         alt={`Dr. ${doctor.firstName} ${doctor.lastName}`}
                         className="h-12 w-12 rounded-full object-cover"
+                        width={48}
+                        height={48}
                       />
                     ) : (
                       <span className="text-lg font-bold">
-                        {doctor.firstName?.[0]}{doctor.lastName?.[0]}
+                        {typeof doctor.firstName === 'string' ? doctor.firstName[0] : ''}
+                        {typeof doctor.lastName === 'string' ? doctor.lastName[0] : ''}
                       </span>
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold">Dr. {doctor.firstName} {doctor.lastName}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{doctor.specialty}</p>
+                    <h3 className="font-semibold">Dr. {doctor.firstName ?? ''} {doctor.lastName ?? ''}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{doctor.specialty ?? ''}</p>
                   </div>
                 </div>
                 
@@ -202,10 +227,10 @@ export default function BookAppointmentPage() {
                   {doctor.location && (
                     <div className="flex items-start text-sm">
                       <MapPin className="h-4 w-4 mt-0.5 mr-2 text-slate-400" />
-                      <span className="text-slate-600 dark:text-slate-300">{doctor.location}</span>
+                      <span className="text-slate-600 dark:text-slate-300">{doctor.location ?? ''}</span>
                     </div>
                   )}
-                  {doctor.consultationFee && (
+                  {doctor.consultationFee !== null && doctor.consultationFee !== undefined && (
                     <div className="flex items-center text-sm">
                       <Clock className="h-4 w-4 mr-2 text-slate-400" />
                       <span className="text-slate-600 dark:text-slate-300">
@@ -264,7 +289,7 @@ export default function BookAppointmentPage() {
               </div>
               <h2 className="text-xl font-semibold mb-2">Appointment Booked Successfully!</h2>
               <p className="text-slate-600 dark:text-slate-300 mb-6">
-                Your appointment with Dr. {doctor?.firstName} {doctor?.lastName} has been confirmed.
+                Your appointment with Dr. {doctor?.firstName ?? ''} {doctor?.lastName ?? ''} has been confirmed.
               </p>
               <p className="text-sm text-slate-500 mb-4">
                 Redirecting to your appointments...
@@ -305,7 +330,7 @@ export default function BookAppointmentPage() {
                   <h2 className="text-lg font-semibold mb-4">2. Select a Time Slot</h2>
                   {availableTimeSlots.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {availableTimeSlots.map((slot, index) => (
+                      {availableTimeSlots.map((slot, index: number) => (
                         <button
                           key={index}
                           type="button"
@@ -340,10 +365,11 @@ export default function BookAppointmentPage() {
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium mb-2">Appointment Type</label>
+                      <label className="block text-sm font-medium mb-2" htmlFor="appointment-type-inperson">Appointment Type</label>
                       <div className="flex space-x-4">
-                        <label className="flex items-center">
+                        <label className="flex items-center" htmlFor="appointment-type-inperson">
                           <input
+                            id="appointment-type-inperson"
                             type="radio"
                             className="h-4 w-4 text-primary border-slate-300"
                             checked={appointmentType === AppointmentType.IN_PERSON}
@@ -351,8 +377,9 @@ export default function BookAppointmentPage() {
                           />
                           <span className="ml-2 text-sm">In-person Visit</span>
                         </label>
-                        <label className="flex items-center">
+                        <label className="flex items-center" htmlFor="appointment-type-video">
                           <input
+                            id="appointment-type-video"
                             type="radio"
                             className="h-4 w-4 text-primary border-slate-300"
                             checked={appointmentType === AppointmentType.VIDEO}
@@ -364,9 +391,7 @@ export default function BookAppointmentPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Reason for Visit (Optional)
-                      </label>
+                      <label className="block text-sm font-medium mb-2" htmlFor="reason">Reason for Visit (Optional)</label>
                       <Textarea
                         id="reason"
                         rows={3}

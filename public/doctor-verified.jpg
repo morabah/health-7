@@ -1,0 +1,11 @@
+{{ ... }}
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="32" fill="#F3F4F6"/>
+  <circle cx="128" cy="96" r="48" fill="#CBD5E1"/>
+  <rect x="48" y="160" width="160" height="56" rx="28" fill="#E5E7EB"/>
+  <path d="M176 184c0-26.51-21.49-48-48-48s-48 21.49-48 48" stroke="#64748B" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="128" cy="96" r="32" fill="#FFF"/>
+  <circle cx="128" cy="96" r="24" fill="#A7F3D0"/>
+  <path d="M112 112l12 12 20-20" stroke="#059669" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{{ ... }}

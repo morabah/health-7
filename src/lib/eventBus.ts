@@ -17,7 +17,7 @@ export enum LogLevel {
 export interface LogEventPayload {
   level: LogLevel;
   message: string;
-  data?: any;
+  data?: unknown;
   timestamp: number;
 }
 

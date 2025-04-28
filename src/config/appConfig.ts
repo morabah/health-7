@@ -59,9 +59,12 @@ const logAppConfig = () => {
 // Execute logging on module import
 logAppConfig();
 
-export default {
+// Assign to variable before exporting
+const appConfig = {
   API_MODE,
   LOG_LEVEL,
   IS_DEVELOPMENT,
   IS_MOCK_MODE
-}; 
+};
+
+export default appConfig; 

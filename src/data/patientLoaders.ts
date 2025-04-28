@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { z } from 'zod';
-import { CancelAppointmentSchema } from '@/types/schemas';
 
 /**
  * Hook to fetch patient profile data
@@ -17,7 +15,10 @@ export const usePatientProfile = () => {
     queryKey: ['patientProfile', user?.uid],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getMyUserProfile', { uid: user.uid });
+      return callApi('getMyUserProfile', { 
+        uid: user.uid,
+        role: UserType.PATIENT
+      });
     },
     enabled: !!user?.uid
   });
@@ -32,7 +33,7 @@ export const useUpdatePatientProfile = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
       // This is a placeholder - will use the proper endpoint when available
       console.warn('updateMyUserProfile not yet implemented in localApiFunctions');
@@ -73,16 +74,23 @@ export const useCancelAppointment = () => {
   return useMutation({
     mutationFn: async (params: { appointmentId: string, reason?: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
+      
+      // Combine context and payload into a single object as required by callApi
+      // Fix object literal property error: remove 'appointmentId' from context object
       return callApi('cancelAppointment', { 
         uid: user.uid, 
         role: UserType.PATIENT,
-        appointmentId: params.appointmentId,
+        // Payload properties
         reason: params.reason
-      });
+      }, params.appointmentId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: unknown) => {
+      console.error('Error cancelling appointment:', error);
+      return error;
     }
   });
 }; 

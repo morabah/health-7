@@ -8,10 +8,10 @@
 
 interface FirestoreEmulator {
   collection: (name: string) => {
-    doc: (id: string) => any;
+    doc: (id: string) => unknown;
   };
   batch: () => {
-    set: (ref: any, data: any) => void;
+    set: (ref: { id: string; collection: string }, data: unknown) => void;
     commit: () => Promise<void>;
   };
 }
@@ -42,7 +42,7 @@ export function initAdminApp(): FirestoreEmulator {
       })
     }),
     batch: () => ({
-      set: (ref: any, data: any) => {
+      set: (ref: { id: string; collection: string }) => {
         console.log(`Would set document ${ref.id} in collection ${ref.collection}`);
       },
       commit: async () => {

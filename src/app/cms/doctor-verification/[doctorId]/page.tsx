@@ -17,7 +17,7 @@ export default function DoctorVerificationDetailPage() {
   
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
-  const [doctor, setDoctor] = useState({
+  const doctor = {
     id: doctorId,
     firstName: 'Jane',
     lastName: 'Smith',
@@ -36,7 +36,7 @@ export default function DoctorVerificationDetailPage() {
       { type: 'Medical License', filename: 'license.pdf', url: '#' },
       { type: 'Board Certification', filename: 'certification.pdf', url: '#' }
     ]
-  });
+  };
   
   useEffect(() => {
     // Log when component mounts
@@ -125,48 +125,48 @@ export default function DoctorVerificationDetailPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">Full Name</label>
                   <p className="mt-1">Dr. {doctor.firstName} {doctor.lastName}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Specialty</label>
+                  <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">Specialty</label>
                   <p className="mt-1">{doctor.specialty}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">License Number</label>
+                  <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">License Number</label>
                   <p className="mt-1">{doctor.licenseNumber}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Years of Experience</label>
+                  <label htmlFor="yearsOfExperience" className="block text-sm font-medium text-gray-700">Years of Experience</label>
                   <p className="mt-1">{doctor.yearsOfExperience}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
                   <p className="mt-1">{doctor.email}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
                   <p className="mt-1">{doctor.phone}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Languages</label>
+                  <label htmlFor="languages" className="block text-sm font-medium text-gray-700">Languages</label>
                   <p className="mt-1">{doctor.languages.join(', ')}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Submitted</label>
+                  <label htmlFor="submittedDate" className="block text-sm font-medium text-gray-700">Submitted</label>
                   <p className="mt-1">{formatDate(doctor.submittedDate)}</p>
                 </div>
               </div>
               
               <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Education</label>
+                <label htmlFor="education" className="block text-sm font-medium text-gray-700 mb-2">Education</label>
                 <ul className="divide-y divide-gray-200 border rounded">
                   {doctor.education.map((edu, index) => (
                     <li key={index} className="p-3">

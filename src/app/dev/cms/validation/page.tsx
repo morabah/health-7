@@ -8,9 +8,6 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { z } from 'zod';
-import Alert from '@/components/ui/Alert';
-import { PatientProfileSchema } from '@/types/schemas';
 
 /**
  * Authentication Flow Validation Page
@@ -34,7 +31,6 @@ export default function AuthValidationPage() {
     userType: UserType.PATIENT,
     gender: 'MALE',
     dateOfBirth: '1990-01-01',
-    bloodType: 'A_POSITIVE',
     medicalHistory: 'No significant history',
   };
 
@@ -126,91 +122,6 @@ export default function AuthValidationPage() {
       );
     }
   }, []);
-
-  const runValidation = (name: string, validator: () => boolean | Promise<boolean>, successMessage?: string) => {
-    try {
-      const result = validator();
-      if (result instanceof Promise) {
-        return result
-          .then(passed => {
-            setResults(prev => [...prev, { name, passed, message: passed ? successMessage : 'Failed' }]);
-            return passed;
-          })
-          .catch(err => {
-            setResults(prev => [...prev, { name, passed: false, message: err.message }]);
-            return false;
-          });
-      } else {
-        setResults(prev => [...prev, { name, passed: result, message: result ? successMessage : 'Failed' }]);
-        return result;
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setResults(prev => [...prev, { name, passed: false, message }]);
-      return false;
-    }
-  };
-
-  const validateEnums = () => {
-    // Check that UserType has expected values
-    const hasUserTypes = UserType.PATIENT && UserType.DOCTOR && UserType.ADMIN;
-    
-    // Check that BloodType has A_POSITIVE
-    const hasBloodTypes = BloodType.A_POSITIVE !== undefined;
-    
-    // Check NotificationType has expected values
-    const hasNotificationTypes = NotificationType.APPOINTMENT_CONFIRMED && 
-                                NotificationType.VERIFICATION_STATUS_CHANGE;
-    
-    return hasUserTypes && hasBloodTypes && hasNotificationTypes;
-  };
-
-  const validateSchemas = () => {
-    try {
-      // Create a test patient profile
-      const testProfile = {
-        userId: 'test-123',
-        dateOfBirth: '1990-01-01',
-        gender: 'MALE',
-        bloodType: BloodType.A_POSITIVE,
-        medicalHistory: 'None',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Try to parse it with the schema
-      const parsed = PatientProfileSchema.parse(testProfile);
-      return !!parsed;
-    } catch (err) {
-      console.error('Schema validation failed:', err);
-      return false;
-    }
-  };
-
-  const runAllValidations = async () => {
-    setLoading(true);
-    setResults([]);
-    
-    try {
-      // Basic validations
-      await runValidation('Enum Types', validateEnums, 'All required enum types are present');
-      await runValidation('Zod Schemas', validateSchemas, 'Schemas are correctly defined');
-      
-      // API integrations validation
-      logValidation('4.11', 'success', 'UI & local backend fully integrated; all interactive elements persist to local_db');
-      
-      // Final validation
-      setResults(prev => [...prev, { 
-        name: 'Final Validation', 
-        passed: true, 
-        message: 'All features are working properly with real data from API calls'
-      }]);
-    } catch (error) {
-      console.error('Validation error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Add test scenario for Patient booking then canceling an appointment
   const runScenarioA = () => {
@@ -370,7 +281,7 @@ export default function AuthValidationPage() {
             <p className="mb-4">Patient books, cancels, sees notifications</p>
             <Button 
               onClick={() => runScenarioA()}
-              disabled={loading || !user || user.profile?.userType !== UserType.PATIENT}
+              disabled={loading || !user || profile?.userType !== UserType.PATIENT}
               className="w-full"
             >
               Run Test
@@ -382,7 +293,7 @@ export default function AuthValidationPage() {
             <p className="mb-4">Doctor sets availability → patient sees slots</p>
             <Button 
               onClick={() => runScenarioB()}
-              disabled={loading || !user || user.profile?.userType !== UserType.DOCTOR}
+              disabled={loading || !user || profile?.userType !== UserType.DOCTOR}
               className="w-full"
             >
               Run Test
@@ -391,10 +302,10 @@ export default function AuthValidationPage() {
           
           <div className="border p-4 rounded bg-slate-50 dark:bg-slate-800">
             <h3 className="text-lg font-bold mb-2">Test Scenario 3</h3>
-            <p className="mb-4">Admin verifies doctor → doctor's status flips, notification delivered</p>
+            <p className="mb-4">Admin verifies doctor → doctor&apos;s status flips, notification delivered</p>
             <Button 
               onClick={() => runScenarioC()}
-              disabled={loading || !user || user.profile?.userType !== UserType.ADMIN}
+              disabled={loading || !user || profile?.userType !== UserType.ADMIN}
               className="w-full"
             >
               Run Test

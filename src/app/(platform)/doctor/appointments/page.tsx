@@ -18,7 +18,6 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
-  Filter,
 } from 'lucide-react';
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
 import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';

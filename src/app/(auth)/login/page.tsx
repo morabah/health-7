@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { LogIn } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
@@ -18,7 +17,6 @@ import { useAuth } from '@/context/AuthContext';
  * @returns Login form component
  */
 export default function LoginPage() {
-  const router = useRouter();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -183,7 +181,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mt-4 text-sm text-slate-500">
-          <p>Test Accounts (use with password "password"):</p>
+          <p>Test Accounts (use with password &quot;password&quot;):</p>
           <ul className="mt-2 space-y-1">
             <li>Patient: test-patient@example.com</li>
             <li>Doctor: test-doctor@example.com</li>

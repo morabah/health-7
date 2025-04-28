@@ -6,11 +6,11 @@ import Card from '@/components/ui/Card';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import VerificationForm from '@/components/admin/VerificationForm';
-import { FileText, ExternalLink, User } from 'lucide-react';
-import { useUserDetail, useUpdateDoctorVerification } from '@/data/adminLoaders';
+import { FileText, ExternalLink } from 'lucide-react';
+import { useUserDetail, useVerifyDoctor } from '@/data/adminLoaders';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { VerificationStatus } from '@/types/enums';
+import type { VerificationStatus } from '@/types/enums';
 import { logInfo, logValidation } from '@/lib/logger';
 import Image from 'next/image';
 
@@ -19,15 +19,6 @@ type Document = {
   url: string;
   type: string;
 };
-
-// Helper component for placeholder content
-function PlaceholderLine({ text }: { text: string }) {
-  return (
-    <div className="p-6 text-center text-slate-500 dark:text-slate-400">
-      {text}
-    </div>
-  );
-}
 
 const DoctorVerificationPage = () => {
   const params = useParams();
@@ -43,36 +34,37 @@ const DoctorVerificationPage = () => {
   } = useUserDetail(doctorId);
   
   // Get verification mutation
-  const verifyDoctorMutation = useUpdateDoctorVerification();
+  const verifyDoctorMutation = useVerifyDoctor();
   
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [documentError, setDocumentError] = useState<string | null>(null);
 
   useEffect(() => {
     logInfo('DoctorVerificationPage mounted', { doctorId });
-    
-    // If doctor data is available, extract documents
-    if (doctorData?.user?.doctorProfile) {
-      const profile = doctorData.user.doctorProfile;
+    // If doctor data is available and successful, extract documents
+    if (
+      doctorData &&
+      'success' in doctorData &&
+      doctorData.success &&
+      doctorData.user &&
+      doctorData.user.doctorProfile &&
+      typeof doctorData.user.doctorProfile === 'object'
+    ) {
+      const profile = doctorData.user.doctorProfile as Record<string, unknown>;
       const docs: Document[] = [];
-      
-      if (profile.licenseDocumentUrl) {
+      if (typeof profile.licenseDocumentUrl === 'string' && profile.licenseDocumentUrl) {
         docs.push({
           title: 'Medical License',
           url: profile.licenseDocumentUrl,
-          type: 'license'
+          type: 'license',
         });
       }
-      
-      if (profile.certificateUrl) {
+      if (typeof profile.certificateUrl === 'string' && profile.certificateUrl) {
         docs.push({
           title: 'Medical Certificate',
           url: profile.certificateUrl,
-          type: 'certificate'
+          type: 'certificate',
         });
       }
-      
       setDocuments(docs);
     }
   }, [doctorId, doctorData]);
@@ -103,13 +95,13 @@ const DoctorVerificationPage = () => {
     logInfo('doctor-verification rendered (with real data)', { doctorId });
   }, [doctorId]);
 
-  const doctor = doctorData?.user;
-  const doctorProfile = doctor?.doctorProfile;
+  const doctor = doctorData && 'success' in doctorData && doctorData.success ? doctorData.user as Record<string, unknown> : null;
+  const doctorProfile = doctor && typeof doctor === 'object' && 'doctorProfile' in doctor && typeof doctor.doctorProfile === 'object' ? doctor.doctorProfile as Record<string, unknown> : null;
 
   if (isLoadingDoctor) {
     return (
       <div className="p-6 flex justify-center items-center min-h-screen">
-        <Spinner size="lg" />
+        <Spinner />
         <span className="ml-3 text-gray-600">Loading doctor information...</span>
       </div>
     );
@@ -157,10 +149,10 @@ const DoctorVerificationPage = () => {
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-center gap-4">
               <div className="flex-shrink-0 w-24 h-24 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
-                {doctorProfile.profilePictureUrl ? (
+                {doctorProfile && typeof doctorProfile.profilePictureUrl === 'string' && doctorProfile.profilePictureUrl ? (
                   <Image
                     src={doctorProfile.profilePictureUrl}
-                    alt={`${doctor.firstName} ${doctor.lastName}`}
+                    alt={`${typeof doctor?.firstName === 'string' ? doctor.firstName : ''} ${typeof doctor?.lastName === 'string' ? doctor.lastName : ''}`}
                     width={96}
                     height={96}
                     className="w-full h-full rounded-full object-cover"
@@ -168,41 +160,42 @@ const DoctorVerificationPage = () => {
                 ) : (
                   <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
                     <span className="text-gray-500 text-xl">
-                      {doctor.firstName?.[0]}{doctor.lastName?.[0]}
+                      {typeof doctor?.firstName === 'string' ? doctor.firstName[0] : ''}
+                      {typeof doctor?.lastName === 'string' ? doctor.lastName[0] : ''}
                     </span>
                   </div>
                 )}
               </div>
               
               <div className="flex-grow">
-                <h3 className="text-xl font-semibold">Dr. {doctor.firstName} {doctor.lastName}</h3>
+                <h3 className="text-xl font-semibold">Dr. {typeof doctor?.firstName === 'string' ? doctor.firstName : ''} {typeof doctor?.lastName === 'string' ? doctor.lastName : ''}</h3>
                 <p className="text-slate-600 dark:text-slate-400">
-                  {doctorProfile?.specialty || 'General Practice'}
+                  {doctorProfile && typeof doctorProfile.specialty === 'string' ? doctorProfile.specialty : 'General Practice'}
                 </p>
                 <p className="text-slate-500 dark:text-slate-500">
-                  License: {doctorProfile?.licenseNumber || 'Not provided'}
+                  License: {doctorProfile && typeof doctorProfile.licenseNumber === 'string' ? doctorProfile.licenseNumber : 'Not provided'}
                 </p>
                 <p className="text-slate-500 dark:text-slate-500">
-                  Experience: {doctorProfile?.yearsOfExperience || '0'} years
+                  Experience: {doctorProfile && typeof doctorProfile.yearsOfExperience === 'number' ? doctorProfile.yearsOfExperience : '0'} years
                 </p>
               </div>
               
               <div className="md:text-right">
                 <div className="inline-block px-3 py-1 rounded-full text-sm" 
                   style={{
-                    backgroundColor: doctor.verificationStatus === 'VERIFIED' 
+                    backgroundColor: doctor && doctor.verificationStatus === 'VERIFIED' 
                       ? 'rgba(16, 185, 129, 0.1)' 
-                      : doctor.verificationStatus === 'REJECTED'
+                      : doctor && doctor.verificationStatus === 'REJECTED'
                         ? 'rgba(239, 68, 68, 0.1)'
                         : 'rgba(245, 158, 11, 0.1)',
-                    color: doctor.verificationStatus === 'VERIFIED'
+                    color: doctor && doctor.verificationStatus === 'VERIFIED'
                       ? 'rgb(16, 185, 129)'
-                      : doctor.verificationStatus === 'REJECTED'
+                      : doctor && doctor.verificationStatus === 'REJECTED'
                         ? 'rgb(239, 68, 68)'
                         : 'rgb(245, 158, 11)'
                   }}
                 >
-                  {doctor.verificationStatus || 'PENDING'}
+                  {doctor && typeof doctor.verificationStatus === 'string' ? doctor.verificationStatus : 'PENDING'}
                 </div>
               </div>
             </div>
@@ -216,13 +209,7 @@ const DoctorVerificationPage = () => {
           <h2 className="text-lg font-semibold">Uploaded Documents</h2>
         </div>
         
-        {isLoadingDocuments ? (
-          <div className="flex justify-center items-center p-6">
-            <Spinner />
-          </div>
-        ) : documentError ? (
-          <Alert variant="error" className="m-4">{documentError}</Alert>
-        ) : documents.length === 0 ? (
+        {documents.length === 0 ? (
           <div className="p-6 text-center text-slate-500 dark:text-slate-400">
             No documents have been uploaded
           </div>

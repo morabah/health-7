@@ -1,18 +1,13 @@
 'use client';
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { 
   UserProfileSchema, 
   PatientProfileSchema, 
   DoctorProfileSchema, 
   AppointmentSchema, 
-  NotificationSchema,
-  type UserProfile,
-  type PatientProfile,
-  type DoctorProfile,
-  type Appointment,
-  type Notification
+  NotificationSchema
 } from '@/types/schemas';
 // Import localDb module statically
 import * as localDb from './localDb';
@@ -23,7 +18,7 @@ import * as localDb from './localDb';
 export interface FieldError { 
   field: string; 
   message: string; 
-  received: any; 
+  received: unknown; 
 }
 
 /**
@@ -64,8 +59,7 @@ export interface ValidationSummary {
  * @returns Promise resolving to validation results for each document
  */
 export async function validateCollectionData<
-  TData extends { [key: string]: any },
-  TSchema extends z.ZodType<any>
+  TSchema extends z.ZodType<unknown>
 >(
   collectionName: string,
   schema: TSchema,
@@ -76,9 +70,9 @@ export async function validateCollectionData<
   
   try {
     // Fetch data from local database
-    const documents = await getLocalData(collectionName);
+    const data = await getLocalData(collectionName);
     
-    if (!documents || !Array.isArray(documents)) {
+    if (!data || !Array.isArray(data)) {
       return [{ 
         id: 'N/A', 
         collection: collectionName, 
@@ -87,53 +81,53 @@ export async function validateCollectionData<
       }];
     }
     
-    logInfo(`Fetched ${documents.length} documents from ${collectionName}`);
+    logInfo(`Fetched ${data.length} documents from ${collectionName}`);
     
     // Validate each document
-    documents.forEach((doc) => {
-      const id = doc.id;
-      // Remove id from validation if using separate id field
-      const { id: docId, ...dataToValidate } = doc;
-      
-      const validation = schema.safeParse(dataToValidate);
-      
-      if (validation.success) {
-        results.push({ 
-          id, 
-          collection: collectionName, 
-          status: 'valid' 
+    for (const doc of data) {
+      // doc is unknown, so we must narrow its type for safe property access
+      if (typeof doc === 'object' && doc !== null && 'id' in doc) {
+        const { id, ...rest } = doc as { id: string } & Record<string, unknown>;
+        const result = schema.safeParse(rest);
+        results.push({
+          id,
+          collection: collectionName,
+          status: result.success ? 'valid' : 'invalid',
+          errors: result.success ? [] : result.error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+            received: Array.isArray(issue.path) && issue.path.length > 0
+              ? issue.path.reduce<{ [key: string]: unknown }>((obj, key) =>
+                  typeof obj === 'object' && obj !== null && key in obj
+                    ? (obj as Record<string, unknown>)[key as string]
+                    : undefined,
+                rest)
+              : undefined
+          })),
         });
         if (verbose) {
           logInfo(`✓ Valid: ${collectionName}/${id}`);
         }
       } else {
-        const fieldErrors: FieldError[] = validation.error.issues.map(issue => ({
-          field: issue.path.join('.'),
-          message: issue.message,
-          received: issue.path.reduce((obj, key) => obj?.[key], dataToValidate) // Get failing value
-        }));
-        
-        results.push({ 
-          id, 
-          collection: collectionName, 
-          status: 'invalid', 
-          errors: fieldErrors 
+        results.push({
+          id: 'unknown',
+          collection: collectionName,
+          status: 'invalid',
+          errors: [{ field: 'id', message: 'Missing id', received: doc }],
         });
-        
-        logWarn(`✗ Validation failed for ${collectionName}/${id}`, fieldErrors);
       }
-    });
+    }
 
     // Generate and log summary
     const summary = generateValidationSummary(results, collectionName);
     logInfo(`Validation summary for ${collectionName}:`, summary);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logError(`Error fetching or validating collection ${collectionName}`, error);
     results.push({ 
       id: 'N/A', 
       collection: collectionName, 
       status: 'error', 
-      fetchError: error.message 
+      fetchError: error instanceof Error ? error.message : String(error)
     });
   }
   
@@ -213,7 +207,7 @@ export async function validateMultipleCollections(
  * @param collectionName - The name of the collection
  * @returns The Zod schema for the collection or undefined if not found
  */
-export function getSchemaForCollection(collectionName: string): z.ZodType<any> | undefined {
+export function getSchemaForCollection(collectionName: string): z.ZodType<unknown> | undefined {
   switch (collectionName) {
     case 'users':
       return UserProfileSchema;
@@ -236,7 +230,7 @@ export function getSchemaForCollection(collectionName: string): z.ZodType<any> |
  * @param collectionName - The name of the collection
  * @returns Promise resolving to the data or null if not found
  */
-async function getLocalData(collectionName: string): Promise<any[] | null> {
+async function getLocalData(collectionName: string): Promise<unknown[] | null> {
   switch (collectionName) {
     case 'users':
       return await localDb.getUsers();

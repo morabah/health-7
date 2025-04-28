@@ -2,10 +2,9 @@
 
 import React, { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
-import Alert from '@/components/ui/Alert';
 
 interface CancelModalProps {
   isOpen: boolean;
@@ -31,7 +30,6 @@ export default function CancelAppointmentModal({
 }: CancelModalProps) {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   // Reset state when modal opens/closes
   React.useEffect(() => {
@@ -39,7 +37,6 @@ export default function CancelAppointmentModal({
       // Small delay to avoid visual flickering during close animation
       const timer = setTimeout(() => {
         setReason('');
-        setError('');
         setLoading(false);
       }, 200);
       return () => clearTimeout(timer);
@@ -50,19 +47,14 @@ export default function CancelAppointmentModal({
   const handleConfirm = async () => {
     if (!appt) return;
     if (!reason.trim()) {
-      setError('Please provide a reason for cancellation');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
       await onConfirm(appt.id, reason.trim());
-    } catch (err) {
-      setError('Failed to cancel appointment. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -112,15 +104,6 @@ export default function CancelAppointmentModal({
                   <strong>{new Date(appt.date).toLocaleDateString()}</strong> at{' '}
                   <strong>{appt.time}</strong>?
                 </p>
-
-                {error && (
-                  <Alert variant="error" className="mb-4">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle size={16} />
-                      <span>{error}</span>
-                    </div>
-                  </Alert>
-                )}
 
                 <Textarea
                   id="cancellation-reason"

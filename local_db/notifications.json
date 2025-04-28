@@ -1,0 +1,22 @@
+[
+  {
+    "userId": "test-patient-verified-001",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Emma Verified has been confirmed.",
+    "isRead": false,
+    "createdAt": "2025-04-28T02:47:11.568Z",
+    "type": "appointment_booked",
+    "relatedId": "appt-upcoming-002",
+    "id": "notif-appt-booked-001"
+  },
+  {
+    "userId": "test-patient-verified-001",
+    "title": "Welcome to Health App",
+    "message": "Thank you for registering. Complete your profile to get the most out of our services.",
+    "isRead": true,
+    "createdAt": "2025-04-21T02:47:11.570Z",
+    "type": "system",
+    "relatedId": null,
+    "id": "notif-system-003"
+  }
+]

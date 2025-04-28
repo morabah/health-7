@@ -1,0 +1,215 @@
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/__tests__/lib/dataValidationUtils.test.ts
+  5:8  error  'DocumentValidationResult' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(auth)/login/page.tsx
+   21:9   error  'router' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+  186:47  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  186:56  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/admin/dashboard/page.tsx
+   33:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  178:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/admin/doctor-verification/[doctorId]/page.tsx
+   9:34  error    'User' is defined but never used                                          @typescript-eslint/no-unused-vars
+  13:1   warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+  24:10  error    'PlaceholderLine' is defined but never used                               @typescript-eslint/no-unused-vars
+  49:30  error    'setIsLoadingDocuments' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  50:25  error    'setDocumentError' is assigned a value but never used                     @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/book-appointment/[doctorId]/page.tsx
+   24:18  error    'parseISO' is defined but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   78:24  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+   79:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  184:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  343:23  error    A form label must be associated with a control                                                                                                                                                                                                                  jsx-a11y/label-has-associated-control
+  367:23  error    A form label must be associated with a control                                                                                                                                                                                                                  jsx-a11y/label-has-associated-control
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/doctor-profile/[doctorId]/page.tsx
+   26:11  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+   30:56  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+   37:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  193:50  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  235:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/doctor/appointments/page.tsx
+  21:3  error  'Filter' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/doctor/availability/page.tsx
+  10:27  error  'Copy' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/messages/page.tsx
+  3:20  error  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/notifications/page.tsx
+  4:29  error  'Trash' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/patient/appointments/page.tsx
+  96:9  error  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/(platform)/patient/profile/page.tsx
+  88:14  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/api/localDb/route.ts
+  47:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  96:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/auth/login/page.tsx
+   21:9   error  'router' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+  152:47  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  152:56  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/cms-validation/page.tsx
+   5:19  error  'logWarn' is defined but never used                   @typescript-eslint/no-unused-vars
+   8:3   error  'getSchemaForCollection' is defined but never used    @typescript-eslint/no-unused-vars
+  10:8   error  'DocumentValidationResult' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/cms/doctor-verification/[doctorId]/page.tsx
+   20:18  error  'setDoctor' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  128:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  133:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  138:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  143:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  148:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  153:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  158:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  163:19  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  169:17  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/cms/doctor-verification/page.tsx
+  15:26  error  'setPendingDoctors' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/app/dev/cms/validation/page.tsx
+   11:10  error  'z' is defined but never used                                    @typescript-eslint/no-unused-vars
+   12:8   error  'Alert' is defined but never used                                @typescript-eslint/no-unused-vars
+  190:9   error  'runAllValidations' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  394:63  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/components/admin/VerificationForm.tsx
+  18:3   error  'doctorId' is defined but never used  @typescript-eslint/no-unused-vars
+  50:14  error  'err' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/components/auth/Protected.tsx
+  8:1  warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/components/doctor/CompleteAppointmentModal.tsx
+  56:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/components/patient/CancelAppointmentModal.tsx
+  64:14  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/config/appConfig.ts
+  62:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/context/AuthContext.tsx
+    3:1   warning  Imports "ReactNode" are only used as type                                                                          @typescript-eslint/consistent-type-imports
+    5:29  error    'logValidation' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+    8:8   error    'localApi' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+   10:1   warning  All imports in the declaration are only used as types. Use `import type`                                           @typescript-eslint/consistent-type-imports
+   12:10  error    'mockUserData' is defined but never used                                                                           @typescript-eslint/no-unused-vars
+   13:10  error    'z' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+   65:69  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+   66:67  error    Unexpected any. Specify a different type                                                                           @typescript-eslint/no-explicit-any
+   70:7   error    'SESSION_KEY' is assigned a value but never used                                                                   @typescript-eslint/no-unused-vars
+   88:10  error    'initialized' is assigned a value but never used                                                                   @typescript-eslint/no-unused-vars
+  123:6   warning  React Hook useEffect has a missing dependency: 'refreshProfile'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/data/adminLoaders.ts
+  4:1  warning  Imports "VerificationStatus" and "AccountStatus" are only used as type  @typescript-eslint/consistent-type-imports
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/data/doctorLoaders.ts
+  7:1  warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+  8:1  warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/data/patientLoaders.ts
+   7:10  error  'z' is defined but never used                        @typescript-eslint/no-unused-vars
+   8:10  error  'CancelAppointmentSchema' is defined but never used  @typescript-eslint/no-unused-vars
+  35:24  error  'data' is defined but never used                     @typescript-eslint/no-unused-vars
+  35:30  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/data/sharedLoaders.ts
+  6:20  error  'AppointmentType' is defined but never used          @typescript-eslint/no-unused-vars
+  7:10  error  'z' is defined but never used                        @typescript-eslint/no-unused-vars
+  8:10  error  'FindDoctorsSchema' is defined but never used        @typescript-eslint/no-unused-vars
+  8:29  error  'GetAvailableSlotsSchema' is defined but never used  @typescript-eslint/no-unused-vars
+  8:54  error  'BookAppointmentSchema' is defined but never used    @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/firebase_backend/functions/src/shared/schemas.ts
+   8:3  error  'AppointmentStatus' is defined but never used  @typescript-eslint/no-unused-vars
+  11:3  error  'Gender' is defined but never used             @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/dataValidationUtils.ts
+    3:1   warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+   11:8   error    'UserProfile' is defined but never used                                   @typescript-eslint/no-unused-vars
+   12:8   error    'PatientProfile' is defined but never used                                @typescript-eslint/no-unused-vars
+   13:8   error    'DoctorProfile' is defined but never used                                 @typescript-eslint/no-unused-vars
+   14:8   error    'Appointment' is defined but never used                                   @typescript-eslint/no-unused-vars
+   15:8   error    'Notification' is defined but never used                                  @typescript-eslint/no-unused-vars
+   26:13  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+   67:3   error    'TData' is defined but never used                                         @typescript-eslint/no-unused-vars
+   67:34  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+   68:29  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+   96:19  error    'docId' is assigned a value but never used                                @typescript-eslint/no-unused-vars
+  130:19  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  216:75  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  239:62  error    Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/emulatorAdmin.ts
+  11:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  14:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  14:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  45:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  45:23  error  'data' is defined but never used          @typescript-eslint/no-unused-vars
+  45:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/eventBus.ts
+  20:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/localApiFunctions.ts
+    12:15  error  A `require()` style import is forbidden               @typescript-eslint/no-require-imports
+    22:10  error  'isSlotAvailable' is defined but never used           @typescript-eslint/no-unused-vars
+    22:27  error  'hasAppointmentConflict' is defined but never used    @typescript-eslint/no-unused-vars
+   116:7   error  'notImpl' is assigned a value but never used          @typescript-eslint/no-unused-vars
+   525:36  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+   555:47  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+   583:44  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  1771:10  error  'getAvailableSlotsForDate' is defined but never used  @typescript-eslint/no-unused-vars
+  1772:3   error  'doctor' is defined but never used                    @typescript-eslint/no-unused-vars
+  1772:11  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  1773:3   error  'date' is defined but never used                      @typescript-eslint/no-unused-vars
+  1774:3   error  'appointments' is defined but never used              @typescript-eslint/no-unused-vars
+  1774:17  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/logger.ts
+  10:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  47:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  65:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/mockApi/appointmentApi.ts
+  10:10  error  'AppointmentSchema' is defined but never used  @typescript-eslint/no-unused-vars
+  10:29  error  'DoctorProfile' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/mockData.ts
+  8:1  warning  All imports in the declaration are only used as types. Use `import type`  @typescript-eslint/consistent-type-imports
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/queryClient.ts
+  4:1  warning  Imports "ReactNode" are only used as type  @typescript-eslint/consistent-type-imports
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/serverLocalDb.ts
+  51:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/types/node-fetch.d.ts
+   6:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  21:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/utils/availabilityUtils.ts
+  12:3   error  'isoDateTimeStringSchema' is defined but never used  @typescript-eslint/no-unused-vars
+  14:18  error  'isEqual' is defined but never used                  @typescript-eslint/no-unused-vars
+
+✖ 131 problems (117 errors, 14 warnings)
+  0 errors and 10 warnings potentially fixable with the `--fix` option.
+

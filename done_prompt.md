@@ -325,3 +325,54 @@ This prompt focused on ensuring every button, form, and UI element in the applic
 - Booking appointments creates records in appointments.json and notifications.json
 
 The polishing work ensures a seamless user experience with real data flowing between the UI and the local database files.
+
+---
+
+**Prompt Step 28: Fix doctor.education.map runtime error**
+
+- Issue: Unhandled runtime error when rendering the doctor profile page if `doctor.education` is not an array.
+- File updated: `/src/app/(platform)/doctor-profile/[doctorId]/page.tsx`
+- Change: Added a defensive check using `Array.isArray(doctor.education)` before calling `.map()` on `doctor.education` to ensure it is safe to iterate. This prevents the error `doctor.education.map is not a function`.
+- No other files or logic were changed.
+- The fix is robust and does not introduce any side effects.
+
+---
+
+**Prompt Step 52: Add placeholder image for doctor-verified.jpg**
+
+- Issue: UI referenced /public/doctor-verified.jpg, but file was missing or invalid (1 byte), resulting in a 404 and broken image.
+- Action: Replaced /public/doctor-verified.jpg with a valid SVG placeholder image representing a verified doctor/avatar with a checkmark badge.
+- No other files or logic were changed.
+- The UI now displays a suitable placeholder image wherever doctor-verified.jpg is referenced.
+
+---
+
+**Prompt Step 67: Fast Refresh warning fix - Split core logic from localApiFunctions.ts**
+
+- Created `src/lib/localApiCore.ts` and moved all non-React logic, types, and utilities from `localApiFunctions.ts` into this file.
+- Updated `localApiFunctions.ts` to import all core types, schemas, and utilities from `localApiCore.ts` and removed duplicate declarations, resolving TypeScript import conflicts and Fast Refresh warnings.
+- No changes to application logic or APIs; this is a pure refactor for developer experience and codebase hygiene.
+- Next.js Fast Refresh should now work without full reload warnings for API logic changes.
+
+---
+
+## Prompt Step 112
+
+- Replaced all occurrences of `any` with `unknown` in:
+  - src/lib/dataValidationUtils.ts (function parameters, generics, variable declarations)
+  - src/lib/logger.ts (function signatures)
+  - src/lib/emulatorAdmin.ts (function signatures and usages)
+- Updated reducer and error mapping logic in data validation to safely access properties on `unknown`.
+- All property accesses on `unknown` are now type-guarded and narrowed.
+- Logger and emulator admin utilities enforce stricter typing.
+- No unrelated features or logic were changed.
+- Outstanding lint errors in unrelated files (e.g., localApiFunctions.ts) remain and need to be fixed in subsequent steps.
+
+Checklist:
+- [x] All `any` → `unknown` in the targeted files
+- [x] All property accesses on `unknown` are narrowed or type-guarded
+- [x] Logger and emulator admin function signatures updated
+- [x] All reducers and error mapping logic now type-safe
+- [x] No accidental removal or addition of logic
+- [x] No unrelated code or feature changes
+- [ ] Outstanding lint errors in unrelated files remain and need attention

@@ -7,7 +7,7 @@ import { appEventBus, LogLevel } from './eventBus';
  * @param message - The log message
  * @param data - Optional data to include with the log
  */
-const log = (level: LogLevel, message: string, data?: any): void => {
+const log = (level: LogLevel, message: string, data?: unknown): void => {
   // Create timestamp
   const timestamp = Date.now();
   
@@ -44,7 +44,7 @@ const log = (level: LogLevel, message: string, data?: any): void => {
  * @param message - The message to log
  * @param data - Optional data to include
  */
-export const logInfo = (message: string, data?: any): void => {
+export const logInfo = (message: string, data?: unknown): void => {
   log(LogLevel.INFO, message, data);
 };
 
@@ -53,7 +53,7 @@ export const logInfo = (message: string, data?: any): void => {
  * @param message - The message to log
  * @param data - Optional data to include
  */
-export const logWarn = (message: string, data?: any): void => {
+export const logWarn = (message: string, data?: unknown): void => {
   log(LogLevel.WARN, message, data);
 };
 
@@ -62,7 +62,7 @@ export const logWarn = (message: string, data?: any): void => {
  * @param message - The message to log
  * @param data - Optional data to include
  */
-export const logError = (message: string, data?: any): void => {
+export const logError = (message: string, data?: unknown): void => {
   log(LogLevel.ERROR, message, data);
 };
 
@@ -71,7 +71,7 @@ export const logError = (message: string, data?: any): void => {
  * @param message - The message to log
  * @param data - Optional data to include
  */
-export const logDebug = (message: string, data?: any): void => {
+export const logDebug = (message: string, data?: unknown): void => {
   log(LogLevel.DEBUG, message, data);
 };
 

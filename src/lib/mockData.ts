@@ -5,7 +5,7 @@
  * Particularly useful for maintaining state across multiple function calls.
  */
 
-import { UserType } from '@/types/enums';
+import type { UserType } from '@/types/enums';
 
 // Define a type for our mock user
 type MockUser = {

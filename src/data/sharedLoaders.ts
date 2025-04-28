@@ -1,12 +1,10 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
-import { UserType, AppointmentType } from '@/types/enums';
-import { z } from 'zod';
-import { FindDoctorsSchema, GetAvailableSlotsSchema, BookAppointmentSchema } from '@/types/schemas';
+import { UserType } from '@/types/enums';
 import { queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * Helper function to get user role as UserType
@@ -18,10 +16,18 @@ const getUserRole = (role?: string): UserType => {
 };
 
 /**
+ * Custom hook to get the current user
+ */
+const useCurrentUser = () => {
+  const { user } = useAuth();
+  return user;
+};
+
+/**
  * Hook to fetch dashboard stats for the current user
  */
 export const useMyDashboard = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useQuery({
     queryKey: ['dashboard', user?.uid],
@@ -40,7 +46,7 @@ export const useMyDashboard = () => {
  * Hook to fetch the current user's notifications
  */
 export const useNotifications = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useQuery({
     queryKey: ['notifications', user?.uid],
@@ -58,31 +64,33 @@ export const useNotifications = () => {
 /**
  * Hook to mark a notification as read
  */
-export const useMarkNotificationRead = () => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  
+export function useMarkNotificationRead() {
+  const user = useCurrentUser();
   return useMutation({
     mutationFn: async (notificationId: string) => {
       if (!user?.uid) throw new Error('User not authenticated');
+      
+      // Need to structure the parameters according to how markNotificationRead is defined in LocalApi
       return callApi('markNotificationRead', { 
+        // Context object
         uid: user.uid, 
-        role: getUserRole(user.role),
+        role: getUserRole(user.role)
+      }, { 
+        // Payload object
         notificationId
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
-};
+}
 
 /**
  * Hook to mark all notifications as read
  */
 export const useMarkAllNotificationsRead = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -111,7 +119,7 @@ export const useMarkAllNotificationsRead = () => {
  * Hook to find doctors based on search criteria
  */
 export const useFindDoctors = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useMutation({
     mutationFn: async (searchParams?: { specialty?: string; location?: string; name?: string }) => {
@@ -129,7 +137,7 @@ export const useFindDoctors = () => {
  * Hook to get a doctor's public profile
  */
 export const useDoctorProfile = (doctorId: string) => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useQuery({
     queryKey: ['doctorProfile', doctorId],
@@ -149,7 +157,7 @@ export const useDoctorProfile = (doctorId: string) => {
  * Hook to get a doctor's availability
  */
 export const useDoctorAvailability = (doctorId: string) => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useQuery({
     queryKey: ['doctorAvailability', doctorId],
@@ -169,7 +177,7 @@ export const useDoctorAvailability = (doctorId: string) => {
  * Hook to get available appointment slots
  */
 export const useAvailableSlots = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
@@ -187,7 +195,7 @@ export const useAvailableSlots = () => {
  * Hook to book an appointment
  */
 export const useBookAppointment = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useMutation({
     mutationFn: async (data: {
@@ -217,7 +225,7 @@ export const useBookAppointment = () => {
  * Hook to send a direct message to another user
  */
 export const useDirectMessage = () => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   
   return useMutation({
     mutationFn: async (data: { recipientId: string; message: string; subject?: string }) => {
@@ -239,7 +247,7 @@ export const useDirectMessage = () => {
  * @param role UserType.PATIENT or UserType.DOCTOR
  */
 export const useMyAppointments = (role: UserType) => {
-  const { user } = useAuth();
+  const user = useCurrentUser();
   return useQuery({
     queryKey: ['myAppointments', user?.uid, role],
     queryFn: async () => {

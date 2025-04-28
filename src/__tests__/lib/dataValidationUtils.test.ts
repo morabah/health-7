@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { 
   validateCollectionData, 
-  getSchemaForCollection, 
-  type DocumentValidationResult 
+  getSchemaForCollection 
 } from '@/lib/dataValidationUtils';
 import * as logger from '@/lib/logger';
 import * as localDb from '@/lib/localDb';

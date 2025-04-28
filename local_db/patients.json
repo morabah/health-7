@@ -1,0 +1,23 @@
+[
+  {
+    "userId": "test-patient-verified-001",
+    "dateOfBirth": "1985-05-15T00:00:00.000Z",
+    "gender": "FEMALE",
+    "bloodType": "A+",
+    "medicalHistory": "No significant medical history. Allergic to penicillin."
+  },
+  {
+    "userId": "test-unverified-user-007",
+    "dateOfBirth": "1990-10-20T00:00:00.000Z",
+    "gender": "MALE",
+    "bloodType": "O-",
+    "medicalHistory": null
+  },
+  {
+    "userId": "test-inactive-user-006",
+    "dateOfBirth": "1978-03-03T00:00:00.000Z",
+    "gender": "OTHER",
+    "bloodType": "B+",
+    "medicalHistory": "Hypertension. Regular medication: Lisinopril 10mg daily."
+  }
+]

@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { z } from 'zod';
-import { UpdateProfileSchema, SetDoctorAvailabilitySchema } from '@/types/schemas';
+import type { z } from 'zod';
+import type { UpdateProfileSchema, SetDoctorAvailabilitySchema } from '@/types/schemas';
 
 /**
  * Hook to fetch doctor profile data

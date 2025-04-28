@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, CheckCircle, Trash, Info, AlertTriangle, Calendar } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertTriangle, Calendar } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
