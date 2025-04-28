@@ -32,6 +32,14 @@ export async function callApi<FN extends keyof LocalApi>(
   logInfo('callApi', { fn, mode: API_MODE, payload });
 
   try {
+    // Special case for login to bypass potential mock login interference
+    if (fn === 'login' && API_MODE === 'local') {
+      const { email, password } = payload as { email: string; password: string };
+      return await import('./localApiFunctions').then(module => 
+        module.signIn(email, password)
+      ) as AwaitedReturn<ReturnType<LocalApi[FN]>>;
+    }
+    
     if (API_MODE === 'local' || API_MODE === 'mock') {
       // direct Typescript-safe local dispatch
       // @ts-expect-error  – ( TS can't see the computed index signature otherwise )

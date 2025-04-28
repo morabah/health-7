@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { logInfo } from '@/lib/logger';
+import { UserType } from '@/types/enums';
 
 interface ProtectedProps {
   children: React.ReactNode;
-  roles?: string[]; // Optional array of allowed roles
+  roles?: UserType[]; // Optional array of allowed roles
 }
 
 /**
@@ -21,6 +22,7 @@ export default function Protected({ children, roles }: ProtectedProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const redirectAttempted = useRef(false);
 
   useEffect(() => {
     // If still loading, wait for auth state to resolve
@@ -28,21 +30,48 @@ export default function Protected({ children, roles }: ProtectedProps) {
       return;
     }
 
+    // Prevent multiple redirects in a short time span
+    if (redirectAttempted.current) {
+      return;
+    }
+
     // If no user is logged in, redirect to login
     if (!user) {
       logInfo('Auth guard: Redirecting to login', { pathname });
-      router.push(`/auth/login?next=${encodeURIComponent(pathname)}`);
+      redirectAttempted.current = true;
+      
+      // Use setTimeout to debounce redirect and prevent rapid redirect cycles
+      setTimeout(() => {
+        const redirectPath = pathname ? `/auth/login?next=${encodeURIComponent(pathname)}` : '/auth/login';
+        router.push(redirectPath);
+        // Reset after a delay to allow potential future redirects if needed
+        setTimeout(() => {
+          redirectAttempted.current = false;
+        }, 5000);
+      }, 100);
+      
       return;
     }
 
     // If roles are specified, check if user has required role
     if (roles && roles.length > 0) {
-      if (!profile || !profile.userType || !roles.includes(profile.userType)) {
+      const userType = profile?.userType;
+      const hasRequiredRole = userType && roles.includes(userType as UserType);
+      
+      if (!hasRequiredRole) {
         logInfo('Auth guard: Unauthorized access', {
-          userType: profile?.userType || 'unknown',
+          userType: userType || 'unknown',
           requiredRoles: roles,
         });
-        router.push('/unauthorized');
+        redirectAttempted.current = true;
+        
+        setTimeout(() => {
+          router.push('/unauthorized');
+          setTimeout(() => {
+            redirectAttempted.current = false;
+          }, 5000);
+        }, 100);
+        
         return;
       }
     }

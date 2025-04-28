@@ -1,34 +1,41 @@
 /**
- * Local session management utilities
- * Handles storing and retrieving auth session from localStorage
+ * localSession.ts
+ * Helpers for persisting minimal user session data in localStorage
+ * Used by AuthContext to keep user logged in between page reloads
  */
 
-const KEY = 'HAS_localAuth';
+type SessionData = { uid: string; email?: string; role?: string } | null;
 
 /**
- * Load auth session from localStorage
- * @returns The stored auth session or null if none exists
+ * Load session data from localStorage
  */
-export const loadSession = () => {
-  if (typeof window === 'undefined') return null;
+export function loadSession(): SessionData {
+  if (typeof localStorage === 'undefined') return null;
+  
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? 'null') as { uid: string } | null;
+    const data = localStorage.getItem('healthSession');
+    if (!data) return null;
+    
+    return JSON.parse(data);
   } catch (e) {
-    console.error('Failed to parse stored auth session:', e);
+    console.error('Failed to load session:', e);
     return null;
   }
-};
+}
 
 /**
- * Save auth session to localStorage
- * @param obj The auth session to save, or null to clear
+ * Save session data to localStorage
  */
-export const saveSession = (obj: { uid: string } | null) => {
-  if (typeof window === 'undefined') return;
-
-  if (obj) {
-    localStorage.setItem(KEY, JSON.stringify(obj));
-  } else {
-    localStorage.removeItem(KEY);
+export function saveSession(data: SessionData): void {
+  if (typeof localStorage === 'undefined') return;
+  
+  try {
+    if (data === null) {
+      localStorage.removeItem('healthSession');
+    } else {
+      localStorage.setItem('healthSession', JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error('Failed to save session:', e);
   }
-};
+}

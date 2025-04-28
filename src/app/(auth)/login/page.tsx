@@ -42,35 +42,69 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Capture the form values to ensure they don't change during async operations
+      const { email, password } = formData;
+      
+      // Validate email and password
+      if (!email || typeof email !== 'string') {
+        throw new Error('Valid email is required');
+      }
+      
+      if (!password || typeof password !== 'string') {
+        throw new Error('Valid password is required');
+      }
+
       // Log authentication attempt
       logInfo('auth-event', {
         action: 'login-attempt',
-        email: formData.email,
+        email,
         timestamp: new Date().toISOString(),
       });
 
-      // Debug log
-      console.log(
-        '[LoginPage.handleSubmit] Login attempt with:',
-        { email: formData.email }
-      );
+      // Enhanced debug logging
+      console.log('[LoginPage.handleSubmit] Login attempt with:', { 
+        email, 
+        passwordProvided: !!password,
+        passwordLength: password ? password.length : 0
+      });
 
       // Use the AuthContext login function with email and password
-      const success = await login(formData.email, formData.password);
+      console.log('About to call login with:', { 
+        email, 
+        password: password ? '(password provided)' : 'undefined',
+        passwordType: typeof password
+      });
       
-      if (success) {
+      try {
+        // Pass 'ACTUAL_LOGIN_IN_PROGRESS' to indicate a real login attempt (not a mock login)
+        // This ensures the window.__mockLogin function doesn't interfere
+        console.log('Login function type:', typeof login);
+        
+        const success = await login(email, password, 'ACTUAL_LOGIN_IN_PROGRESS');
+        
+        console.log('Login result:', success);
+        
+        if (success) {
+          setIsLoading(false);
+          logInfo('Login successful', { email });
+          // Router redirection will be handled by AuthContext based on user role
+        } else {
+          setIsLoading(false);
+          setError('Invalid credentials. Please try again.');
+          logError('Login failed', { email });
+        }
+      } catch (loginErr) {
+        console.error('Login error details:', loginErr);
         setIsLoading(false);
-        logInfo('Login successful', { email: formData.email });
-        // Router redirection will be handled by AuthContext based on user role
-      } else {
-        setIsLoading(false);
-        setError('Invalid credentials. Please try again.');
-        logError('Login failed', { email: formData.email });
+        setError(loginErr instanceof Error ? loginErr.message : 'Login process error. Please try again.');
+        logError('Login error in try-catch', loginErr);
       }
     } catch (err) {
+      console.error('Outer error details:', err);
       setIsLoading(false);
-      setError('Login failed. Please try again.');
-      logError('Login error', err);
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(errorMessage);
+      logError('Login error in outer try-catch', err);
     }
   };
 
@@ -159,4 +193,4 @@ export default function LoginPage() {
       </Card>
     </div>
   );
-}
+} 

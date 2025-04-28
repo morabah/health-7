@@ -1,131 +1,186 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { logInfo, logError, logValidation } from '@/lib/logger';
 import { loadSession, saveSession } from '@/lib/localSession';
 import { callApi } from '@/lib/apiClient';
-import * as api from '@/lib/localApiFunctions';
-import type { UserProfile } from '@/types/schemas';
+import localApi from '@/lib/localApiFunctions';
+import type { UserProfile, PatientProfile, DoctorProfile } from '@/types/schemas';
 import { UserType } from '@/types/enums';
 import { roleToDashboard } from '@/lib/router';
+import { mockUserData } from '@/lib/mockData';
+import { z } from 'zod';
 
 // Add TypeScript augmentation for the window.__mockLogin helper
 declare global {
   interface Window {
-    __mockLogin?: (role: string | null) => void;
+    __mockLogin: (role?: string) => Promise<boolean> | undefined;
   }
 }
 
-// Types for registration payloads
-interface PatientRegistrationPayload {
+// Type definitions for registration payloads
+export interface PatientRegistrationPayload {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
-  userType: UserType | UserType.PATIENT;
-  dateOfBirth?: string;
-  gender?: string;
+  dateOfBirth: string;
+  gender: string;
   bloodType?: string;
   medicalHistory?: string;
+  userType: UserType;
 }
 
-interface DoctorRegistrationPayload {
+export interface DoctorRegistrationPayload {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
-  userType: UserType | UserType.DOCTOR;
-  specialty?: string;
-  licenseNumber?: string;
-  yearsOfExperience?: number;
-  profilePictureUrl?: string | null;
-  licenseDocumentUrl?: string | null;
+  specialty: string;
+  licenseNumber: string;
+  yearsOfExperience: number;
+  userType: UserType;
 }
 
-interface AuthContext {
-  user: { uid: string; email?: string } | null;
-  profile: UserProfile | null;
-  loading: boolean;
+// Type for the User object
+interface User {
+  uid: string;
+  email?: string;
+  role: UserType;
+}
+
+// Context value type
+interface AuthContextType {
+  user: User | null;
+  profile: UserProfile & { id: string } | null;
+  patientProfile: PatientProfile & { id: string } | null;
+  doctorProfile: DoctorProfile & { id: string } | null;
+  isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  login: (email: string, password: string, skipMock?: string) => Promise<boolean>;
+  logout: () => void;
   refreshProfile: () => Promise<void>;
   clearError: () => void;
-  registerPatient: (
-    payload: PatientRegistrationPayload
-  ) => Promise<{ success: boolean; error?: string; data?: unknown }>;
-  registerDoctor: (
-    payload: DoctorRegistrationPayload
-  ) => Promise<{ success: boolean; error?: string; data?: unknown }>;
+  registerPatient: (payload: PatientRegistrationPayload) => Promise<any>;
+  registerDoctor: (payload: DoctorRegistrationPayload) => Promise<any>;
 }
 
-const AuthContext = createContext<AuthContext | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SESSION_KEY = 'healthAppSession';
 
 export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthContext['user']>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile & { id: string } | null>(null);
+  const [patientProfile, setPatientProfile] = useState<PatientProfile & { id: string } | null>(null);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile & { id: string } | null>(null);
+  const [isLoading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState<boolean>(false);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  const logout = useCallback(async () => {
+  // Initialize auth state from localStorage
+  useEffect(() => {
+    const session = loadSession();
+    if (session) {
+      // Ensure the session object conforms to the User type
+      if (session.uid && session.role) {
+        setUser({
+          uid: session.uid,
+          email: session.email,
+          role: session.role as UserType
+        });
+        refreshProfile(); // Fetch the user's profile
+      }
+    }
+    setLoading(false);
+    setInitialized(true);
+  }, []);
+
+  const logout = () => {
     setUser(null);
     setProfile(null);
+    setPatientProfile(null);
+    setDoctorProfile(null);
     saveSession(null);
-    logInfo('Auth logout');
-    // Redirect to home page on logout
-    router.push('/');
-  }, [router]);
+    router.push('/login');
+  };
 
-  const refreshProfile = useCallback(async () => {
-    if (!user) {
-      logInfo('No user to refresh profile for');
-      return;
-    }
-
+  const refreshProfile = async () => {
+    // Skip if no user
+    if (!user) return;
+    
     try {
-      const p = await api.getMyUserProfile(user.uid);
-      setProfile(p);
-      logInfo('Profile refreshed', { uid: user.uid });
-    } catch (err) {
-      logError('Failed to refresh profile', err);
-    }
-  }, [user]);
-
-  const login = useCallback(
-    async (email: string, password: string) => {
-      try {
-        setLoading(true);
-        clearError();
-
-        // Add detailed logging before callApi
-        logInfo('AuthContext.login - received', { email, password });
-        const payloadForApi = { email, password };
-        logInfo('AuthContext.login - payload for callApi', payloadForApi);
-
-        const result = await callApi('login', payloadForApi);
-
-        if (!result.success) {
-          setError(result.error);
-          logError('Auth login failed', { error: result.error });
-          return false;
+      setLoading(true);
+      // Use the direct API function that's designed for getting the user profile
+      const response = await callApi('getMyUserProfile', { uid: user.uid });
+      
+      if (response) {
+        // Set the user profile
+        setProfile(response);
+        
+        // Fetch the specific role profile if needed
+        if (response.userType === UserType.PATIENT) {
+          // For patient profile, we would load it separately if needed
+          // This could be added in the future
+        } else if (response.userType === UserType.DOCTOR) {
+          // For doctor profile, we would load it separately if needed
+          // This could be added in the future
         }
+      } else {
+        logError('Failed to load user profile', { uid: user.uid });
+      }
+    } catch (err) {
+      logError('Error refreshing profile', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const login = async (email: string, password: string, skipMock?: string) => {
+    setLoading(true);
+    
+    console.log('AuthContext.login - received:', { 
+      email, 
+      password: !!password, 
+      skipMock,
+      skipMockProvided: !!skipMock
+    });
+    
+    try {
+      // Ensure email and password are correctly passed
+      if (typeof email !== 'string' || !email) {
+        throw new Error('Invalid email format');
+      }
+      
+      // We need to call the API directly here, not through window.__mockLogin
+      const result = await callApi('login', { 
+        email, 
+        password 
+      });
+      
+      if (result.success) {
         const { user: u, userProfile } = result;
+        
         // Map user to expected shape
-        const mappedUser = { uid: u.id, email: u.email || undefined };
+        const mappedUser: User = { 
+          uid: u.id, 
+          email: u.email || undefined,
+          role: userProfile.userType as UserType
+        };
+        
         setUser(mappedUser);
         saveSession(mappedUser);
         setProfile(userProfile);
@@ -136,181 +191,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userType: userProfile.userType,
         });
 
-        // Redirect to the appropriate dashboard based on user type
-        const dashboardPath = roleToDashboard(userProfile.userType);
+        // Redirect to the appropriate dashboard
+        const dashboardPath = roleToDashboard(userProfile.userType as UserType);
         router.push(dashboardPath);
 
         return true;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error during login';
-        setError(errorMessage);
-        logError('Auth login failed', err);
+      } else {
+        setError(result.error || 'Invalid credentials');
+        logError('Auth login failed', { error: result.error });
         return false;
-      } finally {
-        setLoading(false);
       }
-    },
-    [clearError, router]
-  );
-
-  const registerPatient = useCallback(
-    async (payload: PatientRegistrationPayload) => {
-      try {
-        setLoading(true);
-        clearError();
-
-        // Ensure userType is set to PATIENT
-        const registrationPayload = {
-          ...payload,
-          userType: UserType.PATIENT,
-        };
-
-        const result = await callApi('registerPatient', registrationPayload);
-
-        if (!result.success) {
-          setError(result.error);
-          logError('Patient registration failed', { error: result.error });
-        }
-
-        logInfo('Patient registration', {
-          success: result.success,
-          email: payload.email,
-        });
-
-        return result;
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Unknown error during registration';
-        setError(errorMessage);
-        logError('Patient registration failed', err);
-        return { success: false, error: errorMessage };
-      } finally {
-        setLoading(false);
-      }
-    },
-    [clearError]
-  );
-
-  const registerDoctor = useCallback(
-    async (payload: DoctorRegistrationPayload) => {
-      try {
-        setLoading(true);
-        clearError();
-
-        // Ensure userType is set to DOCTOR
-        const registrationPayload = {
-          ...payload,
-          userType: UserType.DOCTOR,
-        };
-
-        const result = await callApi('registerDoctor', registrationPayload);
-
-        if (!result.success) {
-          setError(result.error);
-          logError('Doctor registration failed', { error: result.error });
-        }
-
-        logInfo('Doctor registration', {
-          success: result.success,
-          email: payload.email,
-        });
-
-        return result;
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Unknown error during registration';
-        setError(errorMessage);
-        logError('Doctor registration failed', err);
-        return { success: false, error: errorMessage };
-      } finally {
-        setLoading(false);
-      }
-    },
-    [clearError]
-  );
-
-  /** hydrate from localStorage once */
-  useEffect(() => {
-    const stored = loadSession();
-    if (stored) {
-      setUser(stored);
-      api
-        .getMyUserProfile(stored.uid)
-        .then(userProfile => {
-          setProfile(userProfile);
-
-          // If we're on the login page or root, redirect to dashboard
-          if (typeof window !== 'undefined') {
-            const path = window.location.pathname;
-            if (path === '/' || path === '/auth/login') {
-              const dashboardPath = roleToDashboard(userProfile.userType);
-              router.push(dashboardPath);
-            }
-          }
-        })
-        .catch(() => null)
-        .finally(() => setLoading(false));
-    } else {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error during login';
+      setError(errorMessage);
+      logError('Auth login error:', err);
+      return false;
+    } finally {
       setLoading(false);
     }
+  };
 
-    // dev helper
-    window.__mockLogin = (role: string | null) => {
-      if (!role) {
-        logout();
+  // Add global helper for mock login, bypassed if real login is in progress
+  if (typeof window !== 'undefined') {
+    window.__mockLogin = (mockType?: string) => {
+      console.log('Mock login called with:', mockType, typeof mockType);
+      
+      // Skip mock login if an actual login is in progress
+      if (mockType === 'ACTUAL_LOGIN_IN_PROGRESS') {
+        console.log('Skipping mock login because real login is in progress');
         return;
       }
-
-      const demo =
-        role === 'PATIENT'
-          ? 'test-patient-verified-001'
-          : role === 'DOCTOR'
-            ? 'test-doctor-verified-003'
-            : 'test-admin-005';
-
-      const mappedUser = { uid: demo };
-      setUser(mappedUser);
-      saveSession(mappedUser);
-      refreshProfile();
-
-      // Redirect to the appropriate dashboard
-      const dashboardPath = roleToDashboard(role);
-      router.push(dashboardPath);
-
-      logInfo('Auth mock login', { role, uid: demo });
-    };
-
-    // Log validation
-    setTimeout(() => {
-      logValidation('4.2', 'success', 'AuthContext operating with local session & mock login');
-      logValidation(
-        '4.8',
-        'success',
-        'Local registration, login, navbar role-switch & redirects verified end-to-end'
-      );
-    }, 1000);
-
-    return () => {
-      // Clean up (though in practice, this won't run for the root provider)
-      if (typeof window !== 'undefined' && window.__mockLogin) {
-        delete window.__mockLogin;
+      
+      const typeMap: Record<string, { email: string; password: string }> = {
+        PATIENT: { email: 'test-patient@example.com', password: 'password' },
+        DOCTOR: { email: 'test-doctor@example.com', password: 'password' },
+        ADMIN: { email: 'admin@example.com', password: 'password' },
+        // Add lowercase options for better compatibility
+        patient: { email: 'test-patient@example.com', password: 'password' },
+        doctor: { email: 'test-doctor@example.com', password: 'password' },
+        admin: { email: 'admin@example.com', password: 'password' },
+      };
+      
+      // Handle the case when mockType is an email address
+      if (mockType && typeof mockType === 'string' && mockType.includes('@')) {
+        console.log('Using provided email as mock login credential:', mockType);
+        return login(mockType, 'password');
       }
+      
+      const loginData = mockType && typeof mockType === 'string' && typeMap[mockType]
+        ? typeMap[mockType]
+        : typeMap.PATIENT;
+      
+      if (!loginData || !loginData.email) {
+        console.error('Invalid mock login data');
+        return Promise.resolve(false);
+      }
+      
+      console.log('Using mock credentials:', loginData);
+      return login(loginData.email, loginData.password);
     };
-  }, [logout, router]);
+  }
 
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
-        loading,
+        patientProfile,
+        doctorProfile,
+        isLoading,
         error,
         login,
         logout,
         refreshProfile,
         clearError,
-        registerPatient,
-        registerDoctor,
+        registerPatient: async (payload) => {
+          try {
+            const result = await callApi('registerPatient', payload);
+            return result.success;
+          } catch (err) {
+            logError('Error registering patient', err);
+            return false;
+          }
+        },
+        registerDoctor: async (payload) => {
+          try {
+            const result = await callApi('registerDoctor', payload);
+            return result.success;
+          } catch (err) {
+            logError('Error registering doctor', err);
+            return false;
+          }
+        },
       }}
     >
       {children}

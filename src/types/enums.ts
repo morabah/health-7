@@ -23,27 +23,25 @@ export enum BloodType {
 
 /** Represents the distinct roles users can have within the system. */
 export enum UserType {
-  PATIENT = 'PATIENT', // End-user seeking medical care
-  DOCTOR = 'DOCTOR',   // Verified healthcare provider
-  ADMIN = 'ADMIN'      // System administrator
+  ADMIN = 'admin',
+  DOCTOR = 'doctor',
+  PATIENT = 'patient',
 }
 
 /** Represents the verification status of a Doctor's profile/credentials. */
 export enum VerificationStatus {
-  PENDING = 'PENDING',              // Initial state after doctor registration
-  VERIFIED = 'VERIFIED',            // Admin approved credentials
-  REJECTED = 'REJECTED',            // Admin rejected credentials
-  MORE_INFO_REQUIRED = 'MORE_INFO_REQUIRED' // Admin needs more info from doctor
+  PENDING = 'pending',
+  VERIFIED = 'verified',
+  REJECTED = 'rejected',
 }
 
 /** Represents the lifecycle states of a scheduled appointment. */
 export enum AppointmentStatus {
-  PENDING = 'PENDING',      // Patient booked, potentially awaiting confirmation
-  CONFIRMED = 'CONFIRMED',  // Appointment confirmed (by system or doctor if needed)
-  SCHEDULED = 'SCHEDULED',  // Often used synonymously with CONFIRMED
-  CANCELLED = 'CANCELLED',  // Cancelled by Patient or Doctor
-  COMPLETED = 'COMPLETED',  // Consultation finished successfully
-  NO_SHOW = 'NO_SHOW'       // Patient did not attend the appointment
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  CANCELED = 'canceled',
+  COMPLETED = 'completed',
+  RESCHEDULED = 'rescheduled',
 }
 
 /** Types of documents uploaded by Doctors for verification purposes. */
@@ -62,9 +60,24 @@ export enum AppointmentType {
 
 /** Types of notifications users can receive. */
 export enum NotificationType {
+  APPOINTMENT_REQUEST = 'appointment_request',
+  APPOINTMENT_CONFIRMED = 'appointment_confirmed',
+  APPOINTMENT_CANCELED = 'appointment_canceled',
+  APPOINTMENT_RESCHEDULED = 'appointment_rescheduled',
+  APPOINTMENT_REMINDER = 'appointment_reminder',
+  NEW_MESSAGE = 'new_message',
+  APPOINTMENT_COMPLETED = 'appointment_completed',
+  VERIFICATION_STATUS_CHANGE = 'verification_status_change',
+  ACCOUNT_STATUS_CHANGE = 'account_status_change',
   APPOINTMENT_BOOKED = 'appointment_booked',
-  APPOINTMENT_CANCELLED = 'appointment_cancelled',
-  VERIFICATION_APPROVED = 'verification_approved',
   SYSTEM_ALERT = 'system_alert',
-  OTHER = 'other'
+  SYSTEM = 'system',          // Used in seedLocalDb.mjs
+  OTHER = 'other',
+}
+
+/** Account statuses for users */
+export enum AccountStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  DEACTIVATED = 'deactivated',
 } 

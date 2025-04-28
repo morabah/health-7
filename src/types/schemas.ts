@@ -91,6 +91,10 @@ export const UserProfileSchema = z.object({
             .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
   updatedAt: isoDateTimeStringSchema
             .describe("Stored as ISO in schema; converted to Firestore Timestamp at runtime."),
+  profilePictureUrl: z.string()
+                   .nullable()
+                   .optional()
+                   .describe("URL to the user's profile picture"),
 });
 
 /** TypeScript type inferred from UserProfileSchema, adding the 'id' field (Auth UID). */
@@ -762,3 +766,101 @@ export type VerificationHistoryEntry = z.infer<typeof VerificationHistoryEntrySc
 
 /** TypeScript type inferred from SystemLogSchema. Represents a system audit log entry. */
 export type SystemLog = z.infer<typeof SystemLogSchema> & { id: string }; // Add Firestore document ID 
+
+/**
+ * Zod schema for booking an appointment
+ */
+export const BookAppointmentSchema = z.object({
+  doctorId: z.string().min(1, "Doctor ID is required"),
+  appointmentDate: isoDateTimeStringSchema,
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid start time format (HH:MM)"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid end time format (HH:MM)"),
+  reason: z.string().max(1000, "Reason exceeds maximum length").optional(),
+  appointmentType: z.nativeEnum(AppointmentType).default(AppointmentType.IN_PERSON),
+});
+
+/**
+ * Zod schema for updating user profile
+ */
+export const UpdateProfileSchema = z.object({
+  firstName: z.string().min(1, "First name is required").optional(),
+  lastName: z.string().min(1, "Last name is required").optional(),
+  phone: z.string().nullable().optional(),
+  // ... add any other updatable fields here
+});
+
+/**
+ * Zod schema for finding doctors
+ */
+export const FindDoctorsSchema = z.object({
+  specialty: z.string().optional(),
+  location: z.string().optional(),
+  availableDate: isoDateTimeStringSchema.optional(),
+  languages: z.array(z.string()).optional(),
+  maxConsultationFee: z.number().optional(),
+  searchTerm: z.string().optional(),
+  pageSize: z.number().optional(),
+  pageNumber: z.number().optional(),
+});
+
+/**
+ * Zod schema for setting doctor availability
+ */
+export const SetDoctorAvailabilitySchema = z.object({
+  weeklySchedule: WeeklyScheduleSchema.optional(),
+  blockedDates: z.array(isoDateTimeStringSchema).optional(),
+  timezone: z.string().optional(),
+});
+
+/**
+ * Zod schema for getting available slots
+ */
+export const GetAvailableSlotsSchema = z.object({
+  doctorId: z.string().min(1, "Doctor ID is required"),
+  date: isoDateTimeStringSchema,
+});
+
+/**
+ * Zod schema for canceling an appointment
+ */
+export const CancelAppointmentSchema = z.object({
+  appointmentId: z.string().min(1, "Appointment ID is required"),
+  reason: z.string().max(1000, "Reason exceeds maximum length").optional(),
+});
+
+/**
+ * Zod schema for completing an appointment
+ */
+export const CompleteAppointmentSchema = z.object({
+  appointmentId: z.string().min(1, "Appointment ID is required"),
+  notes: z.string().max(2000, "Notes exceed maximum length").optional(),
+});
+
+/**
+ * Zod schema for admin user updates
+ */
+export const AdminUpdateUserSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
+  isActive: z.boolean().optional(),
+  // Add other fields that an admin can update
+});
+
+/**
+ * Zod schema for admin doctor verification
+ */
+export const AdminVerifyDoctorSchema = z.object({
+  doctorId: z.string().min(1, "Doctor ID is required"),
+  verificationStatus: z.nativeEnum(VerificationStatus),
+  verificationNotes: z.string().max(1000, "Notes exceed maximum length").optional(),
+});
+
+/**
+ * Zod schema for admin user creation
+ */
+export const AdminCreateUserSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  userType: z.nativeEnum(UserType),
+  // ... add any other required fields
+}); 

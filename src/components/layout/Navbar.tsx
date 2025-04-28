@@ -11,6 +11,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Loader2, UserCircle, LayoutDashboard } from 'lucide-react';
 import clsx from 'clsx';
 import { logInfo } from '@/lib/logger';
+import { UserType } from '@/types/enums';
 
 /**
  * Role-aware Navbar driven by AuthContext.
@@ -28,9 +29,9 @@ export default function Navbar() {
         userType: profile.userType,
         email: profile.email,
         dashPath:
-          profile.userType === 'PATIENT'
+          profile.userType === UserType.PATIENT
             ? '/patient/dashboard'
-            : profile.userType === 'DOCTOR'
+            : profile.userType === UserType.DOCTOR
               ? '/doctor/dashboard'
               : '/admin/dashboard',
       });
@@ -39,18 +40,18 @@ export default function Navbar() {
 
   // Determine dashboard and profile paths based on user role
   const dashPath =
-    profile?.userType === 'PATIENT'
+    profile?.userType === UserType.PATIENT
       ? '/patient/dashboard'
-      : profile?.userType === 'DOCTOR'
+      : profile?.userType === UserType.DOCTOR
         ? '/doctor/dashboard'
-        : profile?.userType === 'ADMIN'
+        : profile?.userType === UserType.ADMIN
           ? '/admin/dashboard'
           : '/';
 
   const profilePath =
-    profile?.userType === 'PATIENT'
+    profile?.userType === UserType.PATIENT
       ? '/patient/profile'
-      : profile?.userType === 'DOCTOR'
+      : profile?.userType === UserType.DOCTOR
         ? '/doctor/profile'
         : '/admin/users';
 
