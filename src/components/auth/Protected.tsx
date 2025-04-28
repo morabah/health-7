@@ -18,15 +18,15 @@ interface ProtectedProps {
  * and redirects to unauthorized page if user doesn't have required role
  */
 export default function Protected({ children, roles }: ProtectedProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const redirectAttempted = useRef(false);
 
   useEffect(() => {
-    // If still loading, wait for auth state to resolve
-    if (loading) {
+    // Only check auth after isLoading is false
+    if (isLoading) {
       return;
     }
 
@@ -35,21 +35,17 @@ export default function Protected({ children, roles }: ProtectedProps) {
       return;
     }
 
-    // If no user is logged in, redirect to login
+    // If no user is logged in (after loading), redirect to login
     if (!user) {
       logInfo('Auth guard: Redirecting to login', { pathname });
       redirectAttempted.current = true;
-      
-      // Use setTimeout to debounce redirect and prevent rapid redirect cycles
       setTimeout(() => {
         const redirectPath = pathname ? `/auth/login?next=${encodeURIComponent(pathname)}` : '/auth/login';
         router.push(redirectPath);
-        // Reset after a delay to allow potential future redirects if needed
         setTimeout(() => {
           redirectAttempted.current = false;
         }, 5000);
       }, 100);
-      
       return;
     }
 
@@ -57,32 +53,29 @@ export default function Protected({ children, roles }: ProtectedProps) {
     if (roles && roles.length > 0) {
       const userType = profile?.userType;
       const hasRequiredRole = userType && roles.includes(userType as UserType);
-      
       if (!hasRequiredRole) {
         logInfo('Auth guard: Unauthorized access', {
           userType: userType || 'unknown',
           requiredRoles: roles,
         });
         redirectAttempted.current = true;
-        
         setTimeout(() => {
           router.push('/unauthorized');
           setTimeout(() => {
             redirectAttempted.current = false;
           }, 5000);
         }, 100);
-        
         return;
       }
     }
 
     // User is authenticated and authorized
     setIsAuthorized(true);
-  }, [user, profile, loading, roles, router, pathname]);
+  }, [user, profile, isLoading, roles, router, pathname]);
 
   // Show loading spinner while authentication state is loading
   // or while authorization is being checked
-  if (loading || !isAuthorized) {
+  if (isLoading || !isAuthorized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="animate-spin text-primary h-8 w-8" />

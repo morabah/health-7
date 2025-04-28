@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu as MenuIcon, X, Bell, Sun, Moon, LogOut } from 'lucide-react';
+import { Menu as MenuIcon, X, Bell, Sun, Moon, LogOut, MessageSquare } from 'lucide-react';
 import { Disclosure, Transition, Menu as HeadlessMenu } from '@headlessui/react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -12,6 +12,8 @@ import { Loader2, UserCircle, LayoutDashboard } from 'lucide-react';
 import clsx from 'clsx';
 import { logInfo } from '@/lib/logger';
 import { UserType } from '@/types/enums';
+import { useNotifications } from '@/data/sharedLoaders';
+import type { Notification } from '@/types/schemas';
 
 /**
  * Role-aware Navbar driven by AuthContext.
@@ -20,6 +22,14 @@ import { UserType } from '@/types/enums';
 export default function Navbar() {
   const { user, profile, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  
+  // Get notification count from API
+  const { data: notificationsData } = useNotifications();
+  
+  // Calculate unread notifications count
+  const unreadCount = notificationsData?.success 
+    ? notificationsData.notifications.filter((n: Notification) => !n.isRead).length 
+    : 0;
 
   // Add debugging logs
   useEffect(() => {
@@ -121,9 +131,19 @@ export default function Navbar() {
                     className="relative p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <Bell size={18} />
-                    <Badge variant="danger" className="absolute -top-1 -right-1 px-1.5">
-                      1
-                    </Badge>
+                    {unreadCount > 0 && (
+                      <Badge variant="danger" className="absolute -top-1 -right-1 px-1.5">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Link>
+
+                  {/* Messages */}
+                  <Link
+                    href="/messages"
+                    className="relative p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <MessageSquare size={18} />
                   </Link>
 
                   {/* User dropdown */}
@@ -249,9 +269,18 @@ export default function Navbar() {
                     >
                       <Bell size={16} className="mr-2" />
                       Notifications
-                      <Badge variant="danger" className="ml-2 px-1.5">
-                        1
-                      </Badge>
+                      {unreadCount > 0 && (
+                        <Badge variant="danger" className="ml-2 px-1.5">
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </Link>
+                    <Link
+                      href="/messages"
+                      className="rounded px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center"
+                    >
+                      <MessageSquare size={16} className="mr-2" />
+                      Messages
                     </Link>
                     <Link
                       href={dashPath}

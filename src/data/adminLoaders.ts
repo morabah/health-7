@@ -121,12 +121,11 @@ export const useUserDetail = (userId: string) => {
 };
 
 /**
- * Hook to update a doctor's verification status
+ * Hook for admin to verify a doctor
  */
-export const useUpdateDoctorVerification = () => {
+export const useVerifyDoctor = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async ({ 
       doctorId, 
@@ -140,7 +139,6 @@ export const useUpdateDoctorVerification = () => {
       if (!user || user.role !== UserType.ADMIN) {
         throw new Error('Unauthorized');
       }
-      
       return callApi('adminVerifyDoctor', {
         uid: user.uid,
         role: UserType.ADMIN,
@@ -158,12 +156,11 @@ export const useUpdateDoctorVerification = () => {
 };
 
 /**
- * Hook to update a user's account status
+ * Hook for admin to activate/deactivate a user
  */
-export const useUpdateUserStatus = () => {
+export const useAdminActivateUser = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async ({ 
       userId, 
@@ -177,7 +174,6 @@ export const useUpdateUserStatus = () => {
       if (!user || user.role !== UserType.ADMIN) {
         throw new Error('Unauthorized');
       }
-      
       return callApi('adminUpdateUserStatus', {
         uid: user.uid,
         role: UserType.ADMIN,

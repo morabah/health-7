@@ -6,17 +6,13 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
+import type { Appointment } from '@/types/schemas';
 
 interface CompleteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  appt: {
-    id: string;
-    patientName: string;
-    date: string; // ISO
-    time: string;
-  } | null;
-  onConfirm: (id: string, notes: string) => Promise<void>;
+  appt: Appointment | null;
+  onConfirm: (appointmentId: string, notes: string) => Promise<void>;
 }
 
 /**
@@ -105,8 +101,8 @@ export default function CompleteAppointmentModal({
               <div className="mt-2">
                 <p className="text-slate-600 dark:text-slate-300 mb-4">
                   Are you sure you want to mark your appointment with <strong>{appt.patientName}</strong> on{' '}
-                  <strong>{new Date(appt.date).toLocaleDateString()}</strong> at{' '}
-                  <strong>{appt.time}</strong> as completed?
+                  <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
+                  <strong>{appt.startTime}</strong> as completed?
                 </p>
 
                 {error && (
@@ -138,7 +134,7 @@ export default function CompleteAppointmentModal({
                     Cancel
                   </Button>
                   <Button
-                    variant="success"
+                    variant="primary"
                     onClick={handleConfirm}
                     isLoading={loading}
                   >

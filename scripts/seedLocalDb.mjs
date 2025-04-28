@@ -70,34 +70,34 @@ async function saveNotifications(notifications) {
 
 // Import enums directly instead of dynamically
 const UserType = {
-  PATIENT: 'PATIENT',
-  DOCTOR: 'DOCTOR',
-  ADMIN: 'ADMIN'
+  PATIENT: 'patient',
+  DOCTOR: 'doctor',
+  ADMIN: 'admin'
 };
 
 const VerificationStatus = {
-  PENDING: 'PENDING',
-  VERIFIED: 'VERIFIED',
-  REJECTED: 'REJECTED',
-  MORE_INFO_REQUIRED: 'MORE_INFO_REQUIRED'
+  PENDING: 'pending',
+  VERIFIED: 'verified',
+  REJECTED: 'rejected',
+  MORE_INFO_REQUIRED: 'more_info_required'
 };
 
 const AppointmentStatus = {
-  SCHEDULED: 'SCHEDULED',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED',
-  NO_SHOW: 'NO_SHOW'
+  SCHEDULED: 'confirmed',
+  COMPLETED: 'completed',
+  CANCELLED: 'canceled',
+  NO_SHOW: 'no_show'
 };
 
 const AppointmentType = {
-  InPerson: 'InPerson',
-  Video: 'Video'
+  InPerson: 'IN_PERSON',
+  Video: 'VIDEO'
 };
 
 const Gender = {
-  Male: 'Male',
-  Female: 'Female',
-  Other: 'Other'
+  Male: 'MALE',
+  Female: 'FEMALE',
+  Other: 'OTHER'
 };
 
 // Create basic Zod schemas for validation
@@ -108,7 +108,7 @@ const UserProfileSchema = z.object({
   phone: z.string().nullable().optional(),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  userType: z.enum(['PATIENT', 'DOCTOR', 'ADMIN']),
+  userType: z.enum(['patient', 'doctor', 'admin']),
   isActive: z.boolean().default(true),
   emailVerified: z.boolean().default(false),
   phoneVerified: z.boolean().default(false),
@@ -119,7 +119,7 @@ const UserProfileSchema = z.object({
 const PatientProfileSchema = z.object({
   userId: z.string().min(1),
   dateOfBirth: isoDateTimeStringSchema.nullable().optional(),
-  gender: z.enum(['Male', 'Female', 'Other']),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
   bloodType: z.string().max(5).nullable().optional(),
   medicalHistory: z.string().max(2000).nullable().optional()
 });
@@ -166,7 +166,7 @@ const DoctorProfileSchema = z.object({
   licenseNumber: z.string().min(1),
   yearsOfExperience: z.number().int().min(0).default(0),
   bio: z.string().max(2000).nullable(),
-  verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED', 'MORE_INFO_REQUIRED']).default('PENDING'),
+  verificationStatus: z.enum(['pending', 'verified', 'rejected', 'more_info_required']).default('pending'),
   verificationNotes: z.string().nullable(),
   adminNotes: z.string().optional(),
   location: z.string().nullable(),
@@ -175,6 +175,8 @@ const DoctorProfileSchema = z.object({
   profilePictureUrl: z.string().url().nullable(),
   licenseDocumentUrl: z.string().url().nullable(),
   certificateUrl: z.string().url().nullable(),
+  education: z.string().min(1),
+  servicesOffered: z.string().min(1),
   educationHistory: z.array(EducationEntrySchema).optional().default([]),
   experience: z.array(ExperienceEntrySchema).optional().default([]),
   weeklySchedule: WeeklyScheduleSchema.optional(),
@@ -192,12 +194,13 @@ const AppointmentSchema = z.object({
   appointmentDate: isoDateTimeStringSchema,
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
-  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+  status: z.enum(['pending', 'confirmed', 'canceled', 'completed', 'rescheduled', 'no_show']),
   reason: z.string().max(1000).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   createdAt: isoDateTimeStringSchema,
   updatedAt: isoDateTimeStringSchema,
-  appointmentType: z.enum(['InPerson', 'Video']).optional().default('InPerson')
+  appointmentType: z.enum(['IN_PERSON', 'VIDEO']).default('IN_PERSON'),
+  videoCallUrl: z.string().url().nullable()
 });
 
 const NotificationSchema = z.object({
@@ -360,6 +363,8 @@ const rawMockDoctors = [
     profilePictureUrl: 'https://example.com/profile-pictures/doctor-pending.jpg',
     licenseDocumentUrl: 'https://example.com/documents/license-pending.pdf',
     certificateUrl: 'https://example.com/documents/certificate-pending.pdf',
+    education: 'University of Medicine - MD',
+    servicesOffered: 'Preventive care, family medicine, routine check-ups',
     educationHistory: [
       {
         institution: 'University of Medicine',
@@ -428,6 +433,8 @@ const rawMockDoctors = [
     profilePictureUrl: 'https://example.com/profile-pictures/doctor-verified.jpg',
     licenseDocumentUrl: 'https://example.com/documents/license-verified.pdf',
     certificateUrl: 'https://example.com/documents/certificate-verified.pdf',
+    education: 'Harvard Medical School - Doctor of Medicine',
+    servicesOffered: 'Cardiovascular consultations, heart health evaluations, preventive cardiology',
     educationHistory: [
       {
         institution: 'Harvard Medical School',
@@ -490,6 +497,8 @@ const rawMockDoctors = [
     profilePictureUrl: 'https://example.com/profile-pictures/doctor-rejected.jpg',
     licenseDocumentUrl: 'https://example.com/documents/license-rejected.pdf',
     certificateUrl: 'https://example.com/documents/certificate-rejected.pdf',
+    education: 'Berlin Medical University - MD',
+    servicesOffered: 'Neurological evaluations, headache treatment, brain disorder diagnosis',
     educationHistory: [],
     // Since this doctor is rejected, they shouldn't have any available slots
     weeklySchedule: {
@@ -562,20 +571,16 @@ const rawMockAppointments = [
     doctorId: doctorVerifiedId,
     doctorName: 'Dr. Emma Verified',
     doctorSpecialty: 'Cardiology',
-    // Last week Monday morning (should match doctor's Monday availability)
-    appointmentDate: new Date(
-      new Date(lastWeek).getFullYear(),
-      new Date(lastWeek).getMonth(),
-      new Date(lastWeek).getDate() - new Date(lastWeek).getDay() + 1 // Monday of last week
-    ).toISOString(),
+    appointmentDate: lastWeek,
     startTime: '09:00',
     endTime: '09:30',
     status: AppointmentStatus.COMPLETED,
     reason: 'Annual heart checkup',
-    notes: "Patient's heart function normal. No concerns at this time.",
+    notes: 'Patient\'s heart function normal. No concerns at this time.',
     createdAt: lastWeek,
     updatedAt: now,
-    appointmentType: AppointmentType.InPerson
+    appointmentType: AppointmentType.InPerson,
+    videoCallUrl: 'https://example.com/video-call/appt-completed-001'
   },
   {
     id: 'appt-upcoming-002',
@@ -584,11 +589,10 @@ const rawMockAppointments = [
     doctorId: doctorVerifiedId,
     doctorName: 'Dr. Emma Verified',
     doctorSpecialty: 'Cardiology',
-    // Next week Tuesday morning (should match doctor's Tuesday availability)
     appointmentDate: new Date(
       new Date().getFullYear(),
       new Date().getMonth(),
-      new Date().getDate() - new Date().getDay() + 9 // Next Tuesday
+      new Date().getDate() - new Date().getDay() + 9
     ).toISOString(),
     startTime: '10:00',
     endTime: '10:30',
@@ -597,20 +601,20 @@ const rawMockAppointments = [
     notes: null,
     createdAt: now,
     updatedAt: now,
-    appointmentType: AppointmentType.InPerson
+    appointmentType: AppointmentType.InPerson,
+    videoCallUrl: 'https://example.com/video-call/appt-upcoming-002'
   },
   {
     id: 'appt-upcoming-003',
     patientId: patientUserId,
     patientName: 'Sarah Patient',
-    doctorId: doctorPendingId, // Using the pending doctor
+    doctorId: doctorPendingId,
     doctorName: 'Dr. James Pending',
     doctorSpecialty: 'General Practice',
-    // Next week Thursday (should match doctor's Thursday availability)
     appointmentDate: new Date(
       new Date().getFullYear(),
       new Date().getMonth(),
-      new Date().getDate() - new Date().getDay() + 11 // Next Thursday
+      new Date().getDate() - new Date().getDay() + 11
     ).toISOString(),
     startTime: '14:00',
     endTime: '14:30',
@@ -619,7 +623,8 @@ const rawMockAppointments = [
     notes: null,
     createdAt: now,
     updatedAt: now,
-    appointmentType: AppointmentType.Video
+    appointmentType: AppointmentType.Video,
+    videoCallUrl: 'https://example.com/video-call/appt-upcoming-003'
   }
 ];
 

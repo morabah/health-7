@@ -94,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state from localStorage
   useEffect(() => {
     const session = loadSession();
+    console.log('[AuthContext] Loaded session from localStorage:', session);
     if (session) {
       // Ensure the session object conforms to the User type
       if (session.uid && session.role) {
@@ -102,43 +103,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: session.email,
           role: session.role as UserType
         });
-        refreshProfile(); // Fetch the user's profile
+        console.log('[AuthContext] Session valid, setting user:', session);
+        // Do NOT call refreshProfile here!
+      } else {
+        console.warn('[AuthContext] Session missing uid or role:', session);
       }
+    } else {
+      console.log('[AuthContext] No session found in localStorage.');
     }
     setLoading(false);
     setInitialized(true);
   }, []);
 
+  // Call refreshProfile only after user is set
+  useEffect(() => {
+    if (user) {
+      refreshProfile();
+    }
+  }, [user]);
+
   const logout = () => {
+    console.log('[AuthContext] Logging out, clearing session and state.');
     setUser(null);
     setProfile(null);
     setPatientProfile(null);
     setDoctorProfile(null);
     saveSession(null);
-    router.push('/login');
+    router.push('/auth/login');
   };
 
   const refreshProfile = async () => {
-    // Skip if no user
-    if (!user) return;
-    
+    if (!user) {
+      console.warn('[AuthContext] refreshProfile called with no user.');
+      return;
+    }
     try {
       setLoading(true);
-      // Use the direct API function that's designed for getting the user profile
-      const response = await callApi('getMyUserProfile', { uid: user.uid });
-      
+      console.log('[AuthContext] Refreshing profile for user:', user);
+      const response = await callApi('getMyUserProfile', { uid: user.uid, role: user.role });
+      console.log('[AuthContext] getMyUserProfile response:', response);
       if (response) {
-        // Set the user profile
         setProfile(response);
-        
-        // Fetch the specific role profile if needed
-        if (response.userType === UserType.PATIENT) {
-          // For patient profile, we would load it separately if needed
-          // This could be added in the future
-        } else if (response.userType === UserType.DOCTOR) {
-          // For doctor profile, we would load it separately if needed
-          // This could be added in the future
-        }
       } else {
         logError('Failed to load user profile', { uid: user.uid });
       }
@@ -151,50 +156,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string, skipMock?: string) => {
     setLoading(true);
-    
-    console.log('AuthContext.login - received:', { 
-      email, 
-      password: !!password, 
-      skipMock,
-      skipMockProvided: !!skipMock
-    });
-    
+    console.log('[AuthContext] login called:', { email, password: !!password, skipMock });
     try {
-      // Ensure email and password are correctly passed
       if (typeof email !== 'string' || !email) {
         throw new Error('Invalid email format');
       }
-      
-      // We need to call the API directly here, not through window.__mockLogin
-      const result = await callApi('login', { 
-        email, 
-        password 
-      });
-      
+      const result = await callApi('login', { email, password });
+      console.log('[AuthContext] login result:', result);
       if (result.success) {
         const { user: u, userProfile } = result;
-        
-        // Map user to expected shape
-        const mappedUser: User = { 
-          uid: u.id, 
+        const mappedUser: User = {
+          uid: u.id,
           email: u.email || undefined,
           role: userProfile.userType as UserType
         };
-        
         setUser(mappedUser);
         saveSession(mappedUser);
         setProfile(userProfile);
-
+        console.log('[AuthContext] Login success, user set and session saved:', mappedUser);
         logInfo('Auth login success', {
           uid: u.id,
           email: u.email,
           userType: userProfile.userType,
         });
-
-        // Redirect to the appropriate dashboard
         const dashboardPath = roleToDashboard(userProfile.userType as UserType);
         router.push(dashboardPath);
-
         return true;
       } else {
         setError(result.error || 'Invalid credentials');

@@ -231,7 +231,7 @@ export async function getMockPatientProfile(userId: string) {
   return {
     userId,
     dateOfBirth: '1990-01-01',
-    gender: 'OTHER' as Gender,
+    gender: Gender.OTHER,
     medicalHistory: 'No significant medical history',
     bloodType: null,
   };
@@ -288,8 +288,8 @@ export async function signIn(
   password: string // Use password (lint error)
 ): Promise<
   | ResultOk<{
-      user: { id: string; email: string | null };
-      userProfile: z.infer<typeof UserProfileSchema> & { id: string };
+  user: { id: string; email: string | null };
+  userProfile: z.infer<typeof UserProfileSchema> & { id: string };
       roleProfile:
         | z.infer<typeof PatientProfileSchema>
         | z.infer<typeof DoctorProfileSchema>
@@ -314,16 +314,16 @@ export async function signIn(
 
     // Handle special test login - allow any password with test@example.com emails
     const isTestLogin = email.includes('test@') && email.includes('.com');
-
+    
     // Also allow test-patient@example.com, test-doctor@example.com, etc.
     const isStandardTestLogin =
-      email === 'test-patient@example.com' ||
-      email === 'test-doctor@example.com' ||
+      email === 'test-patient@example.com' || 
+      email === 'test-doctor@example.com' || 
       email === 'test-admin@example.com';
-
+    
     if (!userProfile && !isTestLogin && !isStandardTestLogin)
       return { success: false, error: 'Invalid credentials' };
-
+    
     // Handle test user login
     if (isTestLogin || isStandardTestLogin) {
       // Create a mock user based on email
@@ -338,7 +338,7 @@ export async function signIn(
         : email.includes('doctor')
           ? 'test-doctor-verified-003'
           : 'test-admin-005';
-
+                  
       const mockUser = await getMyUserProfile(uid);
       
       // Add proper null check for mockUser
@@ -346,7 +346,7 @@ export async function signIn(
         logError('signIn failed: Mock user not found', { uid, email });
         return { success: false, error: 'Error creating test account' };
       }
-
+      
       // Get the appropriate role profile
       let roleProfile = null;
       if (userType === UserType.PATIENT) {
@@ -354,15 +354,19 @@ export async function signIn(
       } else if (userType === UserType.DOCTOR) {
         roleProfile = await getMockDoctorProfile(uid);
       }
-
+      
+      // Fix the returned user profile to ensure userType has the correct case
       return {
         success: true,
         user: { id: mockUser.id, email: mockUser.email },
-        userProfile: mockUser,
+        userProfile: {
+          ...mockUser,
+          userType: userType // Ensure correct enum value
+        },
         roleProfile,
       };
     }
-
+    
     if (!userProfile!.isActive)
       return { success: false, error: 'Account inactive or pending verification' };
 
@@ -409,11 +413,11 @@ export async function signIn(
 export async function getMyUserProfile(uid: string) {
   logInfo('getMyUserProfile called', { uid });
   await sleep();
-
+  
   try {
     const users = await getUsers();
     const user = users.find(u => u.id === uid);
-
+    
     if (!user) {
       // Check if this is a test user ID and generate a mock user
       if (uid.startsWith('test-')) {
@@ -463,10 +467,10 @@ export async function getMyUserProfile(uid: string) {
           };
         }
       }
-
+      
       throw new Error('User not found');
     }
-
+    
     return user;
   } catch (err) {
     logError('getMyUserProfile error', err);
@@ -899,7 +903,7 @@ export async function bookAppointment(
       notes: null,
       createdAt: now,
       updatedAt: now,
-      appointmentType: AppointmentType[appointmentType as keyof typeof AppointmentType] || AppointmentType.IN_PERSON,
+      appointmentType: appointmentType ? AppointmentType[appointmentType as keyof typeof AppointmentType] || AppointmentType.IN_PERSON : AppointmentType.IN_PERSON,
       videoCallUrl: 'https://example.com/video-call/' + appointmentId // Mock URL
     };
     
@@ -1785,7 +1789,148 @@ function getAvailableSlotsForDate(
   ];
 }
 
-// Fix the adminCreateUser interface in localApi
+/**
+ * Send a direct message from one user to another, creating a notification
+ */
+export async function sendDirectMessage(
+  ctx: { uid: string; role: UserType },
+  payload: {
+    recipientId: string;
+    message: string;
+    subject?: string;
+  }
+): Promise<ResultOk<{ success: true }> | ResultErr> {
+  const perf = trackPerformance('sendDirectMessage');
+  
+  try {
+    const { uid, role } = ctx;
+    const { recipientId, message, subject = 'New Message' } = payload;
+    
+    logInfo('sendDirectMessage called', { uid, role, recipientId });
+    
+    // Validate sender exists
+    const users = await getUsers();
+    const sender = users.find(u => u.id === uid);
+    if (!sender) {
+      return { success: false, error: 'Sender not found' };
+    }
+    
+    // Validate recipient exists
+    const recipient = users.find(u => u.id === recipientId);
+    if (!recipient) {
+      return { success: false, error: 'Recipient not found' };
+    }
+    
+    // Create notification for recipient
+    await readWrite('sendDirectMessage.notifications', getNotifications, saveNotifications, notifications => {
+      const notification: Notification = {
+        id: `notif-${generateId()}`,
+        userId: recipientId,
+        title: subject,
+        message: `Message from ${sender.firstName} ${sender.lastName}: ${message}`,
+        type: NotificationType.NEW_MESSAGE,
+        isRead: false,
+        createdAt: nowIso(),
+        relatedId: null
+      };
+      notifications.push(notification);
+    });
+    
+    return { success: true };
+  } catch (e) {
+    logError('sendDirectMessage failed', e);
+    return { success: false, error: 'Error sending message' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Get dashboard stats for the current user
+ */
+export async function getMyDashboardStats(
+  ctx: { uid: string; role: UserType }
+): Promise<ResultOk<{ 
+  upcomingCount: number; 
+  pastCount: number;
+  notifUnread: number;
+  totalPatients?: number; 
+  totalDoctors?: number;
+  pendingVerifications?: number;
+}> | ResultErr> {
+  const perf = trackPerformance('getMyDashboardStats');
+  
+  try {
+    const { uid, role } = ctx;
+    
+    logInfo('getMyDashboardStats called', { uid, role });
+    
+    // Get appointments
+    const appointments = await getAppointments();
+    let myAppointments: Appointment[] = [];
+    
+    if (role === UserType.PATIENT) {
+      myAppointments = appointments.filter(a => a.patientId === uid);
+    } else if (role === UserType.DOCTOR) {
+      myAppointments = appointments.filter(a => a.doctorId === uid);
+    } else if (role === UserType.ADMIN) {
+      // Admins see all appointments
+      myAppointments = appointments;
+    }
+    
+    // Get notifications
+    const notifications = await getNotifications();
+    const myNotifications = notifications.filter(n => n.userId === uid);
+    const unreadCount = myNotifications.filter(n => !n.isRead).length;
+    
+    // Calculate upcomingCount: appointments that are in future and not cancelled
+    const now = new Date();
+    const upcomingCount = myAppointments.filter(a => {
+      const apptDate = new Date(`${a.appointmentDate}T${a.startTime}`);
+      return apptDate > now && a.status !== AppointmentStatus.CANCELED;
+    }).length;
+    
+    // Calculate pastCount: appointments that are in past or completed
+    const pastCount = myAppointments.filter(a => {
+      const apptDate = new Date(`${a.appointmentDate}T${a.startTime}`);
+      return apptDate < now || a.status === AppointmentStatus.COMPLETED;
+    }).length;
+    
+    // For admin users, get additional stats
+    let adminStats = {};
+    if (role === UserType.ADMIN) {
+      const users = await getUsers();
+      const doctors = await getDoctors();
+      
+      const totalPatients = users.filter(u => u.userType === UserType.PATIENT).length;
+      const totalDoctors = doctors.length;
+      const pendingVerifications = doctors.filter(d => 
+        d.verificationStatus === VerificationStatus.PENDING
+      ).length;
+      
+      adminStats = {
+        totalPatients,
+        totalDoctors,
+        pendingVerifications
+      };
+    }
+    
+    return { 
+      success: true, 
+      upcomingCount, 
+      pastCount, 
+      notifUnread: unreadCount,
+      ...adminStats
+    };
+  } catch (e) {
+    logError('getMyDashboardStats failed', e);
+    return { success: false, error: 'Error fetching dashboard stats' };
+  } finally {
+    perf.stop();
+  }
+}
+
+// Define the LocalApi type
 export type LocalApi = {
   login: (params: { email: string; password: string }) => ReturnType<typeof signIn>;
   registerPatient: (payload: unknown) => ReturnType<typeof registerUser>;
@@ -1808,8 +1953,11 @@ export type LocalApi = {
   adminGetUserDetail: typeof adminGetUserDetail;
   adminUpdateUserStatus: typeof adminUpdateUserStatus;
   adminCreateUser: typeof adminCreateUser;
+  sendDirectMessage: typeof sendDirectMessage;
+  getMyDashboardStats: typeof getMyDashboardStats;
 };
 
+// Create a flat localApi object that directly exports all functions
 const localApi: LocalApi = {
   login: (params: { email: string; password: string }) => 
     signIn(params.email, params.password),
@@ -1819,7 +1967,6 @@ const localApi: LocalApi = {
     getMyUserProfile(ctx.uid),
   updateMyUserProfile,
   findDoctors,
-  // Expose all functions directly at the top level
   getMyAppointments,
   bookAppointment,
   cancelAppointment,
@@ -1834,7 +1981,9 @@ const localApi: LocalApi = {
   adminGetAllDoctors,
   adminGetUserDetail,
   adminUpdateUserStatus,
-  adminCreateUser
+  adminCreateUser,
+  sendDirectMessage,
+  getMyDashboardStats
 };
 
 // Add validation logging
@@ -1843,5 +1992,5 @@ setTimeout(() => {
 }, 1000);
 
 /* Default export makes star-import easy */
-export default localApi;
+export default localApi; 
 

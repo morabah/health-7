@@ -1,13 +1,10 @@
 'use client';
 
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryProvider } from '@/lib/queryClient';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import Layout from '@/components/layout/Layout';
-
-// Create a client
-const queryClient = new QueryClient();
 
 /**
  * Client Layout Component
@@ -16,11 +13,11 @@ const queryClient = new QueryClient();
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
+      <QueryProvider>
         <AuthProvider>
           <Layout>{children}</Layout>
         </AuthProvider>
-      </QueryClientProvider>
+      </QueryProvider>
     </ThemeProvider>
   );
 }

@@ -145,8 +145,8 @@ export default function AdminDashboard() {
           </div>
         ) : recentUsers.length > 0 ? (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {recentUsers.map((user: any) => (
-              <div key={user.id} className="p-4 flex justify-between items-center">
+            {recentUsers.map((user: any, idx: number) => (
+              <div key={user.id || user.email || idx} className="p-4 flex justify-between items-center">
                 <div>
                   <p className="font-medium">{user.firstName} {user.lastName}</p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
@@ -175,8 +175,8 @@ export default function AdminDashboard() {
           </div>
         ) : pendingDoctors.length > 0 ? (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {pendingDoctors.map((doctor: any) => (
-              <div key={doctor.id} className="p-4 flex justify-between items-center">
+            {pendingDoctors.map((doctor: any, idx: number) => (
+              <div key={doctor.id || doctor.email || idx} className="p-4 flex justify-between items-center">
                 <div>
                   <p className="font-medium">Dr. {doctor.firstName} {doctor.lastName}</p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{doctor.specialty}</p>

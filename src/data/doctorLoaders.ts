@@ -17,7 +17,7 @@ export const useDoctorProfile = () => {
     queryKey: ['doctorProfile', user?.uid],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getMyUserProfile', { uid: user.uid });
+      return callApi('getMyUserProfile', { uid: user.uid, role: UserType.DOCTOR });
     },
     enabled: !!user?.uid
   });
@@ -72,11 +72,12 @@ export const useCompleteAppointment = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (params: { id: string; notes?: string }) => {
+    mutationFn: async (params: { appointmentId: string; notes?: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
       return callApi('completeAppointment', { 
         uid: user.uid, 
-        role: UserType.DOCTOR
+        role: UserType.DOCTOR,
+        ...params
       });
     },
     onSuccess: () => {
@@ -99,8 +100,7 @@ export const useDoctorCancelAppointment = () => {
       return callApi('cancelAppointment', { 
         uid: user.uid, 
         role: UserType.DOCTOR,
-        appointmentId: params.appointmentId,
-        reason: params.reason
+        ...params
       });
     },
     onSuccess: () => {
@@ -133,21 +133,20 @@ export const useDoctorAvailability = () => {
 /**
  * Hook to set doctor availability
  */
-export const useSetDoctorAvailability = () => {
+export const useSetAvailability = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async (data: z.infer<typeof SetDoctorAvailabilitySchema>) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('setDoctorAvailability', { 
-        uid: user.uid, 
+      return callApi('setDoctorAvailability', {
+        uid: user.uid,
         role: UserType.DOCTOR,
         ...data
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctorAvailability'] });
+      queryClient.invalidateQueries({ queryKey: ['doctorAvailability', user?.uid] });
     }
   });
 }; 

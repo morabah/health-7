@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 // import { Tab } from '@headlessui/react'; // Removed unused import
 import clsx from 'clsx';
@@ -8,6 +8,8 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
+import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import {
   Calendar,
   ClipboardList,
@@ -19,59 +21,121 @@ import {
   Filter,
 } from 'lucide-react';
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
-
-// Sample data - would come from API in real implementation
-const sampleAppointments = [
-  {
-    id: 'appt-123',
-    patientId: 'pat-123',
-    patientName: 'James Wilson',
-    date: '2023-12-15T00:00:00.000Z',
-    time: '10:30 AM',
-    status: 'scheduled',
-    reason: 'Annual check-up',
-  },
-  {
-    id: 'appt-124',
-    patientId: 'pat-456',
-    patientName: 'Emily Johnson',
-    date: '2023-12-15T00:00:00.000Z',
-    time: '2:00 PM',
-    status: 'scheduled',
-    reason: 'Follow-up consultation',
-  },
-];
+import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
+import { AppointmentStatus } from '@/types/enums';
+import { format } from 'date-fns';
+import { logInfo, logValidation } from '@/lib/logger';
+import type { Appointment } from '@/types/schemas';
 
 export default function DoctorAppointmentsPage() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedAppointment, setSelectedAppointment] = useState<
-    null | (typeof sampleAppointments)[0]
-  >(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<null | Appointment>(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  
+  // Get appointments data from API
+  const { data: appointmentsData, isLoading, error } = useDoctorAppointments();
+  const completeMutation = useCompleteAppointment();
+  const cancelMutation = useDoctorCancelAppointment();
+
+  // Filter appointments based on selected filters
+  const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
+  
+  const filteredAppointments = appointments.filter((appointment: Appointment) => {
+    // Date filtering
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    const nextMonth = new Date(today);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    
+    let passesDateFilter = true;
+    
+    if (dateFilter === 'today') {
+      passesDateFilter = appointmentDate.toDateString() === today.toDateString();
+    } else if (dateFilter === 'tomorrow') {
+      passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
+    } else if (dateFilter === 'week') {
+      passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
+    } else if (dateFilter === 'month') {
+      passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
+    }
+    
+    // Status filtering
+    let passesStatusFilter = true;
+    
+    if (statusFilter === 'scheduled') {
+      passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
+    } else if (statusFilter === 'completed') {
+      passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
+    } else if (statusFilter === 'cancelled') {
+      passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
+    }
+    
+    return passesDateFilter && passesStatusFilter;
+  });
 
   // Handle appointment completion
   const handleCompleteAppointment = async (id: string, notes: string) => {
     try {
-      // In a real app, this would call an API endpoint
-      console.log(`Completing appointment ${id} with notes: ${notes}`);
-
-      // Would update local state in a real implementation
+      const result = await completeMutation.mutateAsync({
+        appointmentId: id,
+        notes
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      
       setShowCompleteModal(false);
-
-      // Would show a success toast in a real implementation
+      logInfo('Appointment completed', { id });
+      logValidation('4.10', 'success', 'Doctor appointment completion fully functional');
+      
+      return;
     } catch (error) {
       console.error('Error completing appointment:', error);
-      throw error; // Let the modal handle the error display
+      throw error;
+    }
+  };
+  
+  // Handle appointment cancellation
+  const handleCancelAppointment = async (id: string) => {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+      try {
+        const result = await cancelMutation.mutateAsync({
+          appointmentId: id,
+          reason: 'Cancelled by doctor'
+        });
+        
+        if (!result.success) {
+          alert('Failed to cancel appointment: ' + result.error);
+        }
+        
+        logInfo('Appointment cancelled', { id });
+      } catch (err) {
+        console.error('Error cancelling appointment:', err);
+        alert('An error occurred while cancelling the appointment');
+      }
     }
   };
 
   // Open complete modal with the selected appointment
-  const openCompleteModal = (appointment: (typeof sampleAppointments)[0]) => {
+  const openCompleteModal = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     setShowCompleteModal(true);
   };
+  
+  useEffect(() => {
+    logInfo('Doctor appointments page loaded');
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -118,6 +182,7 @@ export default function DoctorAppointmentsPage() {
               onChange={e => setDateFilter(e.target.value)}
               className="w-full sm:w-40"
             >
+              <option value="all">All Dates</option>
               <option value="today">Today</option>
               <option value="tomorrow">Tomorrow</option>
               <option value="week">This Week</option>
@@ -139,21 +204,49 @@ export default function DoctorAppointmentsPage() {
             </Select>
           </div>
           <div className="flex-grow" />
-          <Button variant="outline" size="sm" className="mt-4 sm:mt-0">
-            <Filter className="h-4 w-4 mr-2" />
-            Apply Filters
-          </Button>
         </div>
       </Card>
 
+      {/* Loading, Error and Empty States */}
+      {isLoading && (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
+      )}
+      
+      {error && (
+        <Alert variant="error" className="my-4">
+          Error loading appointments: {error instanceof Error ? error.message : String(error)}
+        </Alert>
+      )}
+      
+      {!isLoading && !error && filteredAppointments.length === 0 && (
+        <Card className="p-8 text-center">
+          <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-400" />
+          <p className="text-slate-500 dark:text-slate-400">No appointments found matching your filters.</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-4"
+            onClick={() => {
+              setDateFilter('all');
+              setStatusFilter('all');
+            }}
+          >
+            Clear Filters
+          </Button>
+        </Card>
+      )}
+
       {/* List View */}
-      {view === 'list' && (
+      {view === 'list' && !isLoading && !error && filteredAppointments.length > 0 && (
         <div className="space-y-4">
-          {sampleAppointments.map(appointment => (
+          {filteredAppointments.map((appointment: Appointment) => (
             <AppointmentCard
               key={appointment.id}
               appointment={appointment}
               onCompleteClick={() => openCompleteModal(appointment)}
+              onCancelClick={() => handleCancelAppointment(appointment.id)}
             />
           ))}
         </div>
@@ -187,17 +280,32 @@ export default function DoctorAppointmentsPage() {
 function AppointmentCard({
   appointment,
   onCompleteClick,
+  onCancelClick,
 }: {
-  appointment: (typeof sampleAppointments)[0];
+  appointment: Appointment;
   onCompleteClick: () => void;
+  onCancelClick: () => void;
 }) {
   // Format date nicely
-  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedDate = format(new Date(appointment.appointmentDate), 'PPPP');
+  const isCompletable = appointment.status === AppointmentStatus.CONFIRMED;
+  const isCancellable = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
+
+  const statusMap: Record<string, string> = {
+    [AppointmentStatus.PENDING]: 'Pending',
+    [AppointmentStatus.CONFIRMED]: 'Confirmed',
+    [AppointmentStatus.COMPLETED]: 'Completed',
+    [AppointmentStatus.CANCELED]: 'Cancelled',
+    [AppointmentStatus.RESCHEDULED]: 'Rescheduled'
+  };
+
+  const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
+    [AppointmentStatus.PENDING]: 'pending',
+    [AppointmentStatus.CONFIRMED]: 'info',
+    [AppointmentStatus.COMPLETED]: 'success',
+    [AppointmentStatus.CANCELED]: 'danger',
+    [AppointmentStatus.RESCHEDULED]: 'warning',
+  };
 
   return (
     <Card className="p-4">
@@ -211,7 +319,7 @@ function AppointmentCard({
             <div>
               <h3 className="font-medium">{appointment.patientName}</h3>
               <Link
-                href={`/patient/${appointment.patientId}`}
+                href={`/patient-profile/${appointment.patientId}`}
                 className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
               >
                 View Profile
@@ -226,31 +334,49 @@ function AppointmentCard({
             </div>
             <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
               <Clock className="h-4 w-4 mr-2" />
-              {appointment.time}
+              {appointment.startTime} - {appointment.endTime}
             </div>
           </div>
         </div>
 
         {/* Status Badge and Actions */}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Badge variant="info">Scheduled</Badge>
+          <Badge variant={statusColor[appointment.status] || 'default'}>
+            {statusMap[appointment.status] || 'Unknown'}
+          </Badge>
 
           <div className="flex items-center space-x-2">
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" as={Link} href={`/doctor/appointments/${appointment.id}`}>
               <ChevronRight className="h-4 w-4 mr-1" />
               Details
             </Button>
-            <Button size="sm" variant="primary" onClick={onCompleteClick}>
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Complete
-            </Button>
-            <Button size="sm" variant="danger">
-              <XCircle className="h-4 w-4 mr-1" />
-              Cancel
-            </Button>
+            {isCompletable && (
+              <Button size="sm" variant="primary" onClick={onCompleteClick}>
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Complete
+              </Button>
+            )}
+            {isCancellable && (
+              <Button size="sm" variant="danger" onClick={onCancelClick}>
+                <XCircle className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+            )}
           </div>
         </div>
       </div>
+      
+      {appointment.reason && (
+        <p className="text-sm mt-2 text-slate-600 dark:text-slate-400">
+          <strong>Reason:</strong> {appointment.reason}
+        </p>
+      )}
+      
+      {appointment.notes && (
+        <p className="text-sm mt-1 text-slate-600 dark:text-slate-400">
+          <strong>Notes:</strong> {appointment.notes}
+        </p>
+      )}
     </Card>
   );
 }
