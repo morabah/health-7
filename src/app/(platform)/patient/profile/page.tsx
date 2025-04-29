@@ -7,8 +7,7 @@ import Select from '@/components/ui/Select';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
 import { User, Save } from 'lucide-react';
-import { logInfo } from '@/lib/logger';
-import { usePatientProfile } from '@/data/patientLoaders';
+import { usePatientProfile, useUpdatePatientProfile } from '@/data/patientLoaders';
 import { Gender, BloodType } from '@/types/enums';
 
 /**
@@ -18,7 +17,8 @@ import { Gender, BloodType } from '@/types/enums';
  * @returns Patient profile component
  */
 export default function PatientProfile() {
-  const { data: profileData, isLoading: profileLoading, mutate } = usePatientProfile();
+  const { data: profileData, isLoading: profileLoading, error: profileError } = usePatientProfile();
+  const updateProfileMutation = useUpdatePatientProfile();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -34,30 +34,26 @@ export default function PatientProfile() {
   });
   
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Populate form data when profile data loads
   useEffect(() => {
-    if (profileData) {
+    if (profileData?.success) {
+      const { userProfile, roleProfile } = profileData;
       setFormData({
-        firstName: profileData.firstName || '',
-        lastName: profileData.lastName || '',
-        email: profileData.email || '',
-        phone: profileData.phone || '',
-        address: profileData.address || '',
-        dateOfBirth: profileData.dateOfBirth || '',
-        gender: profileData.gender || '',
-        bloodType: profileData.bloodType || '',
-        allergies: profileData.allergies || '',
-        medicalHistory: profileData.medicalHistory || ''
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
+        email: userProfile.email || '',
+        phone: userProfile.phone || '',
+        address: userProfile.address || '',
+        dateOfBirth: roleProfile?.dateOfBirth || '',
+        gender: roleProfile?.gender || '',
+        bloodType: roleProfile?.bloodType || '',
+        allergies: roleProfile?.allergies?.join(', ') || '',
+        medicalHistory: roleProfile?.medicalHistory || ''
       });
     }
   }, [profileData]);
-
-  useEffect(() => {
-    logInfo('Patient profile page rendered');
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -69,29 +65,41 @@ export default function PatientProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
     setSaveStatus(null);
     
     try {
-      // This would call an API to update the profile
-      // const result = await callApi('updatePatientProfile', formData);
+      const allergiesArray = formData.allergies
+        ? formData.allergies.split(',').map(item => item.trim())
+        : [];
+        
+      const result = await updateProfileMutation.mutateAsync({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender as Gender,
+        bloodType: formData.bloodType as BloodType,
+        allergies: allergiesArray,
+        medicalHistory: formData.medicalHistory
+      });
       
-      // For now, we'll simulate a successful update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      await mutate(); // Refresh profile data
+      if (result.success) {
       setSaveStatus({
         type: 'success',
         message: 'Profile updated successfully'
       });
       setIsEditing(false);
+      } else {
+        setSaveStatus({
+          type: 'error',
+          message: result.error || 'Failed to update profile'
+        });
+      }
     } catch (error) {
       setSaveStatus({
         type: 'error',
-        message: 'Failed to update profile'
+        message: error instanceof Error ? error.message : 'Failed to update profile'
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -111,15 +119,23 @@ export default function PatientProfile() {
 
       {saveStatus && (
         <Alert 
-          type={saveStatus.type} 
-          message={saveStatus.message}
-          onClose={() => setSaveStatus(null)}
-        />
+          variant={saveStatus.type} 
+        >
+          {saveStatus.message}
+        </Alert>
+      )}
+
+      {profileError && (
+        <Alert 
+          variant="error" 
+        >
+          {profileError instanceof Error ? profileError.message : 'Error loading profile'}
+        </Alert>
       )}
 
       {profileLoading ? (
         <div className="flex justify-center py-10">
-          <Spinner size="lg" />
+          <Spinner className="w-8 h-8" />
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
@@ -162,7 +178,7 @@ export default function PatientProfile() {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={true} // Email cannot be changed
                   required
                 />
               </div>
@@ -264,47 +280,21 @@ export default function PatientProfile() {
           </Card>
 
           {isEditing && (
-            <div className="mt-6 flex justify-end gap-4">
+            <div className="mt-6 flex justify-end space-x-4">
               <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  setIsEditing(false);
-                  // Reset form data to original data
-                  if (profileData) {
-                    setFormData({
-                      firstName: profileData.firstName || '',
-                      lastName: profileData.lastName || '',
-                      email: profileData.email || '',
-                      phone: profileData.phone || '',
-                      address: profileData.address || '',
-                      dateOfBirth: profileData.dateOfBirth || '',
-                      gender: profileData.gender || '',
-                      bloodType: profileData.bloodType || '',
-                      allergies: profileData.allergies || '',
-                      medicalHistory: profileData.medicalHistory || ''
-                    });
-                  }
-                }}
-                disabled={isSaving}
+                variant="secondary" 
+                onClick={() => setIsEditing(false)}
+                disabled={updateProfileMutation.isPending}
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                disabled={isSaving}
+                variant="primary"
+                isLoading={updateProfileMutation.isPending}
               >
-                {isSaving ? (
-                  <>
-                    <Spinner size="sm" className="mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} className="mr-2" />
+                <Save className="h-4 w-4 mr-2" />
                     Save Changes
-                  </>
-                )}
               </Button>
             </div>
           )}

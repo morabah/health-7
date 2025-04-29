@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, AlertTriangle } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -11,6 +11,9 @@ import Textarea from '@/components/ui/Textarea';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import { logInfo } from '@/lib/logger';
+import { UserType } from '@/types/enums';
+import { useAuth } from '@/context/AuthContext';
+import { callApi } from '@/lib/apiClient';
 
 /**
  * Doctor Registration Page
@@ -20,6 +23,7 @@ import { logInfo } from '@/lib/logger';
  */
 export default function DoctorRegistrationPage() {
   const router = useRouter();
+  const { registerDoctor, error: authError, clearError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -37,6 +41,41 @@ export default function DoctorRegistrationPage() {
     fee: '',
     bio: ''
   });
+  
+  // Form validation state
+  const [isValid, setIsValid] = useState(false);
+  
+  // Validate form on input change
+  useEffect(() => {
+    // Simple email regex validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValidEmail = emailRegex.test(formData.email);
+    const isValidPassword = formData.password.length >= 6;
+    const passwordsMatch = formData.password === formData.confirmPassword;
+    
+    // Check that all required fields have values
+    const hasRequiredFields = 
+      formData.firstName.trim() !== '' &&
+      formData.lastName.trim() !== '' &&
+      formData.specialty.trim() !== '' &&
+      formData.licenseNumber.trim() !== '' &&
+      formData.yearsOfExperience.trim() !== '' &&
+      formData.location.trim() !== '';
+    
+    setIsValid(isValidEmail && isValidPassword && passwordsMatch && hasRequiredFields);
+  }, [formData]);
+  
+  // Auto-hide error message after 5 seconds
+  useEffect(() => {
+    if (error || authError) {
+      const timer = setTimeout(() => {
+        setError('');
+        clearError();
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error, authError, clearError]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -48,31 +87,49 @@ export default function DoctorRegistrationPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    if (!isValid) return;
     
     setError('');
     setIsLoading(true);
     
-    // Log registration attempt
-    logInfo('auth-event', {
-      action: 'doctor-register-attempt',
+    try {
+      // Convert languages to array and prepare payload
+      const languagesArray = formData.languages.split(',').map(lang => lang.trim());
+      
+      const payload = {
       email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        userType: UserType.DOCTOR,
       specialty: formData.specialty,
-      timestamp: new Date().toISOString()
-    });
+        licenseNumber: formData.licenseNumber,
+        yearsOfExperience: parseInt(formData.yearsOfExperience) || 0,
+        location: formData.location,
+        languages: languagesArray,
+        consultationFee: parseInt(formData.fee) || 0,
+        bio: formData.bio
+      };
     
-    // Simulate API call with setTimeout
-    setTimeout(() => {
+      // Call the API directly
+      const res = await callApi('registerDoctor', payload);
+      
       setIsLoading(false);
+      
+      if (res.success) {
+        // On success, use auth context for login and redirection
+        await registerDoctor(payload);
       router.push('/auth/pending-verification');
-    }, 700);
+      } else {
+        setError(res.error || 'Registration failed. Please try again.');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+    }
   };
 
   return (
@@ -87,9 +144,14 @@ export default function DoctorRegistrationPage() {
           <p className="text-slate-600 dark:text-slate-400 mt-2">Create your healthcare provider account</p>
         </div>
         
-        {error && (
+        <Alert variant="warning" className="flex items-center">
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <span>Your account will require admin verification before activation.</span>
+        </Alert>
+        
+        {(error || authError) && (
           <Alert variant="error">
-            {error}
+            {error || authError}
           </Alert>
         )}
         
@@ -126,6 +188,9 @@ export default function DoctorRegistrationPage() {
             value={formData.email}
             onChange={handleChange}
           />
+          {formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
+            <p className="text-xs text-danger mt-1">Please enter a valid email address</p>
+          )}
           
           <Input
             id="phone"
@@ -148,6 +213,9 @@ export default function DoctorRegistrationPage() {
             value={formData.password}
             onChange={handleChange}
           />
+          {formData.password && formData.password.length < 6 && (
+            <p className="text-xs text-danger mt-1">Password must be at least 6 characters</p>
+          )}
           
           <Input
             id="confirmPassword"
@@ -251,54 +319,16 @@ export default function DoctorRegistrationPage() {
             onChange={handleChange}
           />
           
-          <div className="space-y-2">
-            <div className="block text-sm font-medium text-slate-600 dark:text-slate-400">
-              Upload Documents
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="profile-picture" className="text-sm text-slate-600 dark:text-slate-400 mb-1">Profile Picture</label>
-                <input 
-                  id="profile-picture"
-                  type="file" 
-                  accept="image/*"
-                  className="w-full text-sm text-slate-600 dark:text-slate-400
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded file:border-0
-                    file:text-sm file:font-medium
-                    file:bg-primary file:text-white
-                    file:cursor-pointer"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="license-document" className="text-sm text-slate-600 dark:text-slate-400 mb-1">License Document (PDF)</label>
-                <input 
-                  id="license-document"
-                  type="file" 
-                  accept=".pdf"
-                  className="w-full text-sm text-slate-600 dark:text-slate-400
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded file:border-0
-                    file:text-sm file:font-medium
-                    file:bg-primary file:text-white
-                    file:cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-          
           <Button 
             type="submit" 
             className="w-full" 
             isLoading={isLoading}
+            disabled={!isValid || isLoading}
           >
-            Register
+            Register as Doctor
           </Button>
-        </form>
         
-        <div className="text-center">
+          <div className="text-center mt-4">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Already have an account?{' '}
             <Link href="/auth/login" className="text-primary hover:underline">
@@ -306,6 +336,7 @@ export default function DoctorRegistrationPage() {
             </Link>
           </p>
         </div>
+        </form>
       </Card>
     </div>
   );

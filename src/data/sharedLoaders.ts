@@ -66,18 +66,15 @@ export const useNotifications = () => {
  */
 export function useMarkNotificationRead() {
   const user = useCurrentUser();
+  
   return useMutation({
     mutationFn: async (notificationId: string) => {
       if (!user?.uid) throw new Error('User not authenticated');
       
-      // Need to structure the parameters according to how markNotificationRead is defined in LocalApi
       return callApi('markNotificationRead', { 
-        // Context object
         uid: user.uid, 
-        role: getUserRole(user.role)
-      }, { 
-        // Payload object
-        notificationId
+        role: getUserRole(user.role),
+        ...{ notificationId, isRead: true }
       });
     },
     onSuccess: () => {
@@ -102,7 +99,7 @@ export const useMarkAllNotificationsRead = () => {
         await callApi('markNotificationRead', { 
           uid: user.uid, 
           role: getUserRole(user.role),
-          notificationId: id
+          ...{ notificationId: id, isRead: true }
         });
       }
       
@@ -182,7 +179,8 @@ export const useAvailableSlots = () => {
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getDoctorAvailability', { 
+      
+      return callApi('getAvailableSlots', { 
         uid: user.uid, 
         role: getUserRole(user.role),
         ...data

@@ -7,6 +7,8 @@ import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import { 
   Search, 
   MapPin, 
@@ -134,21 +136,15 @@ interface SearchParams {
   name: string;
 }
 
-interface FindDoctorsResult {
-  success: boolean;
-  doctors?: Doctor[];
-  error?: string;
-}
-
 export default function FindDoctorsPage() {
   const [searchParams, setSearchParams] = useState<SearchParams>({
     specialty: '',
     location: '',
     name: ''
   });
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const findDoctorsMutation = useFindDoctors();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { mutateAsync, data, error } = useFindDoctors();
   
   // Handle search form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,26 +157,21 @@ export default function FindDoctorsPage() {
   
   // Handle search submission
   const handleSearch = async () => {
-    setIsSearching(true);
+    setIsLoading(true);
     try {
-      const result = await findDoctorsMutation.mutateAsync({
+      await mutateAsync({
         specialty: searchParams.specialty || undefined,
         location: searchParams.location || undefined,
         name: searchParams.name || undefined
-      }) as FindDoctorsResult;
+      });
       
-      if (result.success && result.doctors) {
-        setDoctors(result.doctors);
-        logInfo('Doctors found', { count: result.doctors.length });
-      } else {
-        setDoctors([]);
-        logError('Failed to find doctors', { error: result.error });
+      if (data?.success) {
+        logInfo('Doctors found', { count: data.doctors.length });
       }
     } catch (error) {
       logError('Error searching for doctors', error);
-      setDoctors([]);
     } finally {
-      setIsSearching(false);
+      setIsLoading(false);
     }
   };
   
@@ -189,21 +180,23 @@ export default function FindDoctorsPage() {
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
+    
+    // Initial search without filters
     (async () => {
-      setIsSearching(true);
+      setIsLoading(true);
       try {
-        const result = await findDoctorsMutation.mutateAsync({}) as FindDoctorsResult;
-        if (result.success && result.doctors) {
-          setDoctors(result.doctors);
-          logInfo('Initial doctors loaded', { count: result.doctors.length });
-        }
+        await mutateAsync({});
+        logInfo('Initial doctors loaded', { count: data?.doctors?.length || 0 });
       } catch (error) {
         logError('Error loading initial doctors', error);
       } finally {
-        setIsSearching(false);
+        setIsLoading(false);
       }
     })();
-  }, []);
+  }, [mutateAsync]);
+  
+  // Get doctors from data
+  const doctors = data?.success ? data.doctors : [];
   
   return (
     <div className="space-y-6">
@@ -248,61 +241,70 @@ export default function FindDoctorsPage() {
             
             <Button 
               variant="primary" 
-              className="w-full"
+              className="w-full flex items-center justify-center" 
               onClick={handleSearch}
-              disabled={isSearching}
+              disabled={isLoading}
             >
-              {isSearching ? (
+              {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Spinner className="h-4 w-4 mr-2" />
                   Searching...
                 </>
               ) : (
                 <>
                   <Search className="h-4 w-4 mr-2" />
-                  Search
+                  Search Doctors
                 </>
               )}
             </Button>
           </Card>
-          
-          {/* Search Tips */}
-          <Card className="p-4">
-            <h3 className="font-medium mb-2">Search Tips</h3>
-            <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
-              <li>• Use precise specialty names for better results</li>
-              <li>• Filter by location for nearby doctors</li>
-              <li>• Search by doctor name if you know who you&apos;re looking for</li>
-              <li>• Check doctor profiles for detailed information</li>
-            </ul>
-          </Card>
         </div>
         
-        {/* Search Results */}
-        <div className="lg:col-span-3 space-y-4">
-          {isSearching ? (
-            <div className="flex justify-center items-center p-12">
-              <Loader2 className="animate-spin h-8 w-8 text-primary mr-2" />
-              <span className="text-slate-600 dark:text-slate-300">Searching for doctors...</span>
+        {/* Main Content */}
+        <div className="lg:col-span-3">
+          {/* Results Count and Message */}
+          {!isLoading && !error && doctors && (
+            <div className="mb-4">
+              <h2 className="text-lg font-medium">
+                {doctors.length} {doctors.length === 1 ? 'Doctor' : 'Doctors'} Available
+              </h2>
+              <p className="text-slate-500 text-sm">
+                Showing doctors that match your criteria
+              </p>
             </div>
-          ) : doctors.length > 0 ? (
-            <>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Showing {doctors.length} {doctors.length === 1 ? 'doctor' : 'doctors'}
+          )}
+          
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center h-60">
+              <Spinner className="w-8 h-8 mb-4" />
+              <p className="text-slate-500">Searching for doctors...</p>
               </div>
-              
-              <div className="space-y-4">
-                {doctors.map((doctor) => (
+          )}
+          
+          {/* Error State */}
+          {error && (
+            <Alert variant="error" className="my-4">
+              Error loading doctors: {error instanceof Error ? error.message : String(error)}
+            </Alert>
+          )}
+          
+          {/* Doctor Cards */}
+          {!isLoading && !error && doctors && doctors.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {doctors.map((doctor: Doctor) => (
                   <DoctorCard key={doctor.id} doctor={doctor} />
                 ))}
               </div>
-            </>
-          ) : (
-            <Card className="p-6 text-center">
-              <p className="text-slate-600 dark:text-slate-300 mb-2">No doctors found matching your search criteria.</p>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">We&apos;ll never share your information.</p>
-            </Card>
-          )}
+          ) : (!isLoading && !error && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
+              <Stethoscope className="h-12 w-12 mx-auto mb-4 text-slate-400" />
+              <h3 className="text-lg font-medium mb-2">No Doctors Found</h3>
+              <p className="text-slate-500 mb-4">
+                Try adjusting your search filters to find more results.
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

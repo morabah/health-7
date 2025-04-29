@@ -26,18 +26,19 @@ export const usePatientProfile = () => {
 
 /**
  * Hook to update patient profile
- * Note: This is currently a placeholder as the updateMyUserProfile endpoint is not yet implemented
  */
 export const useUpdatePatientProfile = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data: any) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      // This is a placeholder - will use the proper endpoint when available
-      console.warn('updateMyUserProfile not yet implemented in localApiFunctions');
-      return { success: false, error: 'Not implemented' };
+      return callApi('updateMyUserProfile', { 
+        uid: user.uid, 
+        role: UserType.PATIENT,
+        ...data
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientProfile'] });
@@ -65,32 +66,43 @@ export const usePatientAppointments = () => {
 };
 
 /**
+ * Hook to get appointment details by ID for the current patient
+ */
+export function useAppointmentDetails(appointmentId: string) {
+  const user = useAuth().user;
+  
+  return useQuery({
+    queryKey: ['appointment', appointmentId],
+    queryFn: async () => {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      return await callApi('getAppointmentDetails', { appointmentId });
+    },
+    enabled: !!appointmentId && !!user,
+  });
+}
+
+/**
  * Hook to cancel an appointment
  */
-export const useCancelAppointment = () => {
-  const { user } = useAuth();
+export function useCancelAppointment() {
+  const user = useAuth().user;
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (params: { appointmentId: string, reason?: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+    mutationFn: async ({ appointmentId, reason }: { appointmentId: string; reason?: string }) => {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
       
-      // Combine context and payload into a single object as required by callApi
-      // Fix object literal property error: remove 'appointmentId' from context object
-      return callApi('cancelAppointment', { 
-        uid: user.uid, 
-        role: UserType.PATIENT,
-        // Payload properties
-        reason: params.reason
-      }, params.appointmentId);
+      return await callApi('cancelAppointment', { appointmentId, reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointment'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
-    onError: (error: unknown) => {
-      console.error('Error cancelling appointment:', error);
-      return error;
-    }
   });
-}; 
+} 

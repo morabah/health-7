@@ -1,37 +1,78 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
-import { User, Save, Upload, GraduationCap, Stethoscope } from 'lucide-react';
-
-// Sample initial profile data
-const initialProfile = {
-  firstName: 'Sarah',
-  lastName: 'Johnson',
-  email: 'dr.sarah@example.com',
-  phone: '+1 (555) 123-4567',
-  specialty: 'cardiology',
-  licenseNumber: 'MD12345678',
-  yearsOfExperience: '8',
-  location: '123 Medical Center, Suite 101, New York, NY',
-  languages: ['english', 'spanish'],
-  consultationFee: '150',
-  bio: 'Board-certified cardiologist with 8 years of experience specializing in preventive cardiology and heart disease management.',
-  education: [
-    { institution: 'Johns Hopkins School of Medicine', degree: 'MD', year: '2010' },
-    { institution: 'University of Michigan', degree: 'BS in Biology', year: '2006' },
-  ],
-  services:
-    'Cardiac consultation, ECG, stress tests, heart disease management, preventive cardiology',
-  verificationStatus: 'pending',
-};
+import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
+import { User, Save, GraduationCap, Stethoscope } from 'lucide-react';
+import { useDoctorProfile, useUpdateDoctorProfile } from '@/data/doctorLoaders';
+import { VerificationStatus } from '@/types/enums';
+import { logValidation } from '@/lib/logger';
 
 export default function DoctorProfilePage() {
-  const [profile, setProfile] = useState(initialProfile);
+  const { data: profileData, isLoading, error, refetch } = useDoctorProfile();
+  const updateProfileMutation = useUpdateDoctorProfile();
+  
+  const [profile, setProfile] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    specialty: string;
+    licenseNumber: string;
+    yearsOfExperience: string;
+    location: string;
+    languages: string[] | string;
+    consultationFee: string;
+    bio: string;
+    services: string;
+    verificationStatus: string;
+  }>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    specialty: '',
+    licenseNumber: '',
+    yearsOfExperience: '',
+    location: '',
+    languages: [] as string[],
+    consultationFee: '',
+    bio: '',
+    services: '',
+    verificationStatus: VerificationStatus.PENDING,
+  });
+  
   const [isEditing, setIsEditing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  
+  // Load profile data when available
+  useEffect(() => {
+    if (profileData?.success) {
+      const { userProfile, roleProfile } = profileData;
+      
+      setProfile({
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
+        email: userProfile.email || '',
+        phone: userProfile.phone || '',
+        specialty: roleProfile?.specialty || '',
+        licenseNumber: roleProfile?.licenseNumber || '',
+        yearsOfExperience: roleProfile?.yearsOfExperience?.toString() || '',
+        location: roleProfile?.location || '',
+        languages: roleProfile?.languages || [],
+        consultationFee: roleProfile?.consultationFee?.toString() || '',
+        bio: roleProfile?.bio || '',
+        services: roleProfile?.servicesOffered || '',
+        verificationStatus: roleProfile?.verificationStatus || VerificationStatus.PENDING,
+      });
+
+      logValidation('4.10', 'success', 'Doctor profile page connected to real data via local API');
+    }
+  }, [profileData]);
 
   // Handle input changes
   const handleChange = (
@@ -42,11 +83,59 @@ export default function DoctorProfilePage() {
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Updated profile:', profile);
+    setStatusMessage(null);
+    
+    try {
+      // Prepare languages array from comma-separated string if needed
+      let languagesArray: string[] = [];
+      if (Array.isArray(profile.languages)) {
+        languagesArray = profile.languages;
+      } else if (typeof profile.languages === 'string') {
+        languagesArray = profile.languages.split(',').map((lang: string) => lang.trim()).filter(Boolean);
+      }
+      
+      // Type the update payload
+      const updatePayload = {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        specialty: profile.specialty,
+        licenseNumber: profile.licenseNumber,
+        yearsOfExperience: parseInt(profile.yearsOfExperience) || 0,
+        location: profile.location,
+        languages: languagesArray,
+        consultationFee: parseInt(profile.consultationFee) || null,
+        bio: profile.bio,
+        servicesOffered: profile.services,
+      };
+      
+      const result = await updateProfileMutation.mutateAsync(updatePayload);
+      
+      if (result.success) {
+        setStatusMessage({
+          type: 'success',
+          message: 'Profile updated successfully'
+        });
     setIsEditing(false);
-    // In a real app, this would save to backend
+        
+        // Explicitly refetch to ensure we have the latest data
+        refetch();
+        
+        logValidation('4.10', 'success', 'Doctor profile update fully functional');
+      } else {
+        setStatusMessage({
+          type: 'error',
+          message: result.error || 'Failed to update profile'
+        });
+      }
+    } catch (error) {
+      setStatusMessage({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'An error occurred while updating profile'
+      });
+    }
   };
 
   return (
@@ -54,8 +143,9 @@ export default function DoctorProfilePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Doctor Profile</h1>
         <Button
-          variant={isEditing ? 'secondary' : 'primary'}
+          variant={isEditing ? "secondary" : "primary"}
           onClick={() => setIsEditing(!isEditing)}
+          disabled={isLoading || updateProfileMutation.isPending}
         >
           {isEditing ? (
             <>Cancel</>
@@ -68,15 +158,33 @@ export default function DoctorProfilePage() {
         </Button>
       </div>
 
-      {profile.verificationStatus === 'pending' && (
-        <div className="flex items-center justify-between p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+      {statusMessage && (
+        <Alert variant={statusMessage.type}>
+          {statusMessage.message}
+        </Alert>
+      )}
+
+      {error && (
+        <Alert variant="error">
+          {error instanceof Error ? error.message : 'Error loading profile'}
+        </Alert>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Spinner className="w-8 h-8" />
+        </div>
+      ) : (
+        <>
+          {profile.verificationStatus === VerificationStatus.PENDING && (
+            <Alert variant="warning" className="mb-4">
           <div className="flex items-center">
-            <User className="h-5 w-5 mr-2 text-warning" />
+                <User className="h-5 w-5 mr-2" />
             <span>
               Your profile is pending verification. Our team will review your credentials shortly.
             </span>
           </div>
-        </div>
+            </Alert>
       )}
 
       <form onSubmit={handleSubmit}>
@@ -106,7 +214,6 @@ export default function DoctorProfilePage() {
                 required
                 disabled={!isEditing}
               />
-              <div className="relative">
                 <Input
                   id="email"
                   name="email"
@@ -115,11 +222,8 @@ export default function DoctorProfilePage() {
                   value={profile.email}
                   onChange={handleChange}
                   required
-                  disabled={!isEditing}
-                  className="pl-10"
+                    disabled={true} // Email cannot be changed
                 />
-              </div>
-              <div className="relative">
                 <Input
                   id="phone"
                   name="phone"
@@ -128,9 +232,7 @@ export default function DoctorProfilePage() {
                   onChange={handleChange}
                   required
                   disabled={!isEditing}
-                  className="pl-10"
                 />
-              </div>
             </div>
           </Card>
 
@@ -148,8 +250,8 @@ export default function DoctorProfilePage() {
                 value={profile.specialty}
                 onChange={handleChange}
                 disabled={!isEditing}
+                    required
               />
-              <div className="relative">
                 <Input
                   id="licenseNumber"
                   name="licenseNumber"
@@ -158,10 +260,7 @@ export default function DoctorProfilePage() {
                   onChange={handleChange}
                   required
                   disabled={!isEditing}
-                  className="pl-10"
                 />
-              </div>
-              <div className="relative">
                 <Input
                   id="yearsOfExperience"
                   name="yearsOfExperience"
@@ -171,10 +270,8 @@ export default function DoctorProfilePage() {
                   onChange={handleChange}
                   required
                   disabled={!isEditing}
-                  className="pl-10"
+                    min="0"
                 />
-              </div>
-              <div className="relative">
                 <Input
                   id="location"
                   name="location"
@@ -183,18 +280,16 @@ export default function DoctorProfilePage() {
                   onChange={handleChange}
                   required
                   disabled={!isEditing}
-                  className="pl-10"
                 />
-              </div>
               <Input
                 id="languages"
                 name="languages"
                 label="Languages Spoken"
-                value={profile.languages.join(', ')}
+                    value={Array.isArray(profile.languages) ? profile.languages.join(', ') : profile.languages}
                 onChange={handleChange}
                 disabled={!isEditing}
+                    placeholder="English, Spanish, French, etc."
               />
-              <div className="relative">
                 <Input
                   id="consultationFee"
                   name="consultationFee"
@@ -204,9 +299,8 @@ export default function DoctorProfilePage() {
                   onChange={handleChange}
                   required
                   disabled={!isEditing}
-                  className="pl-10"
+                    min="0"
                 />
-              </div>
             </div>
           </Card>
 
@@ -225,6 +319,7 @@ export default function DoctorProfilePage() {
                 onChange={handleChange}
                 rows={4}
                 disabled={!isEditing}
+                    placeholder="Tell patients about your background, education, and expertise"
               />
               <Textarea
                 id="services"
@@ -234,62 +329,26 @@ export default function DoctorProfilePage() {
                 onChange={handleChange}
                 rows={3}
                 disabled={!isEditing}
-                placeholder="List the medical services you provide (comma-separated)"
+                    placeholder="List the medical services you provide (e.g., annual checkups, vaccinations, etc.)"
               />
             </div>
           </Card>
 
-          {/* Verification Documents */}
-          <Card>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center">
-              <Upload className="h-5 w-5 mr-2 text-primary" />
-              <h2 className="text-lg font-medium">Verification Documents</h2>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-4 flex flex-col items-center justify-center">
-                  <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 mb-2">
-                    <Upload className="h-6 w-6 text-slate-400" />
-                  </div>
-                  <p className="font-medium">Medical License</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                    license_scan.pdf
-                  </p>
-                  <Button variant="outline" size="sm" disabled={!isEditing}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Replace Document
+              {isEditing && (
+                <div className="mt-6 flex justify-end space-x-4">
+                  <Button 
+                    type="button"
+                    variant="secondary" 
+                    onClick={() => setIsEditing(false)}
+                    disabled={updateProfileMutation.isPending}
+                  >
+                    Cancel
                   </Button>
-                </div>
-
-                <div className="border border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-4 flex flex-col items-center justify-center">
-                  <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 mb-2">
-                    <User className="h-6 w-6 text-slate-400" />
-                  </div>
-                  <p className="font-medium">Profile Photo</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                    profile_photo.jpg
-                  </p>
-                  <Button variant="outline" size="sm" disabled={!isEditing}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Update Photo
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800">
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  <User className="h-4 w-4 inline mr-1 text-warning" />
-                  Documents are reviewed by our team during the verification process. Please ensure
-                  all uploads are clear and current.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Submit Button */}
-          {isEditing && (
-            <div className="flex justify-end">
-              <Button type="submit" variant="primary">
+                  <Button 
+                    type="submit" 
+                    variant="primary"
+                    isLoading={updateProfileMutation.isPending}
+                  >
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
               </Button>
@@ -297,6 +356,8 @@ export default function DoctorProfilePage() {
           )}
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 }

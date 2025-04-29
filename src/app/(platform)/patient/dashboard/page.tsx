@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import {
   CalendarCheck,
   FileText,
@@ -12,12 +13,11 @@ import {
   Pencil,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { logInfo, logValidation } from '@/lib/logger';
-import { usePatientProfile, usePatientAppointments } from '@/data/patientLoaders';
-import { useNotifications } from '@/data/sharedLoaders';
-import { AppointmentStatus } from '@/types/enums';
+import { logValidation, logError } from '@/lib/logger';
+import { useMyDashboard } from '@/data/sharedLoaders';
+import { usePatientProfile } from '@/data/patientLoaders';
 import { format } from 'date-fns';
-import type { Appointment, Notification } from '@/types/schemas';
+import type { Appointment } from '@/types/schemas';
 
 /**
  * Re-usable Stat card
@@ -55,30 +55,37 @@ const StatCard = ({
  * @returns Patient dashboard component
  */
 export default function PatientDashboard() {
-  const { data: profileData, isLoading: profileLoading } = usePatientProfile();
-  const { data: appointmentsData, isLoading: appointmentsLoading } = usePatientAppointments();
-  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications();
+  // Use combined dashboard hook for stats
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useMyDashboard();
+  // Still need profile data for user info
+  const { data: profileData, isLoading: profileLoading, error: profileError } = usePatientProfile();
   
-  const upcomingAppointments = appointmentsData?.success 
-    ? appointmentsData.appointments.filter((a: Appointment) => 
-        a.status !== AppointmentStatus.CANCELED && 
-        a.status !== AppointmentStatus.COMPLETED)
-    : [];
-    
-  const unreadNotifications = notificationsData?.success 
-    ? notificationsData.notifications.filter((n: Notification) => !n.isRead).length
-    : 0;
+  // Extract data from dashboard response
+  const upcomingCount = dashboardData?.success ? dashboardData.upcomingCount : 0;
+  const pastCount = dashboardData?.success ? dashboardData.pastCount : 0;
+  const notifUnread = dashboardData?.success ? dashboardData.notifUnread : 0;
+  const appointments = dashboardData?.success && dashboardData.appointments ? dashboardData.appointments : [];
+  
+  // Get upcoming appointments for the quick view
+  const upcomingAppointments = appointments.slice(0, 3); // Show maximum 3 appointments in the preview
 
   useEffect(() => {
-    logInfo('Patient dashboard rendered (with real data)');
-    
     // Add validation that the dashboard is working correctly
     try {
       logValidation('4.10', 'success', 'Patient dashboard connected to real data via local API.');
     } catch (e) {
-      console.error('Could not log validation', e);
+      logError('Failed to log validation', e);
     }
   }, []);
+
+  // Show error if any API calls fail
+  if (dashboardError || profileError) {
+    return (
+      <Alert variant="error">
+        Error loading dashboard data: {(dashboardError || profileError)?.toString()}
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -87,7 +94,7 @@ export default function PatientDashboard() {
         Welcome,&nbsp;
         {profileLoading ? (
           <Spinner />
-        ) : profileData ? (
+        ) : profileData?.success ? (
           `${profileData.firstName} ${profileData.lastName}`
         ) : (
           'Patient'
@@ -98,17 +105,26 @@ export default function PatientDashboard() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Upcoming Appointments" 
-          value={upcomingAppointments.length} 
+          value={upcomingCount} 
           Icon={CalendarCheck} 
-          isLoading={appointmentsLoading} 
+          isLoading={dashboardLoading} 
         />
-        <StatCard title="Medical Records" value="0" Icon={FileText} />
-        <StatCard title="Prescriptions" value="0" Icon={Pill} />
+        <StatCard 
+          title="Past Appointments" 
+          value={pastCount} 
+          Icon={FileText} 
+          isLoading={dashboardLoading} 
+        />
+        <StatCard 
+          title="Prescriptions" 
+          value="0" 
+          Icon={Pill} 
+        />
         <StatCard 
           title="Notifications" 
-          value={unreadNotifications} 
+          value={notifUnread} 
           Icon={Bell} 
-          isLoading={notificationsLoading} 
+          isLoading={dashboardLoading} 
         />
       </section>
 
@@ -118,13 +134,13 @@ export default function PatientDashboard() {
           Upcoming Appointments
         </h2>
         
-        {appointmentsLoading ? (
+        {dashboardLoading ? (
           <div className="py-6 text-center">
             <Spinner />
           </div>
         ) : upcomingAppointments.length > 0 ? (
           <div className="space-y-4">
-            {upcomingAppointments.slice(0, 3).map((appointment: Appointment) => (
+            {upcomingAppointments.map((appointment: Appointment) => (
               <div key={appointment.id} className="p-3 border-b last:border-0">
                 <div className="flex justify-between">
                   <h3 className="font-medium">{appointment.doctorName}</h3>
@@ -168,7 +184,7 @@ export default function PatientDashboard() {
           <div className="py-6 text-center">
             <Spinner />
           </div>
-        ) : profileData ? (
+        ) : profileData?.success ? (
           <div className="space-y-2">
             <p><strong>Name:</strong> {profileData.firstName} {profileData.lastName}</p>
             <p><strong>Email:</strong> {profileData.email || 'Not provided'}</p>

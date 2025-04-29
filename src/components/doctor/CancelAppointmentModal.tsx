@@ -1,32 +1,31 @@
 'use client';
 
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, Fragment, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
-
 import type { Appointment } from '@/types/schemas';
 
-interface CompleteModalProps {
+interface CancelModalProps {
   isOpen: boolean;
   onClose: () => void;
   appt: Appointment | null;
-  onConfirm: (appointmentId: string, notes: string) => Promise<void>;
+  onConfirm: (id: string, reason: string) => Promise<void>;
 }
 
 /**
- * Modal component for completing appointments
+ * Modal component for doctors cancelling appointments
  * Uses Headless UI Dialog for accessibility and keyboard interactions
  */
-export default function CompleteAppointmentModal({
+export default function CancelAppointmentModal({
   isOpen,
   onClose,
   appt,
   onConfirm,
-}: CompleteModalProps) {
-  const [notes, setNotes] = useState('');
+}: CancelModalProps) {
+  const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +34,7 @@ export default function CompleteAppointmentModal({
     if (!isOpen) {
       // Small delay to avoid visual flickering during close animation
       const timer = setTimeout(() => {
-        setNotes('');
+        setReason('');
         setLoading(false);
         setError(null);
       }, 200);
@@ -46,14 +45,19 @@ export default function CompleteAppointmentModal({
   // Handle confirmation with loading state and error handling
   const handleConfirm = async () => {
     if (!appt) return;
+    if (!reason.trim()) {
+      setError('Please provide a reason for cancellation');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      await onConfirm(appt.id, notes.trim());
+      await onConfirm(appt.id, reason.trim());
+      // Success is handled in the parent component
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete appointment');
+      setError(err instanceof Error ? err.message : 'Failed to cancel appointment');
       setLoading(false);
     }
   };
@@ -90,33 +94,34 @@ export default function CompleteAppointmentModal({
             leaveTo="opacity-0 scale-95"
           >
             <Dialog.Panel className="w-full max-w-md rounded-lg bg-white dark:bg-slate-800 p-6 shadow-xl">
-              <div className="flex items-center space-x-2 text-success mb-4">
-                <CheckCircle className="h-6 w-6" />
+              <div className="flex items-center space-x-2 text-danger mb-4">
+                <XCircle className="h-6 w-6" />
                 <Dialog.Title className="text-lg font-medium">
-                  Complete Appointment
+                  Cancel Appointment
                 </Dialog.Title>
               </div>
 
-              <div className="mt-2">
-                {error && (
-                  <Alert variant="error" className="mb-4">
-                    {error}
-                  </Alert>
-                )}
+              {error && (
+                <Alert variant="error" className="mb-4">
+                  {error}
+                </Alert>
+              )}
 
+              <div className="mt-2">
                 <p className="text-slate-600 dark:text-slate-300 mb-4">
-                  Are you sure you want to mark your appointment with <strong>{appt.patientName}</strong> on{' '}
+                  Are you sure you want to cancel your appointment with patient <strong>{appt.patientName}</strong> on{' '}
                   <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
-                  <strong>{appt.startTime}</strong> as completed?
+                  <strong>{appt.startTime}</strong>?
                 </p>
 
                 <Textarea
-                  id="completion-notes"
-                  label="Appointment Notes (optional)"
-                  placeholder="Add any notes about the appointment..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  id="cancellation-reason"
+                  label="Reason for cancellation"
+                  placeholder="Please provide a reason for cancelling this appointment..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
                   disabled={loading}
+                  required
                   rows={3}
                   className="mb-4"
                 />
@@ -127,14 +132,14 @@ export default function CompleteAppointmentModal({
                     onClick={onClose}
                     disabled={loading}
                   >
-                    Cancel
+                    Keep Appointment
                   </Button>
                   <Button
-                    variant="primary"
+                    variant="danger"
                     onClick={handleConfirm}
                     isLoading={loading}
                   >
-                    Complete Appointment
+                    Confirm Cancellation
                   </Button>
                 </div>
               </div>

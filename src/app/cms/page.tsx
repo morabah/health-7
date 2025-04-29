@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { logInfo } from '@/lib/logger';
 import type { LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
 import { appEventBus } from '@/lib/eventBus';
@@ -9,6 +10,8 @@ import { IS_MOCK_MODE } from '@/config/appConfig';
 import type { ValidationStep } from '@/lib/validation';
 import { logValidation } from '@/lib/validation';
 import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import { Users, UserPlus, BadgeCheck, Calendar, CalendarClock, FileCheck } from 'lucide-react';
 
 /**
  * CMS Landing Page
@@ -27,13 +30,22 @@ export default function CMSPage() {
   // Handle mock login for testing
   const handleMockLogin = (role: string | null) => {
     if (typeof window !== 'undefined' && window.__mockLogin) {
+      if (role) {
       window.__mockLogin(role);
-      setAuthMessage(`Logged in as ${role || 'none'}`);
+        setAuthMessage(`Logged in as ${role}`);
       logValidation(
         '4.3',
         'success',
-        `Navbar connected to local AuthContext with role ${role || 'none'}`
+          `Navbar connected to local AuthContext with role ${role}`
       );
+      } else {
+        // Handle logout case
+        const auth = window.__authContext;
+        if (auth && auth.logout) {
+          auth.logout();
+          setAuthMessage('Logged out');
+        }
+      }
     } else {
       setAuthMessage('mockLogin not available');
     }
@@ -193,21 +205,62 @@ export default function CMSPage() {
 
       {/* CMS Navigation Section */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
-          <h2 className="text-xl font-semibold mb-3">Admin Tools</h2>
-          <div className="grid grid-cols-1 gap-4">
-            {menuItems.map((item, index) => (
-              <Link
-                key={index}
-                href={item.href}
-                className="p-4 border rounded hover:bg-gray-50 flex flex-col"
-              >
-                <span className="font-medium text-lg">{item.label}</span>
-                <span className="text-sm text-gray-500">{item.description}</span>
+        <Card className="p-6">
+          <h2 className="text-xl font-bold mb-4">Users</h2>
+          <div className="space-y-2">
+            <div>
+              <Link href="/cms/users" className="text-primary-600 hover:underline flex items-center">
+                <Users className="h-4 w-4 mr-2" /> Manage Users
               </Link>
-            ))}
+            </div>
+            <div>
+              <Link href="/admin/users/invites" className="text-primary-600 hover:underline flex items-center">
+                <UserPlus className="h-4 w-4 mr-2" /> Invite Users
+              </Link>
+            </div>
           </div>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="text-xl font-bold mb-4">Doctors</h2>
+          <div className="space-y-2">
+            <div>
+              <Link href="/cms/doctors" className="text-primary-600 hover:underline flex items-center">
+                <BadgeCheck className="h-4 w-4 mr-2" /> Verify Doctors
+              </Link>
+            </div>
+            <div>
+              <Link href="/doctor/schedule" className="text-primary-600 hover:underline flex items-center">
+                <Calendar className="h-4 w-4 mr-2" /> Manage Schedules
+              </Link>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="text-xl font-bold mb-4">Appointments</h2>
+          <div className="space-y-2">
+            <div>
+              <Link href="/admin/appointments" className="text-primary-600 hover:underline flex items-center">
+                <CalendarClock className="h-4 w-4 mr-2" /> View All Appointments
+              </Link>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <Link href="/cms/validation" className="flex items-start">
+            <div className="mr-4 p-2 rounded-full bg-blue-50 dark:bg-blue-900/20">
+              <FileCheck className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold mb-1">Validation Tools</h2>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                Run system validation tests to ensure all API functions and core features are working correctly.
+              </p>
         </div>
+          </Link>
+        </Card>
       </div>
     </div>
   );

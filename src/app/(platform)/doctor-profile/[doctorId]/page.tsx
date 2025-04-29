@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Tab } from '@headlessui/react';
@@ -8,6 +8,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import { 
   Stethoscope, 
   MapPin, 
@@ -18,7 +19,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { logInfo, logValidation } from '@/lib/logger';
-import { useDoctorProfile } from '@/data/sharedLoaders';
+import { callApi } from '@/lib/apiClient';
 import Image from 'next/image';
 import type { DoctorProfile } from '@/types/schemas';
 
@@ -38,6 +39,7 @@ interface DoctorPublicProfile extends Omit<DoctorProfile, 'servicesOffered' | 'e
 interface DoctorProfileResponse {
   success: boolean;
   doctor: DoctorPublicProfile;
+  error?: string;
 }
 
 // Sidebar doctor info card
@@ -106,25 +108,37 @@ function DoctorSidebar({ doctor, doctorId }: { doctor: DoctorPublicProfile; doct
 export default function DoctorProfilePage() {
   const params = useParams();
   const doctorId = params?.doctorId as string;
-  const { data, isLoading, error } = useDoctorProfile(doctorId) as {
-    data: DoctorProfileResponse | undefined;
-    isLoading: boolean;
-    error: unknown;
-  };
-  const doctor = data?.success ? data.doctor as DoctorPublicProfile : null;
+  
+  // State for API data
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [doctorData, setDoctorData] = useState<DoctorProfileResponse | null>(null);
   
   useEffect(() => {
-    logInfo('doctor-profile rendered (with real data)', { doctorId });
+    async function fetchDoctorProfile() {
+      setIsLoading(true);
+      setError(null);
     
-    if (doctor) {
-      // Log validation that we're successfully loading data
       try {
+        const response = await callApi('getDoctorPublicProfile', { doctorId });
+        setDoctorData(response);
+        
+        // Log validation that we're successfully loading data
+        logInfo('doctor-profile rendered (with real data)', { doctorId });
         logValidation('4.10', 'success', 'Doctor profile connected to real data via local API.');
-      } catch (e) {
-        console.error('Could not log validation', e);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load doctor profile';
+        setError(errorMessage);
+        logInfo('doctor-profile error', { doctorId, error: errorMessage });
+      } finally {
+        setIsLoading(false);
       }
     }
-  }, [doctorId, doctor]);
+    
+    if (doctorId) {
+      fetchDoctorProfile();
+    }
+  }, [doctorId]);
   
   if (isLoading) {
     return (
@@ -135,19 +149,30 @@ export default function DoctorProfilePage() {
     );
   }
   
-  if (error || !data?.success) {
-    const errorMessage = error instanceof Error ? error.message : 'Error loading doctor profile';
+  if (error || !doctorData?.success) {
     return (
-      <div className="text-center py-12">
-        <p className="text-danger">{errorMessage}</p>
+      <div className="py-6">
+        <Alert variant="error">
+          <div>
+            <h3 className="font-medium">Error loading doctor profile</h3>
+            <p>{error || doctorData?.error || "Failed to retrieve doctor information"}</p>
+          </div>
+        </Alert>
       </div>
     );
   }
   
+  const doctor = doctorData.doctor;
+  
   if (!doctor) {
     return (
-      <div className="text-center py-12">
-        <p className="text-danger">Doctor not found</p>
+      <div className="py-6">
+        <Alert variant="error">
+          <div>
+            <h3 className="font-medium">Doctor not found</h3>
+            <p>The requested doctor profile could not be found</p>
+          </div>
+        </Alert>
       </div>
     );
   }
@@ -209,7 +234,7 @@ export default function DoctorProfilePage() {
                 <Tab.Panel>
                   <div className="space-y-4">
                     {doctor.education && Array.isArray(doctor.education) && doctor.education.length > 0 ? (
-                      doctor.education.map((edu, index: number) => (
+                      doctor.education.map((edu, index) => (
                         <div key={index} className="border-b border-slate-200 dark:border-slate-700 pb-3 last:border-0">
                           <h3 className="font-medium">{edu.degree}</h3>
                           <p className="text-sm text-slate-500">{edu.institution}, {edu.year}</p>
@@ -223,7 +248,7 @@ export default function DoctorProfilePage() {
                 <Tab.Panel>
                   <div className="space-y-2">
                     {doctor.services && doctor.services.length > 0 ? (
-                      doctor.services.map((service: string, index: number) => (
+                      doctor.services.map((service, index) => (
                         <div key={index} className="p-2 border rounded-md border-slate-200 dark:border-slate-700">
                           {service}
                         </div>
@@ -251,7 +276,7 @@ export default function DoctorProfilePage() {
             </div>
             {doctor.reviews && doctor.reviews.length > 0 ? (
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {doctor.reviews.map((review, index: number) => (
+                {doctor.reviews.map((review, index) => (
                   <div key={index} className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>

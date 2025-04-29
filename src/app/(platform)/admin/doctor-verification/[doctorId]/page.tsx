@@ -10,8 +10,8 @@ import { FileText, ExternalLink } from 'lucide-react';
 import { useUserDetail, useVerifyDoctor } from '@/data/adminLoaders';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import type { VerificationStatus } from '@/types/enums';
-import { logInfo, logValidation } from '@/lib/logger';
+import { VerificationStatus } from '@/types/enums';
+import { logInfo, logValidation, logError } from '@/lib/logger';
 import Image from 'next/image';
 
 type Document = {
@@ -25,12 +25,14 @@ const DoctorVerificationPage = () => {
   const router = useRouter();
   const doctorId = params?.doctorId as string;
   const [success, setSuccess] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   
   // Fetch doctor details
   const { 
     data: doctorData, 
     isLoading: isLoadingDoctor, 
-    error: doctorError 
+    error: doctorError,
+    refetch 
   } = useUserDetail(doctorId);
   
   // Get verification mutation
@@ -71,23 +73,34 @@ const DoctorVerificationPage = () => {
 
   // Handle verification submission
   const handleVerification = async ({ status, notes }: { status: string; notes: string }) => {
+    setMutationError(null);
+    
     try {
-      await verifyDoctorMutation.mutateAsync({ 
+      const result = await verifyDoctorMutation.mutateAsync({ 
         doctorId, 
         status: status as VerificationStatus, 
         notes 
       });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update verification status');
+      }
+      
       setSuccess(true);
       logInfo('Doctor verification updated', { doctorId, status });
       logValidation('4.10', 'success', 'Doctor verification fully functional with real API');
+      
+      // Explicitly refetch to ensure we have the latest data
+      await refetch();
       
       // Redirect after successful verification
       setTimeout(() => {
         router.push('/admin/doctors');
       }, 1500);
-    } catch (error) {
-      console.error('Verification error:', error);
-      throw error;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update verification status';
+      logError('Verification error:', err);
+      setMutationError(errorMessage);
     }
   };
   
@@ -98,29 +111,52 @@ const DoctorVerificationPage = () => {
   const doctor = doctorData && 'success' in doctorData && doctorData.success ? doctorData.user as Record<string, unknown> : null;
   const doctorProfile = doctor && typeof doctor === 'object' && 'doctorProfile' in doctor && typeof doctor.doctorProfile === 'object' ? doctor.doctorProfile as Record<string, unknown> : null;
 
-  if (isLoadingDoctor) {
+  // Loading state
+  if (isLoadingDoctor || verifyDoctorMutation.isPending) {
     return (
       <div className="p-6 flex justify-center items-center min-h-screen">
-        <Spinner />
+        <Spinner className="w-8 h-8" />
         <span className="ml-3 text-gray-600">Loading doctor information...</span>
       </div>
     );
   }
 
+  // Error state for data fetching
   if (doctorError) {
     return (
       <div className="p-6">
         <Alert variant="error">
           Error loading doctor: {doctorError instanceof Error ? doctorError.message : 'Unknown error'}
         </Alert>
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            as={Link}
+            href="/admin/doctors"
+          >
+            Back to Doctors
+          </Button>
+        </div>
       </div>
     );
   }
 
+  // Not found state
   if (!doctor || !doctorProfile) {
     return (
       <div className="p-6">
         <Alert variant="warning">Doctor not found or doctor profile not available</Alert>
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            as={Link}
+            href="/admin/doctors"
+          >
+            Back to Doctors
+          </Button>
+        </div>
       </div>
     );
   }
@@ -138,6 +174,13 @@ const DoctorVerificationPage = () => {
           Back to Doctors
         </Button>
       </div>
+      
+      {/* Display mutation error if any */}
+      {mutationError && (
+        <Alert variant="error">
+          {mutationError}
+        </Alert>
+      )}
 
       {/* Doctor Information */}
       <Card>
@@ -240,8 +283,15 @@ const DoctorVerificationPage = () => {
       {/* Verification Form */}
       {!isLoadingDoctor && doctor && (
         <VerificationForm
-          doctorId={doctorId}
-          currentStatus={(doctor.verificationStatus || 'PENDING') as 'PENDING' | 'VERIFIED' | 'REJECTED'}
+          currentStatus={
+            typeof doctor.verificationStatus === 'string' 
+              ? (doctor.verificationStatus.toLowerCase() === 'pending' 
+                ? VerificationStatus.PENDING
+                : doctor.verificationStatus.toLowerCase() === 'verified'
+                  ? VerificationStatus.VERIFIED
+                  : VerificationStatus.REJECTED)
+              : VerificationStatus.PENDING
+          }
           onSubmit={handleVerification}
         />
       )}

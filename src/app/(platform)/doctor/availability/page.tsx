@@ -70,8 +70,9 @@ export default function DoctorAvailabilityPage() {
       ? Array.from(new Set(availability.blockedDates))
       : [];
     setWeeklySchedule(newSchedule);
-    setBlockedDates(dedupedDates);
+    setBlockedDates(dedupedDates.map(date => String(date)));
     initialized.current = true;
+    logValidation('4.10', 'success', 'Doctor availability component successfully loads real data');
   }, [data]);
   
   // Toggle availability for a time slot
@@ -104,10 +105,10 @@ export default function DoctorAvailabilityPage() {
         logValidation('4.11', 'success', 'Doctor availability setting is fully functional with real data');
         await refetch();
       } else {
-        console.error('Error saving availability:', result.error);
+        logInfo(`Error saving availability: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
-      console.error('Error saving availability:', err);
+      logInfo(`Error in availability mutation: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   
@@ -153,11 +154,15 @@ export default function DoctorAvailabilityPage() {
       </div>
       
       {error && (
-        <Alert variant="error">Error loading availability: {error.toString()}</Alert>
+        <Alert variant="error">Error loading availability: {error instanceof Error ? error.message : String(error)}</Alert>
       )}
       
       {setAvailabilityMutation.isError && (
-        <Alert variant="error">Error saving availability changes</Alert>
+        <Alert variant="error">
+          Error saving availability changes: {setAvailabilityMutation.error instanceof Error 
+            ? setAvailabilityMutation.error.message 
+            : 'Please try again later'}
+        </Alert>
       )}
 
       {/* Loading State */}

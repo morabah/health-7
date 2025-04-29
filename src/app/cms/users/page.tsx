@@ -2,10 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { logInfo } from '@/lib/logger';
+import { logInfo, logError } from '@/lib/logger';
+import { UserType, AccountStatus, VerificationStatus } from '@/types/enums';
+import { useAllUsers, useAdminActivateUser } from '@/data/adminLoaders';
+import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 
-type UserRole = 'PATIENT' | 'DOCTOR' | 'ADMIN';
-type UserStatus = 'ACTIVE' | 'PENDING' | 'SUSPENDED';
+// Use the existing UserRole type from enums
+type UserRole = UserType;
+// Use enums but extend AccountStatus with PENDING for backward compatibility
+type UserStatus = AccountStatus | 'PENDING';
 
 interface User {
   id: string;
@@ -24,57 +30,33 @@ interface User {
  * @returns User Management component
  */
 export default function UsersManagementPage() {
-  // Mock data for users
-  const [users, setUsers] = useState<User[]>([
-    { 
-      id: 'user1', 
-      email: 'patient@example.com',
-      firstName: 'John',
-      lastName: 'Patient',
-      role: 'PATIENT',
-      status: 'ACTIVE',
-      createdAt: new Date(Date.now() - 30 * 86400000).toISOString() // 30 days ago
-    },
-    { 
-      id: 'user2', 
-      email: 'doctor@example.com',
-      firstName: 'Jane',
-      lastName: 'Doctor',
-      role: 'DOCTOR',
-      status: 'PENDING',
-      createdAt: new Date(Date.now() - 7 * 86400000).toISOString() // 7 days ago
-    },
-    { 
-      id: 'user3', 
-      email: 'admin@example.com',
-      firstName: 'Bob',
-      lastName: 'Admin',
-      role: 'ADMIN',
-      status: 'ACTIVE',
-      createdAt: new Date(Date.now() - 90 * 86400000).toISOString() // 90 days ago
-    },
-  ]);
+  const { data: usersData, isLoading, error: fetchError } = useAllUsers();
+  const [users, setUsers] = useState<User[]>([]);
+  const [error, setError] = useState<string | null>(null);
   
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Get the activation mutation hook
+  const activateUserMutation = useAdminActivateUser();
+  
   useEffect(() => {
-    // Log when component mounts
     logInfo('User Management page mounted');
     
-    // In a real implementation, fetch users from backend
-    // const fetchUsers = async () => {
-    //   try {
-    //     const response = await callApi('getAllUsers');
-    //     setUsers(response.data);
-    //   } catch (error) {
-    //     console.error('Error fetching users:', error);
-    //   }
-    // };
-    
-    // fetchUsers();
-  }, []);
+    // Update users state when data is loaded
+    if (usersData?.success && usersData.users) {
+      setUsers(usersData.users.map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role || user.userType,
+        status: user.status || user.accountStatus,
+        createdAt: user.createdAt
+      })));
+    }
+  }, [usersData]);
   
   // Filter users based on selected filters and search term
   const filteredUsers = users.filter(user => {
@@ -100,38 +82,45 @@ export default function UsersManagementPage() {
 
   // Handle user status change
   const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
-    // In a real implementation, update user status via API
-    // try {
-    //   await callApi('updateUserStatus', { userId, status: newStatus });
-    //   
-    //   // Update local state
-    //   setUsers(prevUsers => 
-    //     prevUsers.map(user => 
-    //       user.id === userId ? { ...user, status: newStatus } : user
-    //     )
-    //   );
-    // } catch (error) {
-    //   console.error('Error updating user status:', error);
-    // }
+    setError(null);
     
-    // For mock implementation, update local state
-    setUsers(prevUsers => 
-      prevUsers.map(user => 
-        user.id === userId ? { ...user, status: newStatus } : user
-      )
-    );
+    try {
+      // Convert string 'PENDING' to appropriate AccountStatus value if needed
+      let apiStatus: AccountStatus;
+      if (newStatus === 'PENDING') {
+        // When approving a PENDING user, set them to ACTIVE
+        apiStatus = AccountStatus.ACTIVE;
+      } else {
+        // Otherwise use the enum value directly
+        apiStatus = newStatus as AccountStatus;
+      }
+      
+      const result = await activateUserMutation.mutateAsync({
+        userId,
+        status: apiStatus,
+        reason: apiStatus === AccountStatus.SUSPENDED ? 'Account suspended by administrator' : undefined
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
     
-    logInfo(`User ${userId} status updated to ${newStatus}`);
+      // Local state will be updated automatically through query invalidation
+      logInfo(`User ${userId} status updated to ${apiStatus}`);
+    } catch (err) {
+      logError('Failed to update user status', err);
+      setError(err instanceof Error ? err.message : 'Failed to update user status');
+    }
   };
   
   // Get badge style based on status
   const getStatusBadgeStyle = (status: UserStatus) => {
     switch(status) {
-      case 'ACTIVE':
+      case AccountStatus.ACTIVE:
         return 'bg-green-100 text-green-800';
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-800';
-      case 'SUSPENDED':
+      case AccountStatus.SUSPENDED:
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -141,11 +130,11 @@ export default function UsersManagementPage() {
   // Get badge style based on role
   const getRoleBadgeStyle = (role: UserRole) => {
     switch(role) {
-      case 'ADMIN':
+      case UserType.ADMIN:
         return 'bg-purple-100 text-purple-800';
-      case 'DOCTOR':
+      case UserType.DOCTOR:
         return 'bg-blue-100 text-blue-800';
-      case 'PATIENT':
+      case UserType.PATIENT:
         return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -166,6 +155,13 @@ export default function UsersManagementPage() {
         </p>
       </header>
       
+      {/* Display any errors */}
+      {(error || fetchError) && (
+        <Alert variant="error" className="mb-4">
+          {error || (fetchError instanceof Error ? fetchError.message : 'Error loading users')}
+        </Alert>
+      )}
+      
       {/* Filters */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6">
         <div className="p-4 bg-gray-50 border-b">
@@ -184,9 +180,9 @@ export default function UsersManagementPage() {
                 onChange={(e) => setRoleFilter(e.target.value as UserRole | 'ALL')}
               >
                 <option value="ALL">All Roles</option>
-                <option value="PATIENT">Patient</option>
-                <option value="DOCTOR">Doctor</option>
-                <option value="ADMIN">Admin</option>
+                <option value={UserType.PATIENT}>Patient</option>
+                <option value={UserType.DOCTOR}>Doctor</option>
+                <option value={UserType.ADMIN}>Admin</option>
               </select>
             </div>
             
@@ -201,9 +197,9 @@ export default function UsersManagementPage() {
                 onChange={(e) => setStatusFilter(e.target.value as UserStatus | 'ALL')}
               >
                 <option value="ALL">All Statuses</option>
-                <option value="ACTIVE">Active</option>
+                <option value={AccountStatus.ACTIVE}>Active</option>
                 <option value="PENDING">Pending</option>
-                <option value="SUSPENDED">Suspended</option>
+                <option value={AccountStatus.SUSPENDED}>Suspended</option>
               </select>
             </div>
             
@@ -224,7 +220,15 @@ export default function UsersManagementPage() {
         </div>
       </div>
       
+      {/* Loading state */}
+      {(isLoading || activateUserMutation.isPending) && (
+        <div className="bg-white p-8 rounded-lg shadow-md flex justify-center">
+          <Spinner className="w-8 h-8" />
+        </div>
+      )}
+      
       {/* Users Table */}
+      {!isLoading && !activateUserMutation.isPending && (
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
           <h2 className="font-semibold">Users ({filteredUsers.length})</h2>
@@ -283,26 +287,29 @@ export default function UsersManagementPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        {user.status === 'ACTIVE' && (
+                          {user.status === AccountStatus.ACTIVE && (
                           <button 
-                            onClick={() => handleStatusChange(user.id, 'SUSPENDED')}
+                              onClick={() => handleStatusChange(user.id, AccountStatus.SUSPENDED)}
                             className="text-red-600 hover:text-red-900"
+                              disabled={activateUserMutation.isPending}
                           >
                             Suspend
                           </button>
                         )}
-                        {user.status === 'SUSPENDED' && (
+                          {user.status === AccountStatus.SUSPENDED && (
                           <button 
-                            onClick={() => handleStatusChange(user.id, 'ACTIVE')}
+                              onClick={() => handleStatusChange(user.id, AccountStatus.ACTIVE)}
                             className="text-green-600 hover:text-green-900"
+                              disabled={activateUserMutation.isPending}
                           >
                             Activate
                           </button>
                         )}
                         {user.status === 'PENDING' && (
                           <button 
-                            onClick={() => handleStatusChange(user.id, 'ACTIVE')}
+                              onClick={() => handleStatusChange(user.id, AccountStatus.ACTIVE)}
                             className="text-green-600 hover:text-green-900"
+                              disabled={activateUserMutation.isPending}
                           >
                             Approve
                           </button>
@@ -322,6 +329,7 @@ export default function UsersManagementPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 } 

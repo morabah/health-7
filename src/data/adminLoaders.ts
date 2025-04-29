@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callApi } from '@/lib/apiClient';
 import { useAuth } from '@/context/AuthContext';
 import type { VerificationStatus, AccountStatus } from '@/types/enums';
-import { UserType } from '@/types/enums';
+import { UserType, VerificationStatus as VerificationStatusEnum } from '@/types/enums';
+import type { DoctorProfile } from '@/types/schemas';
+import { logInfo } from '@/lib/logger';
 
 /**
  * Hook to fetch all users
@@ -188,6 +190,128 @@ export const useAdminActivateUser = () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'doctors'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'patients'] });
+    }
+  });
+};
+
+/**
+ * Hook to fetch pending doctor verifications
+ */
+export const useAdminGetPendingDoctors = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['admin', 'pendingDoctors'],
+    queryFn: async () => {
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new Error('Unauthorized');
+      }
+      
+      const response = await callApi('adminGetAllDoctors', {
+        uid: user.uid,
+        role: UserType.ADMIN
+      });
+      
+      // Filter for pending doctors only
+      if (response.success) {
+        return {
+          ...response,
+          doctors: response.doctors.filter((doctor: DoctorProfile) => 
+            doctor.verificationStatus === VerificationStatusEnum.PENDING
+          )
+        };
+      }
+      
+      return response;
+    },
+    enabled: !!user && user.role === UserType.ADMIN
+  });
+};
+
+/**
+ * Hook to get appointment details by ID for admin
+ */
+export function useAppointmentDetails(appointmentId: string) {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['admin', 'appointment', appointmentId],
+    queryFn: async () => {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      return await callApi('getAppointmentDetails', { appointmentId });
+    },
+    enabled: !!appointmentId && !!user,
+  });
+}
+
+/**
+ * Hook to get all appointments for admin
+ */
+export function useAdminAppointments() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['admin', 'all-appointments'],
+    queryFn: async () => {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      return await callApi('getMyAppointments', {});
+    },
+    enabled: !!user,
+  });
+}
+
+/**
+ * Hook to get admin dashboard data with all metrics
+ */
+export const useAdminDashboardData = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['admin', 'dashboard'],
+    queryFn: async () => {
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new Error('Unauthorized');
+      }
+      
+      return callApi('getMyDashboardStats', {
+        uid: user.uid,
+        role: UserType.ADMIN
+      });
+    },
+    enabled: !!user && user.role === UserType.ADMIN
+  });
+};
+
+/**
+ * Hook for admin to trigger password reset for user
+ */
+export const useAdminTriggerPasswordReset = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ userId, notifyUser = true }: { userId: string; notifyUser?: boolean }) => {
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new Error('Unauthorized');
+      }
+      
+      return callApi('adminTriggerPasswordReset', {
+        uid: user.uid,
+        role: UserType.ADMIN,
+        userId,
+        notifyUser
+      });
+    },
+    onSuccess: () => {
+      // No need to invalidate queries - password reset doesn't change user data that's displayed
+      // But we can log success
+      logInfo('Admin triggered password reset successfully');
     }
   });
 };

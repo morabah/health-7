@@ -1,6 +1,6 @@
 'use client';
 
-import Protected from '@/components/auth/Protected';
+import ProtectedPage from '@/components/auth/ProtectedPage';
 
 /**
  * Platform layout wrapper
@@ -8,5 +8,5 @@ import Protected from '@/components/auth/Protected';
  * Any user role can access these routes
  */
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
-  return <Protected>{children}</Protected>;
+  return <ProtectedPage>{children}</ProtectedPage>;
 }

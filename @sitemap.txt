@@ -29,6 +29,7 @@ Health Appointment System Sitemap
    /doctor/profile - Doctor profile management (src/app/(platform)/doctor/profile/page.tsx)
    /doctor/availability - Set availability (src/app/(platform)/doctor/availability/page.tsx) 
    /doctor/appointments - Doctor appointment list (src/app/(platform)/doctor/appointments/page.tsx)
+   /doctor/appointments/[appointmentId] - Appointment details (src/app/(platform)/doctor/appointments/[appointmentId]/page.tsx)
    /doctor/patients - Doctor's patient list (src/app/(platform)/doctor/patients/page.tsx)
 
 6. PLATFORM ROUTES - ADMIN

@@ -50,7 +50,7 @@ export default function ProtectedPage({
   const lastRedirectTime = useRef(0);
 
   useEffect(() => {
-    // Always show spinner while loading, even if user is null
+    // Only check auth after loading is false
     if (loading) {
       return;
     }
@@ -95,8 +95,8 @@ export default function ProtectedPage({
       setRedirecting(true);
       lastRedirectTime.current = now;
       
-      // Redirect to login with next parameter
-          const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
+      // Redirect to login
+      const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
       router.replace(`/auth/login${nextParam}`);
       return;
     }
@@ -145,12 +145,7 @@ export default function ProtectedPage({
 
   // If we need authentication but have no user, return null (redirect should happen in useEffect)
   if (!user && !loading && !redirectIfAuth) {
-    // Still show the spinner since we're about to redirect
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner className="w-8 h-8" />
-      </div>
-    );
+    return null;
   }
 
   // User is authenticated and authorized (or we're waiting for redirect), render children

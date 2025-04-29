@@ -1,48 +1,38 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-// import { Tab } from '@headlessui/react'; // Removed unused import
-import clsx from 'clsx';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
-import Select from '@/components/ui/Select';
-import Spinner from '@/components/ui/Spinner';
-import Alert from '@/components/ui/Alert';
+import { format } from 'date-fns';
 import {
   Calendar,
   ClipboardList,
-  Clock,
   User,
+  Clock,
   CheckCircle,
   XCircle,
   ChevronRight,
 } from 'lucide-react';
-import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
-import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
-import { AppointmentStatus } from '@/types/enums';
-import { format } from 'date-fns';
-import { logValidation } from '@/lib/logger';
+import clsx from 'clsx';
+
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Alert from '@/components/ui/Alert';
+import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
+import Select from '@/components/ui/Select';
+
+import { useAdminAppointments } from '@/data/adminLoaders';
+import { AppointmentStatus, UserType } from '@/types/enums';
+import { logInfo } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
 
-export default function DoctorAppointmentsPage() {
-  const [view, setView] = useState<'list' | 'calendar'>('list');
+export default function AdminAppointmentsPage() {
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedAppointment, setSelectedAppointment] = useState<null | Appointment>(null);
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [userTypeFilter, setUserTypeFilter] = useState('all');
   
   // Get appointments data from API
-  const { 
-    data: appointmentsData, 
-    isLoading, 
-    error,
-    refetch 
-  } = useDoctorAppointments();
-  
-  const completeMutation = useCompleteAppointment();
-  const cancelMutation = useDoctorCancelAppointment();
+  const { data: appointmentsData, isLoading, error } = useAdminAppointments();
 
   // Filter appointments based on selected filters
   const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
@@ -87,97 +77,15 @@ export default function DoctorAppointmentsPage() {
     
     return passesDateFilter && passesStatusFilter;
   });
-
-  // Handle appointment completion
-  const handleCompleteAppointment = async (id: string, notes: string) => {
-    try {
-      const result = await completeMutation.mutateAsync({
-        appointmentId: id,
-        notes
-      });
-      
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      
-      setShowCompleteModal(false);
-      logValidation('4.10', 'success', 'Doctor appointment completion fully functional');
-      
-      // Explicitly refetch to ensure we have the latest data
-      refetch();
-    } catch (error) {
-      throw error; // Let the modal handle the error
-    }
-  };
-  
-  // Handle appointment cancellation
-  const handleCancelAppointment = async (id: string) => {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-      try {
-        const result = await cancelMutation.mutateAsync({
-          appointmentId: id,
-          reason: 'Cancelled by doctor'
-        });
-        
-        if (!result.success) {
-          throw new Error(result.error);
-        }
-        
-        // Explicitly refetch to ensure we have the latest data
-        refetch();
-        
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to cancel appointment');
-      }
-    }
-  };
-
-  // Open complete modal with the selected appointment
-  const openCompleteModal = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-    setShowCompleteModal(true);
-  };
   
   useEffect(() => {
-    try {
-      logValidation('4.10', 'success', 'Doctor appointments page connected to real data via local API');
-    } catch (e) {
-      // Error handling for validation logging
-    }
+    logInfo('Admin appointments page loaded');
   }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Appointments</h1>
-
-        {/* View Toggle */}
-        <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-          <button
-            className={clsx(
-              'px-3 py-1.5 rounded-md flex items-center text-sm font-medium',
-              view === 'list'
-                ? 'bg-white dark:bg-slate-700 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400'
-            )}
-            onClick={() => setView('list')}
-          >
-            <ClipboardList className="h-4 w-4 mr-2" />
-            List
-          </button>
-          <button
-            className={clsx(
-              'px-3 py-1.5 rounded-md flex items-center text-sm font-medium',
-              view === 'calendar'
-                ? 'bg-white dark:bg-slate-700 shadow-sm'
-                : 'text-slate-500 dark:text-slate-400'
-            )}
-            onClick={() => setView('calendar')}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Calendar
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold">All Appointments</h1>
       </div>
 
       {/* Filters */}
@@ -248,39 +156,16 @@ export default function DoctorAppointmentsPage() {
       )}
 
       {/* List View */}
-      {view === 'list' && !isLoading && !error && filteredAppointments.length > 0 && (
+      {!isLoading && !error && filteredAppointments.length > 0 && (
         <div className="space-y-4">
           {filteredAppointments.map((appointment: Appointment) => (
             <AppointmentCard
               key={appointment.id}
               appointment={appointment}
-              onCompleteClick={() => openCompleteModal(appointment)}
-              onCancelClick={() => handleCancelAppointment(appointment.id)}
             />
           ))}
         </div>
       )}
-
-      {/* Calendar View */}
-      {view === 'calendar' && (
-        <Card className="p-4">
-          <div className="text-center p-8 text-slate-400 dark:text-slate-500">
-            <Calendar className="h-16 w-16 mx-auto mb-4 opacity-30" />
-            <p>Calendar view is not implemented in this static prototype.</p>
-            <p className="text-sm mt-2">
-              Would display a monthly calendar with daily appointment slots.
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {/* Complete Appointment Modal */}
-      <CompleteAppointmentModal
-        isOpen={showCompleteModal}
-        onClose={() => setShowCompleteModal(false)}
-        appt={selectedAppointment}
-        onConfirm={handleCompleteAppointment}
-      />
     </div>
   );
 }
@@ -288,17 +173,11 @@ export default function DoctorAppointmentsPage() {
 // Appointment Card Component
 function AppointmentCard({
   appointment,
-  onCompleteClick,
-  onCancelClick,
 }: {
   appointment: Appointment;
-  onCompleteClick: () => void;
-  onCancelClick: () => void;
 }) {
   // Format date nicely
   const formattedDate = format(new Date(appointment.appointmentDate), 'PPPP');
-  const isCompletable = appointment.status === AppointmentStatus.CONFIRMED;
-  const isCancellable = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
 
   const statusMap: Record<string, string> = {
     [AppointmentStatus.PENDING]: 'Pending',
@@ -327,50 +206,44 @@ function AppointmentCard({
             </div>
             <div>
               <h3 className="font-medium">{appointment.patientName}</h3>
-              <Link
-                href={`/patient-profile/${appointment.patientId}`}
-                className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-              >
-                View Profile
-              </Link>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Patient
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center md:ml-6">
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-300 mr-4">
-              <Calendar className="h-4 w-4 mr-2" />
-              {formattedDate}
-            </div>
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
-              <Clock className="h-4 w-4 mr-2" />
-              {appointment.startTime} - {appointment.endTime}
+          <div className="flex items-center mt-2 md:mt-0 md:ml-6">
+            <div className="flex flex-col">
+              <div className="font-medium">Dr. {appointment.doctorName}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                {appointment.doctorSpecialty}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Status Badge and Actions */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Badge variant={statusColor[appointment.status] || 'default'}>
-            {statusMap[appointment.status] || 'Unknown'}
-          </Badge>
+        {/* Date, Time and Status */}
+        <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+          <div>
+            <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
+              <Calendar className="h-4 w-4 mr-2" />
+              {formattedDate}
+            </div>
+            <div className="flex items-center text-sm text-slate-600 dark:text-slate-300 mt-1">
+              <Clock className="h-4 w-4 mr-2" />
+              {appointment.startTime} - {appointment.endTime}
+            </div>
+          </div>
 
-          <div className="flex items-center space-x-2">
-            <Button size="sm" variant="outline" as={Link} href={`/doctor/appointments/${appointment.id}`}>
+          <div className="flex flex-col items-end gap-2">
+            <Badge variant={statusColor[appointment.status] || 'default'}>
+              {statusMap[appointment.status] || 'Unknown'}
+            </Badge>
+
+            <Button size="sm" variant="outline" as={Link} href={`/admin/appointments/${appointment.id}`}>
               <ChevronRight className="h-4 w-4 mr-1" />
               Details
             </Button>
-            {isCompletable && (
-              <Button size="sm" variant="primary" onClick={onCompleteClick}>
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Complete
-              </Button>
-            )}
-            {isCancellable && (
-              <Button size="sm" variant="danger" onClick={onCancelClick}>
-                <XCircle className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-            )}
           </div>
         </div>
       </div>
@@ -380,12 +253,6 @@ function AppointmentCard({
           <strong>Reason:</strong> {appointment.reason}
         </p>
       )}
-      
-      {appointment.notes && (
-        <p className="text-sm mt-1 text-slate-600 dark:text-slate-400">
-          <strong>Notes:</strong> {appointment.notes}
-        </p>
-      )}
     </Card>
   );
-}
+} 

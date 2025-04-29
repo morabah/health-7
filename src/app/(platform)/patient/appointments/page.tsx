@@ -6,14 +6,16 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
-import { Clock, User, X } from 'lucide-react';
-import { logInfo, logValidation } from '@/lib/logger';
-import { usePatientAppointments } from '@/data/patientLoaders';
-import { useCancelAppointment } from '@/data/patientLoaders';
-import { useRouter } from 'next/navigation';
+import Alert from '@/components/ui/Alert';
+import { Clock, User, X, CheckCircle } from 'lucide-react';
+import { logValidation } from '@/lib/logger';
+import { usePatientAppointments, useCancelAppointment } from '@/data/patientLoaders';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AppointmentStatus } from '@/types/enums';
 import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
+import Link from 'next/link';
+import CancelAppointmentModal from '@/components/patient/CancelAppointmentModal';
 
 const tabs = ['Upcoming', 'Past', 'Cancelled'] as const;
 const statusMap = {
@@ -35,9 +37,9 @@ const statusColor: Record<string, "success" | "default" | "warning" | "info" | "
 /**
  * Appointment row component
  */
-const AppointmentRow = ({ appointment, handleCancel }: { 
+const AppointmentRow = ({ appointment, onCancel }: { 
   appointment: Appointment; 
-  handleCancel: (id: string) => void;
+  onCancel: (appointment: Appointment) => void;
 }) => {
   const isPast = new Date(appointment.appointmentDate) < new Date();
   const isUpcoming = !isPast && appointment.status !== AppointmentStatus.CANCELED;
@@ -59,20 +61,25 @@ const AppointmentRow = ({ appointment, handleCancel }: {
         </Badge>
 
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => logInfo('View details', { id: appointment.id })}>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            as={Link} 
+            href={`/patient/appointments/${appointment.id}`}
+          >
             <User size={14} className="mr-1" />
             Details
           </Button>
           {isUpcoming && (
             <>
-              <Button size="sm" variant="secondary" onClick={() => logInfo('Reschedule', { id: appointment.id })}>
+              <Button size="sm" variant="secondary">
                 <Clock size={14} className="mr-1" />
                 Reschedule
               </Button>
               <Button 
                 size="sm" 
                 variant="danger" 
-                onClick={() => handleCancel(appointment.id)}
+                onClick={() => onCancel(appointment)}
               >
                 <X size={14} className="mr-1" />
                 Cancel
@@ -92,11 +99,32 @@ const AppointmentRow = ({ appointment, handleCancel }: {
  */
 export default function PatientAppointments() {
   const [index, setIndex] = useState(0);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showBookingSuccess, setShowBookingSuccess] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   
-  const { data: appointmentsData, isLoading, error } = usePatientAppointments();
+  const { 
+    data: appointmentsData, 
+    isLoading, 
+    error,
+    refetch 
+  } = usePatientAppointments();
+  
   const cancelMutation = useCancelAppointment();
+
+  // Check for justBooked parameter
+  useEffect(() => {
+    const justBooked = searchParams?.get('justBooked');
+    if (justBooked === '1') {
+      setShowBookingSuccess(true);
+      // Remove the parameter from URL after a short delay
+      setTimeout(() => {
+        router.replace('/patient/appointments');
+      }, 3000);
+    }
+  }, [searchParams, router]);
 
   // Filter appointments based on tab
   const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
@@ -117,31 +145,32 @@ export default function PatientAppointments() {
     )
   };
 
+  // Handle opening cancel modal
+  const handleOpenCancelModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setShowCancelModal(true);
+  };
+
   // Handle appointment cancellation
-  const handleCancel = async (appointmentId: string) => {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-      setIsCancelling(true);
+  const handleCancelAppointment = async (appointmentId: string, reason: string) => {
       try {
         const result = await cancelMutation.mutateAsync({ 
           appointmentId, 
-          reason: 'Cancelled by patient' 
+        reason 
         });
         
         if (!result.success) {
-          alert('Failed to cancel appointment: ' + result.error);
+        throw new Error(result.error);
         }
+      
+      setShowCancelModal(false);
+      refetch(); // Explicitly refetch after cancellation
       } catch (err) {
-        console.error('Error cancelling appointment:', err);
-        alert('An error occurred while cancelling your appointment');
-      } finally {
-        setIsCancelling(false);
-      }
+      throw err; // Let the modal handle the error
     }
   };
 
   useEffect(() => {
-    logInfo(`Appointments tab ${tabs[index]}`);
-
     // Add validation that the appointments page is working correctly
     try {
       logValidation(
@@ -150,22 +179,31 @@ export default function PatientAppointments() {
         'Patient appointments page with real data and actions implemented.'
       );
     } catch (e) {
-      console.error('Could not log validation', e);
+      // Silent error handling for validation
     }
-  }, [index]);
+  }, []);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-6 dark:text-white">My Appointments</h1>
 
-      {isCancelling && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
-            <Spinner />
-            <p className="mt-2 text-center">Cancelling appointment...</p>
+      {/* Booking Success Message */}
+      {showBookingSuccess && (
+        <Alert variant="success" className="mb-6">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 mr-2" />
+            <span>Your appointment has been booked successfully!</span>
           </div>
-        </div>
+        </Alert>
       )}
+
+      {/* Cancel Appointment Modal */}
+      <CancelAppointmentModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        appt={selectedAppointment}
+        onConfirm={handleCancelAppointment}
+      />
 
       <Tab.Group selectedIndex={index} onChange={setIndex}>
         <Tab.List className="flex gap-1 rounded-lg bg-primary/10 p-1 mb-6">
@@ -193,9 +231,9 @@ export default function PatientAppointments() {
               <Spinner />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-danger">
-              Error loading appointments
-            </div>
+            <Alert variant="error" className="my-4">
+              Error loading appointments: {error instanceof Error ? error.message : String(error)}
+            </Alert>
           ) : (
             tabs.map(tab => (
               <Tab.Panel key={tab} className="rounded-xl bg-white dark:bg-slate-800 p-3">
@@ -204,7 +242,7 @@ export default function PatientAppointments() {
                     <AppointmentRow 
                       key={appointment.id} 
                       appointment={appointment} 
-                      handleCancel={handleCancel}
+                      onCancel={handleOpenCancelModal}
                     />
                   ))
                 ) : (

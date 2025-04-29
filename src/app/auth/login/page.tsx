@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { LogIn } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
-import { logInfo, logError } from '@/lib/logger';
+import { logInfo } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
+import { callApi } from '@/lib/apiClient';
 
 /**
  * Login Page
@@ -17,60 +18,75 @@ import { useAuth } from '@/context/AuthContext';
  * @returns Login form component
  */
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, error: authError, clearError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    rememberMe: false,
+    password: ''
   });
+  
+  // Form validation state
+  const [isValid, setIsValid] = useState(false);
+  
+  // Validate form on input change
+  useEffect(() => {
+    // Simple email regex validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValidEmail = emailRegex.test(formData.email);
+    const isValidPassword = formData.password.length >= 6;
+    
+    setIsValid(isValidEmail && isValidPassword);
+  }, [formData]);
+  
+  // Auto-hide error message after 5 seconds
+  useEffect(() => {
+    if (error || authError) {
+      const timer = setTimeout(() => {
+        setError('');
+        clearError();
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error, authError, clearError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (!isValid) return;
+    
     setError('');
     setIsLoading(true);
 
     try {
-      // Enhanced logging
-      console.log('[LoginPage] Login attempt started', { email: formData.email });
-      
-      // Log authentication attempt
-      logInfo('auth-event', {
-        action: 'login-attempt',
+      // Call the API directly to follow the required flow
+      const res = await callApi('login', {
         email: formData.email,
-        timestamp: new Date().toISOString(),
+        password: formData.password,
       });
-
-      // Use the AuthContext login function with email and password
-      console.log('[LoginPage] Calling login function');
-      const success = await login(formData.email, formData.password);
-      console.log('[LoginPage] Login function returned:', success);
       
-      if (success) {
-        setIsLoading(false);
+      setIsLoading(false);
+      
+      if (res.success) {
+        // On success, use the auth context login which will handle redirection
+        await login(formData.email, formData.password);
+        
         logInfo('Login successful', { email: formData.email });
-        console.log('[LoginPage] Login successful - AuthContext will handle redirection');
-        // Do NOT redirect here - AuthContext will handle redirection based on user role
       } else {
-        setIsLoading(false);
-        setError('Invalid credentials. Please try again.');
-        console.log('[LoginPage] Login failed - invalid credentials');
-        logError('Login failed', { email: formData.email });
+        setError(res.error || 'Invalid credentials. Please try again.');
       }
     } catch (err) {
-      console.error('[LoginPage] Login error:', err);
       setIsLoading(false);
-      setError('Login failed. Please try again.');
-      logError('Login error', err);
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     }
   };
 
@@ -86,7 +102,9 @@ export default function LoginPage() {
           <p className="text-slate-600 dark:text-slate-400 mt-2">Access your health account</p>
         </div>
 
-        {error && <Alert variant="error">{error}</Alert>}
+        {(error || authError) && (
+          <Alert variant="error">{error || authError}</Alert>
+        )}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
@@ -99,6 +117,9 @@ export default function LoginPage() {
             value={formData.email}
             onChange={handleChange}
           />
+          {formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
+            <p className="text-xs text-danger mt-1">Please enter a valid email address</p>
+          )}
 
           <Input
             id="password"
@@ -110,31 +131,22 @@ export default function LoginPage() {
             value={formData.password}
             onChange={handleChange}
           />
+          {formData.password && formData.password.length < 6 && (
+            <p className="text-xs text-danger mt-1">Password must be at least 6 characters</p>
+          )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                className="h-4 w-4 text-primary border-slate-300 rounded"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-              />
-              <label
-                htmlFor="rememberMe"
-                className="ml-2 block text-sm text-slate-600 dark:text-slate-400"
-              >
-                Remember me
-              </label>
-            </div>
-
+          <div className="flex justify-end">
             <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            isLoading={isLoading}
+            disabled={!isValid || isLoading}
+          >
             Sign In
           </Button>
         </form>

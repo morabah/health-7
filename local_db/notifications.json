@@ -18,5 +18,15 @@
     "type": "system",
     "relatedId": null,
     "id": "notif-system-003"
+  },
+  {
+    "id": "notif-m0r8kxqxpje1y5uw5kxff",
+    "userId": "test-doctor-verified-003",
+    "title": "Appointment Canceled",
+    "message": "Sarah Patient has canceled the appointment scheduled for 2025-05-05T21:00:00.000Z at 10:00 - Reason: hh.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-04-29T10:32:04.870Z",
+    "relatedId": "appt-upcoming-002"
   }
 ]

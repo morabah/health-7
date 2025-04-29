@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import {
   CalendarCheck,
   ClipboardList,
@@ -20,13 +21,13 @@ import { useDoctorProfile, useDoctorAppointments } from '@/data/doctorLoaders';
 import { useNotifications } from '@/data/sharedLoaders';
 import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { AppointmentStatus, VerificationStatus } from '@/types/enums';
-import { logInfo, logValidation } from '@/lib/logger';
+import { logValidation } from '@/lib/logger';
 import type { Appointment, Notification } from '@/types/schemas';
 
 export default function DoctorDashboardPage() {
-  const { data: profileData, isLoading: profileLoading } = useDoctorProfile();
-  const { data: appointmentsData, isLoading: appointmentsLoading } = useDoctorAppointments();
-  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications();
+  const { data: profileData, isLoading: profileLoading, error: profileError } = useDoctorProfile();
+  const { data: appointmentsData, isLoading: appointmentsLoading, error: appointmentsError } = useDoctorAppointments();
+  const { data: notificationsData, isLoading: notificationsLoading, error: notificationsError } = useNotifications();
   
   const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
   const unreadNotifications = notificationsData?.success 
@@ -62,14 +63,21 @@ export default function DoctorDashboardPage() {
   );
 
   useEffect(() => {
-    logInfo('Doctor dashboard rendered with real data');
-    
     try {
       logValidation('4.10', 'success', 'Doctor dashboard connected to real data via local API');
     } catch (e) {
-      console.error('Could not log validation', e);
+      // Error handling for validation logging
     }
   }, []);
+
+  // Show error if any API calls fail
+  if (profileError || appointmentsError || notificationsError) {
+    return (
+      <Alert variant="error">
+        Error loading dashboard data: {(profileError || appointmentsError || notificationsError)?.toString()}
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -77,7 +85,7 @@ export default function DoctorDashboardPage() {
         <h1 className="text-2xl font-bold">
           {profileLoading ? (
             <>Doctor Dashboard <Spinner /></>
-          ) : profileData ? (
+          ) : profileData?.success ? (
             `Dr. ${profileData.firstName} ${profileData.lastName}'s Dashboard`
           ) : (
             'Doctor Dashboard'
@@ -266,7 +274,7 @@ export default function DoctorDashboardPage() {
                 <div className="flex justify-center py-4">
                   <Spinner />
                 </div>
-              ) : profileData ? (
+              ) : profileData?.success ? (
                 <>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300">

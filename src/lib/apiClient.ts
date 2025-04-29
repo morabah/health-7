@@ -1,65 +1,109 @@
 /**
  * API Client
  *
- * Centralizes API calls and handles routing between local and cloud functions.
- * When process.env.NEXT_PUBLIC_API_MODE === 'local', routes to localApi functions.
- * Eventually will route to cloud functions when mode is 'emulator' or 'production'.
+ * Unified caller for local API functions.
+ * All components must use this wrapper rather than importing localApiFunctions directly.
+ * This allows us to swap the backend implementation later by changing only this file.
  */
 
-import type { LocalApi } from './localApiFunctions';
-import localApi from './localApiFunctions';
-import { logInfo, logError, logValidation } from './logger';
-
-// Firebase bits are tree-shaken away in 'local' mode
-import { httpsCallable } from '@/types/firebase';
-import { functions } from '@/firebase_backend/init'; // (stub exists, will be implemented Phase-5)
-
-const API_MODE = process.env.NEXT_PUBLIC_API_MODE ?? 'local';
-
-type AwaitedReturn<T> = T extends Promise<infer R> ? R : T;
+import * as localAPI from './localApiFunctions';
+import { getCurrentAuthCtx } from './apiAuthCtx';
+import { logInfo } from './logger';
 
 /**
- * Call an API function with typesafe parameters and return values
- *
- * @param fn - API function name to call
- * @param payload - Parameters for the function
- * @returns Promise with the function result
+ * Call a local API function with the provided arguments
+ * 
+ * @param method - The API method name to call
+ * @param args - Arguments to pass to the API method
+ * @returns Promise with the result of the API call
  */
-export async function callApi<FN extends keyof LocalApi>(
-  fn: FN,
-  payload: Parameters<LocalApi[FN]>[0]
-): Promise<AwaitedReturn<ReturnType<LocalApi[FN]>>> {
-  logInfo('callApi', { fn, mode: API_MODE, payload });
-
+export async function callApi<T = any>(
+  method: string, 
+  ...args: any[]
+): Promise<T> {
   try {
-    // Special case for login to bypass potential mock login interference
-    if (fn === 'login' && API_MODE === 'local') {
-      const { email, password } = payload as { email: string; password: string };
-      return await import('./localApiFunctions').then(module => 
-        module.signIn(email, password)
-      ) as AwaitedReturn<ReturnType<LocalApi[FN]>>;
+    // Add artificial delay in development mode to expose loading states
+    if (process.env.NODE_ENV === 'development') {
+      await new Promise(r => setTimeout(r, 400));
     }
     
-    if (API_MODE === 'local' || API_MODE === 'mock') {
-      // direct Typescript-safe local dispatch
-      // @ts-expect-error  – ( TS can't see the computed index signature otherwise )
-      return await localApi[fn](payload);
+    console.log(`[callApi] Calling ${method} with args:`, args);
+    
+    // Map login to signIn
+    if (method === 'login') {
+      method = 'signIn';
+      // Extract email and password from object parameter
+      if (args.length === 1 && typeof args[0] === 'object' && args[0].email && args[0].password) {
+        args = [args[0].email, args[0].password];
+      }
+    } else {
+      // For any API method other than login, we need to get the auth context
+      const authContext = getCurrentAuthCtx();
+      
+      // Handle two-parameter functions that receive a merged object
+      const twoParamMethods = [
+        'completeAppointment', 'cancelAppointment', 'markNotificationRead', 
+        'bookAppointment', 'getAvailableSlots', 'updateMyUserProfile',
+        'sendDirectMessage', 'setDoctorAvailability', 'adminUpdateUserStatus',
+        'adminVerifyDoctor', 'findDoctors', 'getAppointmentDetails'
+      ];
+      
+      if (twoParamMethods.includes(method)) {
+        // For methods needing both context and payload, check if we need to add context
+        if (args.length === 1 && typeof args[0] === 'object') {
+          // If args[0] doesn't have uid and role but we have auth context, add it
+          const payload = args[0];
+          if (!payload.uid && !payload.role && authContext) {
+            // Create a new context object
+            const context = { uid: authContext.uid, role: authContext.role };
+            
+            // Replace args with separate context and payload
+            args = [context, payload];
+          } else if (payload.uid === undefined && payload.role === undefined && authContext) {
+            // If uid and role are undefined, replace with auth context
+            const { uid, role, ...rest } = payload;
+            const context = { uid: authContext.uid, role: authContext.role };
+            args = [context, rest];
+          }
+        }
+      } else if (args.length === 0 && authContext) {
+        // For methods that just need context, add it if not provided
+        args = [{ uid: authContext.uid, role: authContext.role }];
+      } else if (args.length === 1 && typeof args[0] === 'object') {
+        // For single-argument methods, check if we need to add auth context properties
+        const param = args[0];
+        if (param.uid === undefined && param.role === undefined && authContext) {
+          // Add auth context properties to the param
+          args = [{ ...param, uid: authContext.uid, role: authContext.role }];
+        }
+      }
     }
-
-    // --- cloud / emulator branch ---
-    const callable = httpsCallable(functions, fn as string);
-    const res = await callable(payload as unknown);
-    return res.data as AwaitedReturn<ReturnType<LocalApi[FN]>>;
+    
+    // Map registerPatient and registerDoctor to registerUser
+    if (method === 'registerPatient' || method === 'registerDoctor') {
+      method = 'registerUser';
+    }
+    
+    // Check if method exists in localAPI
+    if (!(method in localAPI) || typeof localAPI[method as keyof typeof localAPI] !== 'function') {
+      return { success: false, error: `Method "${method}" not found in localAPI or is not a function` } as T;
+    }
+    
+    // Log the actual args being used (for debugging)
+    logInfo(`Calling ${method} with processed args`, args);
+    
+    // Call the function dynamically
+    // @ts-expect-error – dynamic access
+    const result = await localAPI[method](...args);
+    return result;
   } catch (err) {
-    logError('callApi error', err);
-    // Re-throw with a labelled error so UI can catch if needed
-    throw err;
+    console.error('[callApi]', method, err);
+    // Always return a consistent error object, never throw to callers
+    return { 
+      success: false, 
+      error: err instanceof Error ? err.message : 'Unknown error' 
+    } as T;
   }
 }
 
-// Log validation for this implementation
-logValidation('4.9', 'success', 'apiClient wrapper implemented (local mode operational)');
-
-const apiClient = { callApi };
-
-export default apiClient;
+export default { callApi };

@@ -2,27 +2,76 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { logInfo, logError } from '@/lib/logger';
 import { loadSession, saveSession } from '@/lib/localSession';
 import { callApi } from '@/lib/apiClient';
-import type { UserProfile, PatientProfile, DoctorProfile } from '@/types/schemas';
-import type { UserType } from '@/types/enums';
+import { UserType } from '@/types/enums';
 import { roleToDashboard } from '@/lib/router';
+import type { UserProfile, PatientProfile, DoctorProfile } from '@/types/schemas';
+import { setCurrentAuthCtx, clearCurrentAuthCtx } from '@/lib/apiAuthCtx';
 
-// Add TypeScript augmentation for the window.__mockLogin helper
+// Constants
+const isBrowser = typeof window !== 'undefined';
+
+// Add TypeScript augmentation for window global state
 declare global {
   interface Window {
-    __mockLogin: (role?: string) => Promise<boolean> | undefined;
-    __authFetching: boolean; // Global state to prevent duplicate requests
+    __mockLogin: (creds: { email: string; password: string } | string) => Promise<void>;
+    __authFetchInFlight: boolean; // Global race condition guard
     __lastProfileFetch: number; // Timestamp of last profile fetch
+    __authContext?: AuthContextType; // Reference to auth context for direct access
   }
 }
 
 // Initialize global state if in browser
-if (typeof window !== 'undefined') {
-  window.__authFetching = false;
+if (isBrowser) {
+  window.__authFetchInFlight = false;
   window.__lastProfileFetch = 0;
+  
+  // Dev helper for mock login
+  window.__mockLogin = async (credsOrRole) => {
+    // Handle both string role shortcuts and credential objects
+    if (typeof credsOrRole === 'string') {
+      // For role-based testing, use preset test accounts
+      let email, password;
+      const role = credsOrRole;
+      
+      switch (role) {
+        case 'PATIENT':
+        case UserType.PATIENT:
+          email = 'test-patient@example.com';
+          password = 'password123';
+          break;
+        case 'DOCTOR':
+        case UserType.DOCTOR:
+          email = 'test-doctor@example.com';
+          password = 'password123';
+          break;
+        case 'ADMIN':
+        case UserType.ADMIN:
+          email = 'test-admin@example.com';
+          password = 'password123';
+          break;
+        default:
+          console.error('Invalid role for mock login');
+          return;
+      }
+      
+      // Get the auth context through the global accessor
+      const auth = useAuthStore();
+      if (auth) {
+        auth.login(email, password);
+      }
+    } else if (credsOrRole && typeof credsOrRole === 'object') {
+      // Handle credential object with email/password
+      const creds = credsOrRole;
+      const auth = useAuthStore();
+      if (auth && creds.email && creds.password) {
+        auth.login(creds.email, creds.password);
+      }
+    }
+  };
 }
 
 // Type definitions for registration payloads
@@ -56,15 +105,15 @@ interface User {
   role: UserType;
 }
 
-// Context value type
+// Define the Auth Context type
 interface AuthContextType {
   user: User | null;
-  profile: UserProfile & { id: string } | null;
-  patientProfile: PatientProfile & { id: string } | null;
-  doctorProfile: DoctorProfile & { id: string } | null;
-  isLoading: boolean;
+  profile: (UserProfile & { id: string }) | null;
+  patientProfile: (PatientProfile & { id: string }) | null;
+  doctorProfile: (DoctorProfile & { id: string }) | null;
+  loading: boolean;
   error: string | null;
-  login: (email: string, password: string, skipMock?: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   clearError: () => void;
@@ -74,6 +123,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Global auth store for mock login helper
+let useAuthStore: () => AuthContextType | undefined = () => undefined;
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -82,13 +134,10 @@ export const useAuth = () => {
   return context;
 };
 
-// Safe check for browser environment
-const isBrowser = typeof window !== 'undefined';
-
-// Safe global state access functions
-const isAuthFetching = () => isBrowser && window.__authFetching;
-const setAuthFetching = (value: boolean) => {
-  if (isBrowser) window.__authFetching = value;
+// Safe check for race condition guard
+const isAuthFetchInFlight = () => isBrowser && window.__authFetchInFlight;
+const setAuthFetchInFlight = (value: boolean) => {
+  if (isBrowser) window.__authFetchInFlight = value;
 };
 const getLastProfileFetch = () => isBrowser ? window.__lastProfileFetch : 0;
 const setLastProfileFetch = (value: number) => {
@@ -104,16 +153,14 @@ const canFetchProfile = () => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile & { id: string } | null>(null);
   const [patientProfile, setPatientProfile] = useState<PatientProfile & { id: string } | null>(null);
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile & { id: string } | null>(null);
-  const [isLoading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Request tracking
-  const profileFetched = useRef(false);
-  const loginInProgress = useRef(false);
+  const loginInProgress = useRef<boolean>(false);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -121,275 +168,245 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state from localStorage - runs once on mount
   useEffect(() => {
-    const initAuth = () => {
+    const initAuth = async () => {
       const session = loadSession();
-      console.log('[AuthContext] Loaded session from localStorage:', session);
       
       if (session) {
-        // Ensure the session object conforms to the User type
-        if (session.uid && session.role) {
+        // Set user from session
           setUser({
             uid: session.uid,
             email: session.email,
-            role: session.role as UserType
-          });
-          console.log('[AuthContext] Session valid, setting user:', session);
-        } else {
-          console.warn('[AuthContext] Session missing uid or role:', session);
-        }
+          role: session.role
+        });
+        
+        // Also set the auth context for API calls
+        setCurrentAuthCtx({ uid: session.uid, role: session.role });
       } else {
-        console.log('[AuthContext] No session found in localStorage.');
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
     
     initAuth();
   }, []);
 
-  // Define refreshProfile with strong rate limiting
+  // Define refreshProfile with race condition guard
   const refreshProfile = useCallback(async () => {
-    // Check global state flags to prevent duplicate requests
-    if (isAuthFetching()) {
-      console.log('[AuthContext] Auth fetching already in progress, skipping');
+    // Check global flag to prevent duplicate requests
+    if (isAuthFetchInFlight()) {
+      logInfo('Auth fetch already in flight, skipping duplicate request');
       return;
     }
     
-    // Enforce time-based rate limit
+    // Time-based rate limit
     if (!canFetchProfile()) {
-      console.log('[AuthContext] Profile refresh rate limited');
-      return;
-    }
-    
-    // Skip if profile already fetched
-    if (profileFetched.current) {
-      console.log('[AuthContext] Profile already fetched, skipping');
+      logInfo('Profile refresh rate limited');
       return;
     }
     
     if (!user) {
-      console.warn('[AuthContext] refreshProfile called with no user.');
+      logError('refreshProfile called with no user');
       return;
     }
 
     try {
-      // Set global fetch flag
-      setAuthFetching(true);
+      // Set global flag
+      setAuthFetchInFlight(true);
       setLastProfileFetch(Date.now());
       setLoading(true);
       
-      console.log('[AuthContext] Refreshing profile for user:', user);
-      
       const response = await callApi('getMyUserProfile', { uid: user.uid, role: user.role });
-      console.log('[AuthContext] getMyUserProfile response:', response);
       
-      if (response) {
-        setProfile(response);
-        profileFetched.current = true;
+      if (response.success && response.userProfile) {
+        // Set the user profile
+        setProfile(response.userProfile);
+        
+        // Set role-specific profile if available
+        if (response.roleProfile) {
+          if (user.role === UserType.PATIENT) {
+            setPatientProfile(response.roleProfile as PatientProfile & {id: string});
+          } else if (user.role === UserType.DOCTOR) {
+            setDoctorProfile(response.roleProfile as DoctorProfile & {id: string});
+          }
+        }
+        
+        // Check if we need to redirect to dashboard
+        if (profile && pathname) {
+          const dashPath = roleToDashboard(profile.userType);
+          
+          // Only redirect if not already on dashboard to avoid loops
+          if (pathname !== dashPath && !pathname.includes('/auth/')) {
+            router.replace(dashPath);
+          }
+        }
       } else {
-        logError('Failed to load user profile', { uid: user.uid });
+        const errorMsg = response.error || 'Failed to load profile';
+        setError(errorMsg);
       }
     } catch (err) {
-      logError('Error refreshing profile', err);
+      setError(err instanceof Error ? err.message : 'Unknown error loading profile');
     } finally {
       setLoading(false);
-      setAuthFetching(false);
+      setAuthFetchInFlight(false);
     }
-  }, [user]);
+  }, [user, profile, pathname, router]);
 
-  // Call refreshProfile only when user is first set
+  // Fetch user profile when user changes
   useEffect(() => {
-    if (user && !profileFetched.current) {
+    if (user) {
       refreshProfile();
     }
   }, [user, refreshProfile]);
 
-  const logout = () => {
-    console.log('[AuthContext] Logging out, clearing session and state.');
-    
-    // Ensure we're not in the middle of any auth operations
-    if (isAuthFetching()) return;
-    
-    setUser(null);
-    setProfile(null);
-    setPatientProfile(null);
-    setDoctorProfile(null);
-    saveSession(null);
-    
-    // Reset tracking flags
-    profileFetched.current = false;
-    loginInProgress.current = false;
-    
-    // Use direct navigation to break any potential loops
-    if (isBrowser) {
-      window.location.href = '/auth/login';
-    } else {
-      router.push('/auth/login');
-    }
-  };
-
-  const login = async (email: string, password: string, skipMock?: string) => {
-    // Prevent concurrent login attempts
-    if (loginInProgress.current || isAuthFetching()) {
-      console.log('[AuthContext] Login already in progress, skipping');
+  // Login function
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    // Prevent double execution
+    if (loginInProgress.current) {
+      logInfo('Login already in progress, skipping duplicate request');
       return false;
     }
     
-    loginInProgress.current = true;
-    setAuthFetching(true);
-    setLoading(true);
-    
-    console.log('[AuthContext] login called:', { email, password: !!password, skipMock });
-    
     try {
-      if (typeof email !== 'string' || !email) {
-        throw new Error('Invalid email format');
-      }
+    loginInProgress.current = true;
+      setLoading(true);
+      clearError();
       
-      const result = await callApi('login', { email, password });
-      console.log('[AuthContext] login result:', result);
+      // Use callApi for login
+      const res = await callApi('login', { email, password });
       
-      if (result.success) {
-        const { user: u, userProfile } = result;
-        const mappedUser: User = {
-          uid: u.id,
-          email: u.email || undefined,
-          role: userProfile.userType as UserType
+      if (res.success) {
+        // Create a strict User object with fields from the correct response structure
+        const userData: User = {
+          uid: res.user.id,
+          email: res.user.email,
+          role: res.userProfile.userType as UserType
         };
         
-        // Set state first
-        setUser(mappedUser);
-        saveSession(mappedUser);
-        setProfile(userProfile);
-        profileFetched.current = true;
+        // Save session to localStorage
+        saveSession(userData);
         
-        console.log('[AuthContext] Login success, user set and session saved:', mappedUser);
-        logInfo('Auth login success', {
-          uid: u.id,
-          email: u.email,
-          userType: userProfile.userType,
-        });
+        // Update React state
+        setUser(userData);
         
-        // Only try to redirect if userProfile and userType exist
-        if (userProfile && userProfile.userType) {
-          try {
-            console.log('[AuthContext] Getting dashboard path for role:', userProfile.userType);
-            const dashboardPath = roleToDashboard(userProfile.userType as UserType);
-            console.log('[AuthContext] Redirecting to dashboard:', dashboardPath);
-            
-            // Use direct browser navigation to break any potential loops
-            if (isBrowser) {
-              // Delay navigation to ensure state is saved
-              setTimeout(() => {
-                window.location.href = dashboardPath;
-              }, 500);
-            } else {
-              router.push(dashboardPath);
-            }
-          } catch (routeErr) {
-            console.error('[AuthContext] Navigation error:', routeErr);
-            logError('Navigation error after login', routeErr);
-          }
-        } else {
-          console.warn('[AuthContext] No userProfile or userType available for redirection');
+        // Set auth context for API calls
+        setCurrentAuthCtx({ uid: userData.uid, role: userData.role });
+        
+        // Redirect to dashboard page based on user role
+        const dashboardPath = roleToDashboard(res.userProfile.userType);
+        if (dashboardPath) {
+          router.replace(dashboardPath);
         }
         
         return true;
       } else {
-        setError(result.error || 'Invalid credentials');
-        logError('Auth login failed', { error: result.error });
+        setError(res.error || 'Login failed');
         return false;
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error during login';
-      setError(errorMessage);
-      logError('Auth login error:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error during login');
       return false;
     } finally {
       setLoading(false);
-      setAuthFetching(false);
-      
-      // Reset login flag after a delay to prevent rapid re-attempts
-      setTimeout(() => {
         loginInProgress.current = false;
-      }, 2000);
     }
-  };
+  }, [clearError, router]);
 
-  // Add global helper for mock login, bypassed if real login is in progress
+  // Logout function
+  const logout = useCallback(() => {
+    // Clear React state
+    setUser(null);
+    setProfile(null);
+    setPatientProfile(null);
+    setDoctorProfile(null);
+    
+    // Clear localStorage session
+    saveSession(null);
+    
+    // Clear auth context for API calls
+    clearCurrentAuthCtx();
+    
+    // Redirect to login page
   if (isBrowser) {
-    window.__mockLogin = (mockType?: string) => {
-      console.log('Mock login called with:', mockType, typeof mockType);
-      
-      // Skip mock login if an actual login is in progress
-      if (mockType === 'ACTUAL_LOGIN_IN_PROGRESS') {
-        console.log('Skipping mock login because real login is in progress');
-        return;
+      try {
+        router.replace('/auth/login');
+      } catch (e) {
+        // Fallback to direct navigation if router fails
+        window.location.href = '/auth/login';
       }
-      
-      const typeMap: Record<string, { email: string; password: string }> = {
-        PATIENT: { email: 'test-patient@example.com', password: 'password' },
-        DOCTOR: { email: 'test-doctor@example.com', password: 'password' },
-        ADMIN: { email: 'admin@example.com', password: 'password' },
-        // Add lowercase options for better compatibility
-        patient: { email: 'test-patient@example.com', password: 'password' },
-        doctor: { email: 'test-doctor@example.com', password: 'password' },
-        admin: { email: 'admin@example.com', password: 'password' },
-      };
-      
-      // Handle the case when mockType is an email address
-      if (mockType && typeof mockType === 'string' && mockType.includes('@')) {
-        console.log('Using provided email as mock login credential:', mockType);
-        return login(mockType, 'password');
-      }
-      
-      const loginData = mockType && typeof mockType === 'string' && typeMap[mockType]
-        ? typeMap[mockType]
-        : typeMap.PATIENT;
-      
-      if (!loginData || !loginData.email) {
-        console.error('Invalid mock login data');
-        return Promise.resolve(false);
-      }
-      
-      console.log('Using mock credentials:', loginData);
-      return login(loginData.email, loginData.password);
-    };
-  }
+    }
+  }, [router]);
 
-  return (
-    <AuthContext.Provider
-      value={{
+  // Register patient function
+  const registerPatient = useCallback(async (payload: PatientRegistrationPayload) => {
+    try {
+      setLoading(true);
+      clearError();
+      
+      const res = await callApi('registerPatient', payload);
+      
+      if (res.success) {
+        // Auto-login after successful registration
+        return login(payload.email, payload.password);
+      } else {
+        setError(res.error || 'Registration failed');
+        return res;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error during registration');
+      return { success: false, error: error };
+    } finally {
+      setLoading(false);
+    }
+  }, [login, clearError, error]);
+      
+  // Register doctor function
+  const registerDoctor = useCallback(async (payload: DoctorRegistrationPayload) => {
+    try {
+      setLoading(true);
+      clearError();
+      
+      const res = await callApi('registerDoctor', payload);
+      
+      if (res.success) {
+        // Auto-login after successful registration
+        return login(payload.email, payload.password);
+      } else {
+        setError(res.error || 'Registration failed');
+        return res;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error during registration');
+      return { success: false, error: error };
+    } finally {
+      setLoading(false);
+      }
+  }, [login, clearError, error]);
+
+  // Create the context value object
+  const contextValue: AuthContextType = {
         user,
         profile,
         patientProfile,
         doctorProfile,
-        isLoading,
+    loading,
         error,
         login,
         logout,
+    clearError,
         refreshProfile,
-        clearError,
-        registerPatient: async (payload: PatientRegistrationPayload) => {
-          try {
-            const result = await callApi('registerPatient', payload);
-            return result.success;
-          } catch (err) {
-            logError('Error registering patient', err);
-            return false;
-          }
-        },
-        registerDoctor: async (payload: DoctorRegistrationPayload) => {
-          try {
-            const result = await callApi('registerDoctor', payload);
-            return result.success;
-          } catch (err) {
-            logError('Error registering doctor', err);
-            return false;
-          }
-        },
-      }}
-    >
+        registerPatient,
+    registerDoctor
+  };
+  
+  // Update global auth store for mock login helper
+  useAuthStore = () => contextValue;
+  
+  // Store auth context in window for direct access
+  if (isBrowser) {
+    window.__authContext = contextValue;
+  }
+
+  return (
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -26,6 +26,48 @@ export function roleToDashboard(userType: UserType | string | null | undefined):
 }
 
 /**
+ * Get the profile page path for a user type
+ *
+ * @param userType - The user role or userType
+ * @returns The path to the appropriate profile page
+ */
+export function roleToProfile(userType: UserType | string | null | undefined): string {
+  if (!userType) return '/';
+
+  switch (userType) {
+    case UserType.PATIENT:
+      return '/patient/profile';
+    case UserType.DOCTOR:
+      return '/doctor/profile';
+    case UserType.ADMIN:
+      return '/admin/users';
+    default:
+      return '/profile';
+  }
+}
+
+/**
+ * Get the landing page path for a user type
+ *
+ * @param userType - The user role or userType
+ * @returns The path to the appropriate landing page
+ */
+export function roleToLanding(userType: UserType | string | null | undefined): string {
+  if (!userType) return '/';
+
+  switch (userType) {
+    case UserType.PATIENT:
+      return '/find-doctors';
+    case UserType.DOCTOR:
+      return '/doctor/appointments';
+    case UserType.ADMIN:
+      return '/admin/doctors';
+    default:
+      return '/';
+  }
+}
+
+/**
  * Determine path after successful login
  *
  * @param userType - The user role or userType

@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { logInfo, logValidation } from '@/lib/logger';
+import { logInfo, logValidation, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationType } from '@/types/enums';
 import { useNotifications, useMarkNotificationRead } from '@/data/sharedLoaders';
@@ -19,6 +19,8 @@ export default function NotificationsPage() {
   const { data, isLoading, error, refetch } = useNotifications();
   const notificationMutation = useMarkNotificationRead();
   const [error2, setError2] = useState<string | null>(null);
+  const [isMarkingRead, setIsMarkingRead] = useState(false);
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
@@ -27,6 +29,9 @@ export default function NotificationsPage() {
     // Get all unread notifications
     const unreadNotifications = data.notifications.filter((notif: Notification) => !notif.isRead);
     if (!unreadNotifications.length) return;
+
+    setIsMarkingAllRead(true);
+    setError2(null);
 
     try {
       // Mark each notification as read
@@ -39,19 +44,26 @@ export default function NotificationsPage() {
       logValidation('4.10', 'success', 'Notification system fully functional with real data');
     } catch (err) {
       setError2('Failed to mark all notifications as read');
-      console.error(err);
+      logError('Error marking all notifications as read', err);
+    } finally {
+      setIsMarkingAllRead(false);
     }
   };
 
   // Mark a single notification as read
   const markAsRead = async (id: string) => {
+    setIsMarkingRead(true);
+    setError2(null);
+    
     try {
       await notificationMutation.mutateAsync(id);
       await refetch();
       logInfo('notifications', { action: 'mark-read', notificationId: id, userId: user?.uid });
     } catch (err) {
       setError2('Failed to mark notification as read');
-      console.error(err);
+      logError('Error marking notification as read', { notificationId: id, error: err });
+    } finally {
+      setIsMarkingRead(false);
     }
   };
 
@@ -88,7 +100,13 @@ export default function NotificationsPage() {
             </Badge>
           )}
         </h1>
-        <Button variant="outline" size="sm" onClick={markAllAsRead} disabled={isLoading || unreadCount === 0}>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={markAllAsRead} 
+          disabled={isLoading || unreadCount === 0 || isMarkingAllRead}
+          isLoading={isMarkingAllRead}
+        >
           Mark All as Read
         </Button>
       </div>
@@ -135,6 +153,8 @@ export default function NotificationsPage() {
                       size="sm"
                       onClick={() => markAsRead(notification.id)}
                       className="mt-2"
+                      disabled={isMarkingRead}
+                      isLoading={isMarkingRead}
                     >
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Mark as Read

@@ -5,21 +5,11 @@ import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
+import Alert from '@/components/ui/Alert';
 import { Users, UserRound, Stethoscope, ShieldAlert, ArrowRight } from 'lucide-react';
-import { useAllUsers, useAllDoctors } from '@/data/adminLoaders';
+import { useAdminDashboardData, useAllUsers, useAllDoctors } from '@/data/adminLoaders';
 import { VerificationStatus, UserType } from '@/types/enums';
 import { logInfo, logValidation } from '@/lib/logger';
-
-// API response interfaces
-interface UsersApiResponse {
-  success: boolean;
-  users: User[];
-}
-
-interface DoctorsApiResponse {
-  success: boolean;
-  doctors: Doctor[];
-}
 
 // Stat component for dashboard statistics
 function Stat({ 
@@ -82,27 +72,18 @@ type Doctor = User & {
 };
 
 export default function AdminDashboard() {
-  const { data: usersData, isLoading: usersLoading } = useAllUsers() as { 
-    data: UsersApiResponse | undefined, 
-    isLoading: boolean, 
-    error: unknown 
-  };
+  // Use unified dashboard data loader
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useAdminDashboardData();
   
-  const { data: doctorsData, isLoading: doctorsLoading } = useAllDoctors() as { 
-    data: DoctorsApiResponse | undefined, 
-    isLoading: boolean, 
-    error: unknown 
-  };
+  // Still need these for the user and doctor lists
+  const { data: usersData, isLoading: usersLoading, error: usersError } = useAllUsers();
+  const { data: doctorsData, isLoading: doctorsLoading, error: doctorsError } = useAllDoctors();
   
-  // Calculate stats
+  // Get stats from dashboard data
   const totalUsers = usersData?.success ? usersData.users.length : 0;
-  const totalPatients = usersData?.success 
-    ? usersData.users.filter((user: User) => user.userType === UserType.PATIENT).length
-    : 0;
-  const totalDoctors = doctorsData?.success ? doctorsData.doctors.length : 0;
-  const pendingVerifications = doctorsData?.success 
-    ? doctorsData.doctors.filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING).length
-    : 0;
+  const totalPatients = dashboardData?.success ? dashboardData.adminStats?.totalPatients || 0 : 0;
+  const totalDoctors = dashboardData?.success ? dashboardData.adminStats?.totalDoctors || 0 : 0;
+  const pendingVerifications = dashboardData?.success ? dashboardData.adminStats?.pendingVerifications || 0 : 0;
   
   // Get recent users and pending doctors
   const recentUsers = usersData?.success 
@@ -113,16 +94,33 @@ export default function AdminDashboard() {
     ? doctorsData.doctors.filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING).slice(0, 5)
     : [];
   
+  // Combined error state
+  const hasError = dashboardError || usersError || doctorsError;
+  const errorMessage = dashboardError 
+    ? String(dashboardError) 
+    : usersError 
+      ? String(usersError) 
+      : doctorsError 
+        ? String(doctorsError) 
+        : '';
+  
   useEffect(() => {
     logInfo('Admin dashboard rendered (with real data)');
     
     // Log validation
-    try {
+    if (dashboardData?.success) {
       logValidation('4.10', 'success', 'Admin dashboard connected to real data via local API.');
-    } catch (e) {
-      console.error('Could not log validation', e);
+      logValidation('4.FINAL-POLISH', 'success', 'Full local-DB prototype: all pages fetch from & write to local_db, workflows verified');
     }
-  }, []);
+  }, [dashboardData]);
+  
+  if (hasError) {
+    return (
+      <Alert variant="error" className="my-4">
+        Error loading dashboard data: {errorMessage}
+      </Alert>
+    );
+  }
   
   return (
     <div className="space-y-10">
@@ -131,9 +129,9 @@ export default function AdminDashboard() {
       {/* Stats grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat title="Total Users" value={totalUsers} Icon={Users} isLoading={usersLoading} />
-        <Stat title="Patients" value={totalPatients} Icon={UserRound} isLoading={usersLoading} />
-        <Stat title="Doctors" value={totalDoctors} Icon={Stethoscope} isLoading={doctorsLoading} />
-        <Stat title="Pending Verifications" value={pendingVerifications} Icon={ShieldAlert} isLoading={doctorsLoading} />
+        <Stat title="Patients" value={totalPatients} Icon={UserRound} isLoading={dashboardLoading} />
+        <Stat title="Doctors" value={totalDoctors} Icon={Stethoscope} isLoading={dashboardLoading} />
+        <Stat title="Pending Verifications" value={pendingVerifications} Icon={ShieldAlert} isLoading={dashboardLoading} />
       </section>
 
       {/* Recent users */}

@@ -27,6 +27,7 @@
 │   ├── doctor/                     # DOCTOR-ONLY ROUTES
 │   │   ├── dashboard/              →  /doctor/dashboard        *
 │   │   ├── appointments/           →  /doctor/appointments     *
+│   │   │   └── [appointmentId]/    →  /doctor/appointments/:appointmentId (details page) *
 │   │   │   └── complete/[id]/      →  /doctor/appointments/:id/complete (modal) *
 │   │   ├── profile/                →  /doctor/profile          *
 │   │   └── availability/           →  /doctor/availability     *
@@ -35,6 +36,8 @@
 │   │   ├── dashboard/              →  /admin/dashboard        *
 │   │   ├── users/                  →  /admin/users           *
 │   │   ├── doctors/                →  /admin/doctors         *
+│   │   ├── appointments/           →  /admin/appointments    *
+│   │   │   └── [appointmentId]/    →  /admin/appointments/:appointmentId  *
 │   │   └── doctor-verification/
 │   │       └── [doctorId]/         →  /admin/doctor-verification/:doctorId  *
 │   │

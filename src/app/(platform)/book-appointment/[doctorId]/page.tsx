@@ -17,9 +17,9 @@ import {
   VideoIcon,
   Calendar
 } from 'lucide-react';
-import { logInfo, logValidation } from '@/lib/logger';
+import { logInfo, logValidation, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
-import { useDoctorProfile, useDoctorAvailability } from '@/data/sharedLoaders';
+import { useDoctorProfile, useDoctorAvailability, useAvailableSlots } from '@/data/sharedLoaders';
 import { useBookAppointment } from '@/data/sharedLoaders';
 import { format, addDays } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
@@ -56,6 +56,7 @@ export default function BookAppointmentPage() {
     error: unknown;
   };
   const bookAppointmentMutation = useBookAppointment();
+  const availableSlotsMutation = useAvailableSlots();
   
   // State variables
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -65,9 +66,12 @@ export default function BookAppointmentPage() {
   const [reason, setReason] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<Array<{ startTime: string; endTime: string }>>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectableDates, setSelectableDates] = useState<Date[]>([]);
   
-  // Generate available dates (next 14 days)
-  const generateAvailableDates = () => {
+  // Generate dates for the next 14 days
+  const generateDates = () => {
     const dates = [];
     const currentDate = new Date();
     
@@ -79,35 +83,78 @@ export default function BookAppointmentPage() {
     return dates;
   };
   
-  const availableDates = generateAvailableDates();
+  const allDates = generateDates();
   
-  // Get available time slots for selected date
-  const getAvailableTimeSlots = () => {
-    if (!selectedDate || !availabilityData?.success) return [];
-    const { availability } = availabilityData;
-    const dayOfWeek = format(selectedDate, 'EEEE').toLowerCase();
-    const dateString = format(selectedDate, 'yyyy-MM-dd');
-    // Check if date is blocked
-    if (Array.isArray(availability.blockedDates) && availability.blockedDates.includes(dateString)) {
-      return [];
+  // Determine which dates are actually available based on doctor's schedule and blocked dates
+  useEffect(() => {
+    if (availabilityData?.success) {
+      const { weeklySchedule, blockedDates } = availabilityData.availability;
+      
+      // Filter dates that have slots in weekly schedule and are not blocked
+      const availableDates = allDates.filter(date => {
+        const dayOfWeek = format(date, 'EEEE').toLowerCase();
+        const hasSchedule = weeklySchedule[dayOfWeek] && weeklySchedule[dayOfWeek].length > 0;
+        
+        // Check if date is in blocked dates
+        const formattedDate = format(date, 'yyyy-MM-dd');
+        const isBlocked = blockedDates.some(blockedDate => {
+          return blockedDate.includes(formattedDate);
+        });
+        
+        return hasSchedule && !isBlocked;
+      });
+      
+      setSelectableDates(availableDates);
     }
-    // Get slots for the day
-    if (
-      availability.weeklySchedule &&
-      Object.prototype.hasOwnProperty.call(availability.weeklySchedule, dayOfWeek) &&
-      Array.isArray(availability.weeklySchedule[dayOfWeek])
-    ) {
-      return (availability.weeklySchedule[dayOfWeek] as TimeSlot[])
-        .filter((slot) => slot.isAvailable)
-        .map((slot) => ({
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-        }));
+  }, [availabilityData]);
+  
+  // Update to get available slots from the API when date changes
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      if (!selectedDate || !doctorId) return;
+      
+      setSlotsLoading(true);
+      setError(null);
+      
+      try {
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        const result = await availableSlotsMutation.mutateAsync({
+          doctorId,
+          date: formattedDate
+        });
+        
+        if (result.success) {
+          setAvailableTimeSlots(result.slots);
+        } else {
+          setError(`Failed to load available slots: ${result.error}`);
+          logError('Failed to fetch available slots', { doctorId, date: selectedDate.toISOString(), error: result.error });
+          setAvailableTimeSlots([]);
+        }
+      } catch (err) {
+        setError('Error loading available time slots. Please try again.');
+        logError('Error in fetchAvailableSlots', err);
+        setAvailableTimeSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+    
+    if (selectedDate && doctorId) {
+      fetchAvailableSlots();
+      
+      // Reset selected time slot when date changes
+      setSelectedTimeSlot(null);
+      setSelectedEndTime(null);
     }
-    return [];
+  // Only run this effect when the date or doctorId changes, not on every availableSlotsMutation change
+  }, [selectedDate, doctorId]);
+  
+  // Check if a date is selectable
+  const isDateSelectable = (date: Date) => {
+    return selectableDates.some(selectableDate => 
+      format(selectableDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+    );
   };
-  
-  const availableTimeSlots = getAvailableTimeSlots();
   
   // Format date for display
   const formatDate = (date: Date) => {
@@ -122,6 +169,8 @@ export default function BookAppointmentPage() {
       setError('Please select a date and time for your appointment');
       return;
     }
+    
+    setError(null);
     
     try {
       const result = await bookAppointmentMutation.mutateAsync({
@@ -146,27 +195,22 @@ export default function BookAppointmentPage() {
         
         logValidation('4.11', 'success', 'Book appointment function fully operational with real data');
         
-        // Redirect to appointments page after short delay
+        // Redirect to appointments page with justBooked parameter
         setTimeout(() => {
-          router.push('/patient/appointments');
+          router.push('/patient/appointments?justBooked=1');
         }, 1500);
       } else {
         setError(result.error || 'Failed to book appointment');
       }
     } catch (err) {
-      setError('An error occurred while booking your appointment');
-      console.error('Error booking appointment:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while booking your appointment';
+      setError(errorMessage);
+      logError('Error in handleBookAppointment', err);
     }
   };
   
   const isLoading = doctorLoading || availabilityLoading;
   const doctor = doctorData?.success ? doctorData.doctor : null;
-  
-  useEffect(() => {
-    // Reset selected time slot when date changes
-    setSelectedTimeSlot(null);
-    setSelectedEndTime(null);
-  }, [selectedDate]);
   
   if (doctorError || availabilityError) {
     return (
@@ -305,47 +349,61 @@ export default function BookAppointmentPage() {
               <Card className="p-6 mb-6">
                 <h2 className="text-lg font-semibold mb-4">1. Select a Date</h2>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  {availableDates.map((date, index) => (
+                  {allDates.map((date, index) => {
+                    const isSelectable = isDateSelectable(date);
+                    return (
                     <button
                       key={index}
                       type="button"
+                        disabled={!isSelectable}
                       className={`p-3 rounded-md border text-center transition-colors duration-200 ${
                         selectedDate && date.toDateString() === selectedDate.toDateString()
                           ? 'bg-primary/10 border-primary text-primary'
-                          : 'border-slate-200 hover:border-primary/50 dark:border-slate-700'
+                            : isSelectable
+                              ? 'border-slate-200 hover:border-primary/50 dark:border-slate-700'
+                              : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:text-slate-600'
                       }`}
-                      onClick={() => setSelectedDate(date)}
+                        onClick={() => isSelectable && setSelectedDate(date)}
                     >
                       <div className="font-medium">{format(date, 'EEE')}</div>
                       <div className="text-xl font-bold">{format(date, 'd')}</div>
                       <div className="text-xs">{format(date, 'MMM')}</div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
+                {selectableDates.length === 0 && !isLoading && (
+                  <p className="text-center mt-4 text-slate-500">
+                    No available dates in the doctor's schedule for the next 14 days
+                  </p>
+                )}
               </Card>
               
               {/* Time Slot Selection */}
               {selectedDate && (
                 <Card className="p-6 mb-6">
                   <h2 className="text-lg font-semibold mb-4">2. Select a Time Slot</h2>
-                  {availableTimeSlots.length > 0 ? (
+                  
+                  {slotsLoading ? (
+                    <div className="py-8 flex justify-center">
+                      <Spinner />
+                    </div>
+                  ) : availableTimeSlots.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                       {availableTimeSlots.map((slot, index: number) => (
-                        <button
+                        <Button
                           key={index}
                           type="button"
-                          className={`py-2 px-3 rounded-md border text-center transition-colors duration-200 ${
-                            slot.startTime === selectedTimeSlot
-                              ? 'bg-primary/10 border-primary text-primary'
-                              : 'border-slate-200 hover:border-primary/50 dark:border-slate-700'
-                          }`}
+                          variant={slot.startTime === selectedTimeSlot ? "primary" : "outline"}
+                          size="sm"
+                          className="py-2 px-3 text-center justify-center"
                           onClick={() => {
                             setSelectedTimeSlot(slot.startTime);
                             setSelectedEndTime(slot.endTime);
                           }}
                         >
                           {slot.startTime}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ) : (

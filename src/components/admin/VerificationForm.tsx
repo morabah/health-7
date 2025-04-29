@@ -7,10 +7,11 @@ import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { VerificationStatus } from '@/types/enums';
 
 interface VerificationFormProps {
-  currentStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  onSubmit: (payload: { status: string; notes: string }) => Promise<void>;
+  currentStatus: VerificationStatus;
+  onSubmit: (payload: { status: VerificationStatus; notes: string }) => Promise<void>;
 }
 
 export default function VerificationForm({ 
@@ -25,7 +26,7 @@ export default function VerificationForm({
   // Check if form can be submitted
   const canSubmit = () => {
     if (status === currentStatus) return false;
-    if (status === 'REJECTED' && !notes.trim()) return false;
+    if (status === VerificationStatus.REJECTED && !notes.trim()) return false;
     return true;
   };
 
@@ -72,32 +73,32 @@ export default function VerificationForm({
           <Select
             id="status"
             value={status}
-            onChange={(e) => setStatus(e.target.value as 'PENDING' | 'VERIFIED' | 'REJECTED')}
+            onChange={(e) => setStatus(e.target.value as VerificationStatus)}
             className="w-full"
           >
-            <option value="PENDING">Pending Verification</option>
-            <option value="VERIFIED">Verified</option>
-            <option value="REJECTED">Rejected</option>
+            <option value={VerificationStatus.PENDING}>Pending Verification</option>
+            <option value={VerificationStatus.VERIFIED}>Verified</option>
+            <option value={VerificationStatus.REJECTED}>Rejected</option>
           </Select>
         </div>
         
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-1">
-            Notes {status === 'REJECTED' && <span className="text-danger">*</span>}
+            Notes {status === VerificationStatus.REJECTED && <span className="text-danger">*</span>}
           </label>
           <Textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder={
-              status === 'REJECTED'
+              status === VerificationStatus.REJECTED
                 ? 'Please provide a reason for rejection...'
                 : 'Optional notes about the verification decision...'
             }
-            required={status === 'REJECTED'}
+            required={status === VerificationStatus.REJECTED}
             rows={4}
           />
-          {status === 'REJECTED' && !notes.trim() && (
+          {status === VerificationStatus.REJECTED && !notes.trim() && (
             <p className="mt-1 text-sm text-danger">
               Notes are required when rejecting a verification request.
             </p>
@@ -109,10 +110,10 @@ export default function VerificationForm({
             type="submit"
             disabled={!canSubmit() || loading}
             isLoading={loading}
-            variant={status === 'VERIFIED' ? 'primary' : status === 'REJECTED' ? 'danger' : 'secondary'}
+            variant={status === VerificationStatus.VERIFIED ? 'primary' : status === VerificationStatus.REJECTED ? 'danger' : 'secondary'}
           >
-            {status === 'VERIFIED' && <CheckCircle className="h-4 w-4 mr-2" />}
-            {status === 'REJECTED' && <XCircle className="h-4 w-4 mr-2" />}
+            {status === VerificationStatus.VERIFIED && <CheckCircle className="h-4 w-4 mr-2" />}
+            {status === VerificationStatus.REJECTED && <XCircle className="h-4 w-4 mr-2" />}
             Confirm Decision
           </Button>
         </div>

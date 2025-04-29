@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
 import type { z } from 'zod';
-import type { UpdateProfileSchema, SetDoctorAvailabilitySchema } from '@/types/schemas';
+import type { UpdateProfileSchema, SetDoctorAvailabilitySchema, Appointment } from '@/types/schemas';
 
 /**
  * Hook to fetch doctor profile data
@@ -148,5 +148,24 @@ export const useSetAvailability = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctorAvailability', user?.uid] });
     }
+  });
+};
+
+/**
+ * Hook to fetch a single appointment details
+ */
+export const useAppointmentDetails = (appointmentId: string) => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['appointmentDetails', appointmentId, user?.uid],
+    queryFn: async () => {
+      if (!user?.uid) throw new Error('User not authenticated');
+      
+      return await callApi('getAppointmentDetails', { 
+        appointmentId 
+      });
+    },
+    enabled: !!user?.uid && !!appointmentId
   });
 }; 

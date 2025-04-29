@@ -1,20 +1,17 @@
 'use client';
 
-import React, { useState, Fragment } from 'react';
+import React, { useState, Fragment, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
+import Alert from '@/components/ui/Alert';
+import type { Appointment } from '@/types/schemas';
 
 interface CancelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  appt: {
-    id: string;
-    doctorName: string;
-    date: string; // ISO
-    time: string;
-  } | null;
+  appt: Appointment | null;
   onConfirm: (id: string, reason: string) => Promise<void>;
 }
 
@@ -30,14 +27,16 @@ export default function CancelAppointmentModal({
 }: CancelModalProps) {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset state when modal opens/closes
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) {
       // Small delay to avoid visual flickering during close animation
       const timer = setTimeout(() => {
         setReason('');
         setLoading(false);
+        setError(null);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -47,14 +46,18 @@ export default function CancelAppointmentModal({
   const handleConfirm = async () => {
     if (!appt) return;
     if (!reason.trim()) {
+      setError('Please provide a reason for cancellation');
       return;
     }
 
     setLoading(true);
+    setError(null);
 
     try {
       await onConfirm(appt.id, reason.trim());
-    } finally {
+      // Success is handled in the parent component
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel appointment');
       setLoading(false);
     }
   };
@@ -98,11 +101,17 @@ export default function CancelAppointmentModal({
                 </Dialog.Title>
               </div>
 
+              {error && (
+                <Alert variant="error" className="mb-4">
+                  {error}
+                </Alert>
+              )}
+
               <div className="mt-2">
                 <p className="text-slate-600 dark:text-slate-300 mb-4">
                   Are you sure you want to cancel your appointment with <strong>{appt.doctorName}</strong> on{' '}
-                  <strong>{new Date(appt.date).toLocaleDateString()}</strong> at{' '}
-                  <strong>{appt.time}</strong>?
+                  <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
+                  <strong>{appt.startTime}</strong>?
                 </p>
 
                 <Textarea

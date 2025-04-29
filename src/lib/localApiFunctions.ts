@@ -10,6 +10,7 @@
 import { logInfo, logWarn, logError, logValidation } from './logger';
 import { trackPerformance } from './performance';
 import { getUsers, saveUsers, getPatients, savePatients, getDoctors, saveDoctors, getAppointments, saveAppointments, getNotifications, saveNotifications } from './localDb';
+import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
 
 import type {
   ResultOk,
@@ -38,7 +39,8 @@ import type {
   Notification
 } from '@/types/schemas';
 
-import type { z } from 'zod';
+// Import z as a value, not just a type
+import { z } from 'zod';
 
 // Utility imports
 
@@ -80,14 +82,13 @@ export async function registerUser(
     const base: z.infer<typeof UserProfileSchema> & { id: string } = {
       id: uid,
       email: data.email,
-      phone: null, // Default value for optional field
       firstName: data.firstName,
       lastName: data.lastName,
       userType: data.userType,
       isActive: data.userType === UserType.PATIENT, // doctors stay inactive—awaiting verification
       emailVerified: false,
       phoneVerified: false,
-      phone: null,
+      phone: null, // Only include phone once
       createdAt: timestamp,
       updatedAt: timestamp,
       profilePictureUrl: null,
@@ -148,56 +149,86 @@ export async function registerUser(
 /**
  * Get mock patient profile for test users
  */
-export async function getMockPatientProfile(userId: string): Promise<z.infer<typeof PatientProfileSchema>> {
+export async function getMockPatientProfile(userId: string): Promise<z.infer<typeof PatientProfileSchema> & { id: string }> {
+  const timestamp = new Date().toISOString();
+  const uniqueId = `patient-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
+  
   return {
+    id: uniqueId,
     userId,
     dateOfBirth: '1990-01-01',
     gender: Gender.MALE,
-    bloodType: BloodType.A_POSITIVE,
-    medicalHistory: 'None',
+    bloodType: BloodType.O_POSITIVE,
+    medicalHistory: null,
+    profilePictureUrl: null,
+    createdAt: timestamp,
+    updatedAt: timestamp
   };
 }
 
 /**
  * Get mock doctor profile for test users
  */
-export async function getMockDoctorProfile(userId: string): Promise<z.infer<typeof DoctorProfileSchema>> {
-  const now = nowIso();
+export async function getMockDoctorProfile(userId: string): Promise<z.infer<typeof DoctorProfileSchema> & { id: string }> {
+  const timestamp = new Date().toISOString();
+  const uniqueId = `doctor-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
+  
   return {
+    id: uniqueId,
     userId,
-    createdAt: now,
-    updatedAt: now,
-    profilePictureUrl: null,
     specialty: 'General Practice',
-    licenseNumber: 'DOC123456',
-    yearsOfExperience: 10,
-    bio: null,
+    licenseNumber: `MD-${Math.floor(Math.random() * 100000)}`,
+    yearsOfExperience: 5,
+    bio: 'Experienced doctor with a passion for patient care',
     verificationStatus: VerificationStatus.VERIFIED,
-    location: null,
-    education: null,
-    servicesOffered: null,
-    languages: [],
-    consultationFee: null,
-    licenseDocumentUrl: null,
-    certificateUrl: null,
-    educationHistory: [],
-    experience: [],
-    weeklySchedule: {
-      monday: [],
-      tuesday: [],
-      wednesday: [],
-      thursday: [],
-      friday: [],
-      saturday: [],
-      sunday: [],
-    },
-    blockedDates: [],
-    timezone: 'UTC',
     verificationNotes: null,
-    adminNotes: undefined,
-    profilePicturePath: null,
-    licenseDocumentPath: null,
-    certificatePath: null,
+    adminNotes: '',
+    education: [
+      {
+        institution: 'Medical University',
+        degree: 'Doctor of Medicine',
+        field: 'Medicine',
+        startYear: 2010,
+        endYear: 2014,
+        isOngoing: false,
+        description: 'Studied general medicine with a focus on primary care'
+      }
+    ],
+    certifications: [
+      {
+        name: 'Board Certification',
+        issuer: 'American Board of Medicine',
+        issueDate: '2015-01-15',
+        expiryDate: '2025-01-15',
+        isExpired: false,
+        credentialId: 'BOARD-12345'
+      }
+    ],
+    languages: ['English'],
+    insuranceAccepted: ['Medicare', 'Blue Cross'],
+    appointmentTypes: ['Consultation', 'Follow-up', 'Annual Physical'],
+    officeAddress: {
+      line1: '123 Medical Drive',
+      line2: 'Suite 100',
+      city: 'Healthville',
+      state: 'CA',
+      postalCode: '90210',
+      country: 'USA'
+    },
+    officePhone: '555-123-4567',
+    officeHours: {
+      monday: { start: '09:00', end: '17:00' },
+      tuesday: { start: '09:00', end: '17:00' },
+      wednesday: { start: '09:00', end: '17:00' },
+      thursday: { start: '09:00', end: '17:00' },
+      friday: { start: '09:00', end: '17:00' },
+      saturday: null,
+      sunday: null
+    },
+    profilePictureUrl: null,
+    weeklySchedule: null,
+    createdAt: timestamp,
+    updatedAt: timestamp
   };
 }
 
@@ -206,118 +237,77 @@ export async function getMockDoctorProfile(userId: string): Promise<z.infer<type
  */
 export async function signIn(
   email: string,
-  password: string // Use password (lint error)
+  password: string
 ): Promise<
   | ResultOk<{
   user: { id: string; email: string | null };
   userProfile: z.infer<typeof UserProfileSchema> & { id: string };
       roleProfile:
-        | z.infer<typeof PatientProfileSchema>
-        | z.infer<typeof DoctorProfileSchema>
+        | (z.infer<typeof PatientProfileSchema> & { id: string })
+        | (z.infer<typeof DoctorProfileSchema> & { id: string })
         | null;
     }>
   | ResultErr
 > {
   const perf = trackPerformance('signIn');
-  await sleep(200); // mimic latency
-
-  // Add detailed logging
-  console.log('localApiFunctions.signIn - received:', {
-    email,
-    emailType: typeof email,
-    passwordProvided: !!password,
-    passwordType: typeof password
-  });
-
+  
   try {
+    /* 1  log and validate */
+    logInfo('signIn attempt', { email });
+    
+    /* 2  find user in users.json */
     const users = await getUsers();
-    const userProfile = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const userMatch = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
-    // Handle special test login - allow any password with test@example.com emails
-    const isTestLogin = email.includes('test@') && email.includes('.com');
-    
-    // Also allow test-patient@example.com, test-doctor@example.com, etc.
-    const isStandardTestLogin =
-      email === 'test-patient@example.com' || 
-      email === 'test-doctor@example.com' || 
-      email === 'test-admin@example.com';
-    
-    if (!userProfile && !isTestLogin && !isStandardTestLogin)
-      return { success: false, error: 'Invalid credentials' };
-    
-    // Handle test user login
-    if (isTestLogin || isStandardTestLogin) {
-      // Create a mock user based on email
-      const userType = email.includes('patient')
-        ? UserType.PATIENT
-        : email.includes('doctor')
-          ? UserType.DOCTOR
-          : UserType.ADMIN;
-
-      const uid = email.includes('patient')
-        ? 'test-patient-verified-001'
-        : email.includes('doctor')
-          ? 'test-doctor-verified-003'
-          : 'test-admin-005';
-                  
-      const mockUser = await getMyUserProfile(uid);
-      
-      // Add proper null check for mockUser
-      if (!mockUser) {
-        logError('signIn failed: Mock user not found', { uid, email });
-        return { success: false, error: 'Error creating test account' };
-      }
-      
-      // Get the appropriate role profile
-      let roleProfile: z.infer<typeof PatientProfileSchema> | z.infer<typeof DoctorProfileSchema> | null = null;
-      if (userType === UserType.PATIENT) {
-        roleProfile = await getMockPatientProfile(uid);
-      } else if (userType === UserType.DOCTOR) {
-        roleProfile = await getMockDoctorProfile(uid);
-      }
-      
-      // Fix the returned user profile to ensure userType has the correct case
-      return {
-        success: true,
-        user: { id: mockUser.id, email: mockUser.email },
-        userProfile: {
-          ...mockUser,
-          userType: userType // Ensure correct enum value
-        },
-        roleProfile,
-      };
+    if (!userMatch) {
+      logWarn('signIn failed: email not found', { email });
+      return { success: false, error: 'Invalid email or password' };
     }
     
-    if (!userProfile!.isActive)
-      return { success: false, error: 'Account inactive or pending verification' };
+    /* 3  validate password (hard-coded for now) */
+    if (password !== 'password123' && password !== 'password') {
+      logWarn('signIn failed: incorrect password', { email });
+      return { success: false, error: 'Invalid email or password' };
+      }
+      
+    // Support automatic mock user generation in dev
+    if (userMatch.userType === UserType.ADMIN && email === 'admin@example.com') {
+      logInfo('Admin auto-login detected');
+    }
+    
+    const uid = userMatch.id;
+    
+    /* 4  get role profile */
+    let roleProfile: (z.infer<typeof PatientProfileSchema> & { id: string }) | 
+                   (z.infer<typeof DoctorProfileSchema> & { id: string }) | null = null;
 
-    let roleProfile:
-      | z.infer<typeof PatientProfileSchema>
-      | z.infer<typeof DoctorProfileSchema>
-      | null = null;
-
-    if (userProfile!.userType === UserType.PATIENT) {
+    // Get profile details by role
+    if (userMatch.userType === UserType.PATIENT) {
       const patients = await getPatients();
-      roleProfile = patients.find(p => p.userId === userProfile!.id) ?? null;
-    } else if (userProfile!.userType === UserType.DOCTOR) {
-      const doctors = await getDoctors();
-      // Type cast to ensure compatibility
-      roleProfile = doctors.find(d => d.userId === userProfile!.id) as z.infer<typeof DoctorProfileSchema> ?? null;
-    }
-
+      roleProfile = patients.find(p => p.userId === uid) || null;
+      
+      // Auto-create mock profile if missing
     if (!roleProfile) {
-      logWarn('signIn: missing role profile', { uid: userProfile!.id });
+        logInfo('Auto-creating missing patient profile');
+        roleProfile = await getMockPatientProfile(uid);
+        await savePatients([...patients, roleProfile]);
     }
-
-    // Use the password variable to avoid lint error
-    if (password === 'trigger-lint-pass') {
-      console.log('This is just to use the password variable');
+    } else if (userMatch.userType === UserType.DOCTOR) {
+      const doctors = await getDoctors();
+      roleProfile = doctors.find(d => d.userId === uid) || null;
+      
+      // Auto-create mock profile if missing
+      if (!roleProfile) {
+        logInfo('Auto-creating missing doctor profile');
+        roleProfile = await getMockDoctorProfile(uid);
+        await saveDoctors([...doctors, roleProfile]);
+      }
     }
 
     return {
       success: true,
-      user: { id: userProfile!.id, email: userProfile!.email },
-      userProfile: userProfile!,
+      user: { id: uid, email: userMatch.email },
+      userProfile: userMatch,
       roleProfile,
     };
   } catch (e) {
@@ -330,75 +320,73 @@ export async function signIn(
 
 /**
  * Get a user profile by UID - directly exported for AuthContext
+ * Returns the user profile along with role-specific profile data
  */
-export async function getMyUserProfile(uid: string): Promise<z.infer<typeof UserProfileSchema> & { id: string } | null> {
-  logInfo('getMyUserProfile called', { uid });
-  await sleep();
-  
+export async function getMyUserProfile(
+  ctx: { uid: string; role: UserType }
+): Promise<
+  | ResultOk<{
+      userProfile: z.infer<typeof UserProfileSchema> & { id: string };
+      roleProfile:
+        | (z.infer<typeof PatientProfileSchema> & { id: string })
+        | (z.infer<typeof DoctorProfileSchema> & { id: string })
+        | null;
+    }>
+  | ResultErr
+> {
+  const perf = trackPerformance('getMyUserProfile');
   try {
-    const users = await getUsers();
-    const user = users.find(u => u.id === uid);
+    await sleep(200); // simulate network request
     
-    if (!user) {
-      // Check if this is a test user ID and generate a mock user
-      if (uid.startsWith('test-')) {
-        const now = nowIso();
-        // Handle different user types
-        if (uid.includes('patient')) {
-          return {
-            id: uid,
-            email: 'test-patient@example.com',
-            firstName: 'Test',
-            lastName: 'Patient',
-            userType: UserType.PATIENT,
-            isActive: true,
-            emailVerified: true,
-            phoneVerified: false,
-            phone: null,
-            createdAt: now,
-            updatedAt: now,
-            profilePictureUrl: null,
-          };
-        } else if (uid.includes('doctor')) {
-          return {
-            id: uid,
-            email: 'test-doctor@example.com',
-            firstName: 'Test',
-            lastName: 'Doctor',
-            userType: UserType.DOCTOR,
-            isActive: true,
-            emailVerified: true,
-            phoneVerified: false,
-            phone: null,
-            createdAt: now,
-            updatedAt: now,
-            profilePictureUrl: null,
-          };
-        } else if (uid.includes('admin')) {
-          return {
-            id: uid,
-            email: 'test-admin@example.com',
-            firstName: 'Test',
-            lastName: 'Admin',
-            userType: UserType.ADMIN,
-            isActive: true,
-            emailVerified: true,
-            phoneVerified: false,
-            phone: null,
-            createdAt: now,
-            updatedAt: now,
-            profilePictureUrl: null,
-          };
-        }
+    logInfo('getMyUserProfile', { uid: ctx.uid, role: ctx.role });
+    
+    // Handle test user auto-generation
+    if (ctx.uid.startsWith('test-')) {
+      const mockUser = await getMockUserProfile(ctx.uid, ctx.role);
+      let roleProfile = null;
+      
+      if (ctx.role === UserType.PATIENT) {
+        roleProfile = await getMockPatientProfile(ctx.uid);
+      } else if (ctx.role === UserType.DOCTOR) {
+        roleProfile = await getMockDoctorProfile(ctx.uid);
       }
       
-      throw new Error('User not found');
+          return {
+        success: true,
+        userProfile: mockUser,
+        roleProfile,
+      };
     }
     
-    return user;
-  } catch (err) {
-    logError('getMyUserProfile error', err);
-    throw err;
+    // Get actual user from DB
+    const users = await getUsers();
+    const userProfile = users.find(u => u.id === ctx.uid);
+    
+    if (!userProfile) {
+      logError('getMyUserProfile failed: User not found', { uid: ctx.uid });
+      return { success: false, error: 'User not found' };
+    }
+    
+    // Get role-specific profile
+    let roleProfile = null;
+    if (ctx.role === UserType.PATIENT) {
+      const patients = await getPatients();
+      roleProfile = patients.find(p => p.userId === ctx.uid) || null;
+    } else if (ctx.role === UserType.DOCTOR) {
+      const doctors = await getDoctors();
+      roleProfile = doctors.find(d => d.userId === ctx.uid) || null;
+    }
+    
+    return {
+      success: true,
+      userProfile,
+      roleProfile,
+          };
+  } catch (e) {
+    logError('getMyUserProfile failed', e);
+    return { success: false, error: 'Failed to load user profile' };
+  } finally {
+    perf.stop();
   }
 }
 
@@ -654,7 +642,7 @@ export async function findDoctors(
 type JoinedDoctor = z.infer<typeof DoctorProfileSchema> & { id: string; firstName: string; lastName: string; isActive: boolean; rating: number; reviewCount: number };
 
 /**
- * Set a doctor's availability schedule
+ * Set doctor availability schedule and blocked dates
  */
 export async function setDoctorAvailability(
   ctx: { uid: string; role: UserType.DOCTOR },
@@ -662,35 +650,55 @@ export async function setDoctorAvailability(
     weeklySchedule?: Record<string, Array<{ startTime: string; endTime: string; isAvailable: boolean }>>;
     blockedDates?: string[];
   }
-): Promise<ResultOk<{ updated: boolean }> | ResultErr> {
+): Promise<ResultOk<{ success: true; updated: boolean; doctorProfile: z.infer<typeof DoctorProfileSchema> & { id: string } }> | ResultErr> {
   const perf = trackPerformance('setDoctorAvailability');
   
   try {
     const { uid, role } = ctx;
-    const { weeklySchedule = {}, blockedDates = [] } = data;
     
-    logInfo('setDoctorAvailability called', { uid, role, weeklyScheduleKeys: Object.keys(weeklySchedule || {}), blockedDatesCount: blockedDates?.length });
+    // Validate with Zod schema
+    const timeSlotSchema = z.object({
+      startTime: z.string().min(1, "Start time is required"),
+      endTime: z.string().min(1, "End time is required"),
+      isAvailable: z.boolean()
+    });
     
-    // Validate doctor role
+    const validationSchema = z.object({
+      weeklySchedule: z.record(z.string(), z.array(timeSlotSchema)).optional(),
+      blockedDates: z.array(z.string()).optional()
+    });
+
+    const result = validationSchema.safeParse(data);
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: `Invalid availability data: ${result.error.message}` 
+      };
+    }
+    
+    // Ensure user is a doctor
     if (role !== UserType.DOCTOR) {
       return { success: false, error: 'Only doctors can set availability' };
     }
     
-    let hasChanges = false;
+    const { weeklySchedule, blockedDates } = data;
     
-    // Update the doctor's availability
+    // Get all doctors
     const doctors = await getDoctors();
+    
+    // Find the doctor by userId
     const doctorIndex = doctors.findIndex(d => d.userId === uid);
     
     if (doctorIndex === -1) {
-      logError('Doctor not found', { uid });
-      return { success: false, error: 'Doctor not found' };
+      return { success: false, error: 'Doctor profile not found' };
     }
     
-    // Get the current doctor
     const doctor = doctors[doctorIndex];
     
-    // Create an updated schedule object with correct typing
+    // Track if any changes were made
+    let hasChanges = false;
+    
+    // Define the weekly schedule type 
     type WeeklySchedule = {
       monday: Array<{ startTime: string; endTime: string; isAvailable: boolean }>;
       tuesday: Array<{ startTime: string; endTime: string; isAvailable: boolean }>;
@@ -701,7 +709,8 @@ export async function setDoctorAvailability(
       sunday: Array<{ startTime: string; endTime: string; isAvailable: boolean }>;
     };
     
-    const updatedSchedule: WeeklySchedule = {
+    // Handle weekly schedule update
+    let updatedSchedule = doctor.weeklySchedule || {
       monday: [],
       tuesday: [],
       wednesday: [],
@@ -711,41 +720,22 @@ export async function setDoctorAvailability(
       sunday: []
     };
     
-    // Process each day in the schedule
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
-    
-    days.forEach(day => {
-      if (weeklySchedule[day]) {
-        // Validate slots (time format, overlap, etc.)
-        const validSlots = weeklySchedule[day].filter(slot => {
-          // Basic validation - improve as needed
-          return slot.startTime && slot.endTime;
-        });
-        
-        if (validSlots.length > 0) {
-          // Check if this is different from the current schedule
-          const doctorSchedule = doctor.weeklySchedule || {} as WeeklySchedule;
-          const currentDaySchedule = JSON.stringify(doctorSchedule[day] || []);
-          const newDaySchedule = JSON.stringify(validSlots);
+    if (weeklySchedule) {
+      // Check if schedule is different
+      const currentScheduleJSON = JSON.stringify(updatedSchedule);
+      const newScheduleJSON = JSON.stringify(weeklySchedule);
           
-          if (currentDaySchedule !== newDaySchedule) {
-            updatedSchedule[day] = validSlots;
+      if (currentScheduleJSON !== newScheduleJSON) {
+        updatedSchedule = weeklySchedule as WeeklySchedule;
             hasChanges = true;
           }
         }
-      } else {
-        // Preserve existing schedule for days not included in the update
-        const doctorSchedule = doctor.weeklySchedule || {} as WeeklySchedule;
-        updatedSchedule[day] = doctorSchedule[day] || [];
-      }
-    });
     
-    // Process blocked dates
+    // Handle blocked dates update
     const currentBlockedDates = doctor.blockedDates || [];
     let blockedDatesChanged = false;
     
-    // Check if the blocked dates array is different
-    if (JSON.stringify(currentBlockedDates.sort()) !== JSON.stringify([...blockedDates].sort())) {
+    if (blockedDates && JSON.stringify(currentBlockedDates) !== JSON.stringify(blockedDates)) {
       blockedDatesChanged = true;
       hasChanges = true;
     }
@@ -760,9 +750,35 @@ export async function setDoctorAvailability(
       };
       
       await saveDoctors(doctors);
+      
+      // Create a notification for the doctor
+      const notifications = await getNotifications();
+      const notification: Notification = {
+        id: `notif-${generateId()}`,
+        userId: uid,
+        title: 'Availability Updated',
+        message: 'Your availability settings have been updated successfully.',
+        type: NotificationType.SYSTEM,
+        isRead: false,
+        createdAt: nowIso(),
+        relatedId: null
+      };
+      notifications.push(notification as Notification);
+      await saveNotifications(notifications);
     }
     
-    return { success: true, updated: hasChanges };
+    // Return updated doctor profile with ID
+    const updatedDoctor = doctors[doctorIndex];
+    const doctorWithId = {
+      ...updatedDoctor,
+      id: uid
+    };
+    
+    return { 
+      success: true, 
+      updated: hasChanges,
+      doctorProfile: doctorWithId
+    };
   } catch (e) {
     logError('setDoctorAvailability failed', e);
     return { success: false, error: 'Error updating availability' };
@@ -774,43 +790,66 @@ export async function setDoctorAvailability(
 /**
  * Book an appointment with a doctor
  */
-export async function bookAppointment(context: { uid: string; role: UserType }, payload: { doctorId: string; appointmentDate: string; startTime: string; endTime: string; reason?: string; appointmentType?: AppointmentType }): Promise<unknown> {
-  const { uid, role } = context;
+export async function bookAppointment(
+  context: { uid: string; role: UserType }, 
+  payload: { doctorId: string; appointmentDate: string; startTime: string; endTime: string; reason?: string; appointmentType?: AppointmentType }
+): Promise<ResultOk<{ success: true; appointment: Appointment }> | ResultErr> {
+  const perf = trackPerformance('bookAppointment');
   
   try {
+  const { uid, role } = context;
+  
+    // Validate with Zod schema
+    const validationSchema = z.object({
+      doctorId: z.string().min(1, "Doctor ID is required"),
+      appointmentDate: z.string().min(1, "Appointment date is required"),
+      startTime: z.string().min(1, "Start time is required"),
+      endTime: z.string().min(1, "End time is required"),
+      reason: z.string().optional(),
+      appointmentType: z.nativeEnum(AppointmentType).optional()
+    });
+
+    const result = validationSchema.safeParse(payload);
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: `Invalid booking data: ${result.error.message}` 
+      };
+    }
+    
     // Validate user is authenticated and has correct role
     if (!uid) {
-      throw new Error('User not authenticated');
+      return { success: false, error: 'User not authenticated' };
     }
     
     if (role !== UserType.PATIENT) {
-      throw new Error('Only patients can book appointments');
+      return { success: false, error: 'Only patients can book appointments' };
     }
     
     // Check required parameters
     const { doctorId, appointmentDate, startTime, endTime, reason, appointmentType } = payload;
     
     if (!doctorId || !appointmentDate || !startTime || !endTime) {
-      throw new Error('Missing required appointment details');
+      return { success: false, error: 'Missing required appointment details' };
     }
     
     // Check doctor exists
     const doctors = await getDoctors();
     const doctor = doctors.find(d => d.userId === doctorId);
     if (!doctor) {
-      throw new Error(`Doctor with ID ${doctorId} not found`);
+      return { success: false, error: `Doctor with ID ${doctorId} not found` };
     }
     
-    // Check doctor is verified
-    if (doctor.verificationStatus !== 'verified') {
-      throw new Error('Doctor is not verified');
+    // Check doctor is verified - FIXED: now using enum instead of string literal
+    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
+      return { success: false, error: 'Doctor is not verified' };
     }
     
     // Get patient profile
     const patients = await getPatients();
     const patient = patients.find(p => p.userId === uid);
     if (!patient) {
-      throw new Error('Patient profile not found');
+      return { success: false, error: 'Patient profile not found' };
     }
     
     // Get user profiles for patient and doctor
@@ -848,19 +887,42 @@ export async function bookAppointment(context: { uid: string; role: UserType }, 
     appointments.push(appointment);
     await saveAppointments(appointments);
     
-    // Create notification for doctor
-    // Removed createNotification call as it's not defined
+    // Create notification for doctor and patient
+    const notifications = await getNotifications();
     
+    // Doctor notification
+    const doctorNotification: Notification = {
+      id: `notif-${generateId()}`,
+      userId: doctorId,
+      title: 'New Appointment',
+      message: `${patientName} has booked an appointment on ${appointmentDate} at ${startTime}`,
+      type: NotificationType.APPOINTMENT_BOOKED,
+      isRead: false,
+      createdAt: nowIso(),
+      relatedId: appointment.id
+    };
+    notifications.push(doctorNotification as Notification);
+    
+    // Patient notification
+    const patientNotification: Notification = {
+      id: `notif-${generateId()}`,
+      userId: uid,
+      title: 'Appointment Confirmed',
+      message: `Your appointment with Dr. ${doctorName} on ${appointmentDate} at ${startTime} has been booked.`,
+      type: NotificationType.APPOINTMENT_BOOKED,
+      isRead: false,
+      createdAt: nowIso(),
+      relatedId: appointment.id
+    };
+    notifications.push(patientNotification as Notification);
+    
+    // Save notifications
+    await saveNotifications(notifications);
+    
+    // Return full appointment object in response
     return {
       success: true,
-      appointment: {
-        id: appointment.id,
-        date: appointmentDate,
-        startTime,
-        endTime,
-        doctorName: appointment.doctorName,
-        status: appointment.status
-      }
+      appointment
     };
   } catch (error) {
     logError('bookAppointment failed', error);
@@ -868,6 +930,8 @@ export async function bookAppointment(context: { uid: string; role: UserType }, 
       success: false,
       error: error instanceof Error ? error.message : 'Failed to book appointment'
     };
+  } finally {
+    perf.stop();
   }
 }
 
@@ -880,12 +944,26 @@ export async function cancelAppointment(
     appointmentId: string;
     reason?: string;
   }
-): Promise<ResultOk<{ success: true }> | ResultErr> {
+): Promise<ResultOk<{ success: true; appointment: Appointment }> | ResultErr> {
   const perf = trackPerformance('cancelAppointment');
   
   try {
     const { uid, role } = ctx;
     const { appointmentId, reason } = payload;
+    
+    // Validate with Zod schema
+    const validationSchema = z.object({
+      appointmentId: z.string().min(1, "Appointment ID is required"),
+      reason: z.string().optional()
+    });
+
+    const result = validationSchema.safeParse(payload);
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: `Invalid cancellation data: ${result.error.message}` 
+      };
+    }
     
     logInfo('cancelAppointment called', { uid, role, appointmentId, reason });
     
@@ -918,58 +996,89 @@ export async function cancelAppointment(
     
     // Get the canceler's name for the notification
     let canceledBy = 'Unknown';
-    
     const users = await getUsers();
-    const userRecord = users.find(u => u.id === uid);
     
-    if (userRecord) {
-      canceledBy = role === UserType.ADMIN 
-        ? 'Admin' 
-        : `${userRecord.firstName} ${userRecord.lastName}`;
+    if (role === UserType.ADMIN) {
+      canceledBy = 'Admin';
+    } else {
+      const user = users.find(u => u.id === uid);
+      if (user) {
+        canceledBy = `${user.firstName} ${user.lastName}`;
+      }
     }
     
-    // Update appointment
+    // Update the appointment
     appointment.status = AppointmentStatus.CANCELED;
-    appointment.notes = reason ? `Canceled by ${canceledBy}: ${reason}` : `Canceled by ${canceledBy}`;
+    if (reason) appointment.notes = `Canceled - ${reason}`;
     appointment.updatedAt = nowIso();
     
+    // Save updated appointment
     appointments[appointmentIndex] = appointment;
     await saveAppointments(appointments);
     
-    // Create notifications
+    // Create notifications for both parties
     const notifications = await getNotifications();
-    // If canceled by patient, notify doctor
+    let patientNotification: Notification;
+    let doctorNotification: Notification;
+    
+    // Only create notifications for the non-canceler
     if (role === UserType.PATIENT) {
-      const doctorNotification: Notification = {
+      // Patient canceled, notify doctor
+      doctorNotification = {
         id: `notif-${generateId()}`,
         userId: appointment.doctorId,
         title: 'Appointment Canceled',
-        message: `${appointment.patientName} canceled the appointment on ${appointment.appointmentDate} at ${appointment.startTime}`,
+        message: `${canceledBy} has canceled the appointment scheduled for ${appointment.appointmentDate} at ${appointment.startTime}${reason ? ` - Reason: ${reason}` : ''}.`,
         type: NotificationType.APPOINTMENT_CANCELED,
         isRead: false,
         createdAt: nowIso(),
-        relatedId: appointmentId
+        relatedId: appointment.id
       };
       notifications.push(doctorNotification as Notification);
-    } 
-    // If canceled by doctor, notify patient
-    else if (role === UserType.DOCTOR) {
-      const patientNotification: Notification = {
+    } else if (role === UserType.DOCTOR) {
+      // Doctor canceled, notify patient
+      patientNotification = {
         id: `notif-${generateId()}`,
         userId: appointment.patientId,
-        title: 'Appointment Canceled',
-        message: `Your appointment with ${appointment.doctorName} on ${appointment.appointmentDate} at ${appointment.startTime} has been canceled by the doctor.`,
+        title: 'Appointment Canceled by Doctor',
+        message: `Dr. ${canceledBy} has canceled your appointment scheduled for ${appointment.appointmentDate} at ${appointment.startTime}${reason ? ` - Reason: ${reason}` : ''}.`,
         type: NotificationType.APPOINTMENT_CANCELED,
         isRead: false,
         createdAt: nowIso(),
-        relatedId: appointmentId
+        relatedId: appointment.id
       };
       notifications.push(patientNotification as Notification);
+    } else if (role === UserType.ADMIN) {
+      // Admin canceled, notify both patient and doctor
+      patientNotification = {
+        id: `notif-${generateId()}`,
+        userId: appointment.patientId,
+        title: 'Appointment Canceled by Admin',
+        message: `Your appointment with ${appointment.doctorName} scheduled for ${appointment.appointmentDate} at ${appointment.startTime} has been canceled by an administrator${reason ? ` - Reason: ${reason}` : ''}.`,
+        type: NotificationType.APPOINTMENT_CANCELED,
+        isRead: false,
+        createdAt: nowIso(),
+        relatedId: appointment.id
+      };
+      
+      doctorNotification = {
+        id: `notif-${generateId()}`,
+        userId: appointment.doctorId,
+        title: 'Appointment Canceled by Admin',
+        message: `Your appointment with ${appointment.patientName} scheduled for ${appointment.appointmentDate} at ${appointment.startTime} has been canceled by an administrator${reason ? ` - Reason: ${reason}` : ''}.`,
+        type: NotificationType.APPOINTMENT_CANCELED,
+        isRead: false,
+        createdAt: nowIso(),
+        relatedId: appointment.id
+      };
+      
+      notifications.push(patientNotification as Notification);
+      notifications.push(doctorNotification as Notification);
     }
     
     await saveNotifications(notifications);
     
-    return { success: true };
+    return { success: true, appointment };
   } catch (e) {
     logError('cancelAppointment failed', e);
     return { success: false, error: 'Error canceling appointment' };
@@ -987,12 +1096,26 @@ export async function completeAppointment(
     appointmentId: string;
     notes?: string;
   }
-): Promise<ResultOk<{ success: true }> | ResultErr> {
+): Promise<ResultOk<{ success: true; appointment: Appointment }> | ResultErr> {
   const perf = trackPerformance('completeAppointment');
   
   try {
     const { uid, role } = ctx;
     const { appointmentId, notes } = payload;
+    
+    // Validate with Zod schema
+    const validationSchema = z.object({
+      appointmentId: z.string().min(1, "Appointment ID is required"),
+      notes: z.string().optional()
+    });
+
+    const result = validationSchema.safeParse(payload);
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: `Invalid completion data: ${result.error.message}` 
+      };
+    }
     
     logInfo('completeAppointment called', { uid, role, appointmentId, notes });
     
@@ -1046,7 +1169,7 @@ export async function completeAppointment(
     notifications.push(patientNotification as Notification);
     await saveNotifications(notifications);
     
-    return { success: true };
+    return { success: true, appointment };
   } catch (e) {
     logError('completeAppointment failed', e);
     return { success: false, error: 'Error completing appointment' };
@@ -1097,6 +1220,62 @@ export async function getMyAppointments(
   } catch (e) {
     logError('getMyAppointments failed', e);
     return { success: false, error: 'Error fetching appointments' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Get detailed information about a specific appointment
+ */
+export async function getAppointmentDetails(
+  ctx: { uid: string; role: UserType },
+  payload: { appointmentId: string }
+): Promise<ResultOk<{ appointment: Appointment }> | ResultErr> {
+  const perf = trackPerformance('getAppointmentDetails');
+  
+  try {
+    const { uid, role } = ctx;
+    const { appointmentId } = payload;
+    
+    // Simple validation instead of using zod
+    if (!appointmentId) {
+      return { 
+        success: false, 
+        error: "Appointment ID is required" 
+      };
+    }
+    
+    logInfo('getAppointmentDetails called', { uid, role, appointmentId });
+    
+    // Get all appointments
+    const appointments = await getAppointments();
+    
+    // Find the specific appointment
+    let appointment: Appointment | undefined;
+    
+    if (role === UserType.ADMIN) {
+      // Admins can view any appointment
+      appointment = appointments.find(a => a.id === appointmentId);
+    } else if (role === UserType.DOCTOR) {
+      // Doctors can only view their own appointments
+      appointment = appointments.find(a => a.id === appointmentId && a.doctorId === uid);
+    } else if (role === UserType.PATIENT) {
+      // Patients can only view their own appointments
+      appointment = appointments.find(a => a.id === appointmentId && a.patientId === uid);
+    }
+    
+    if (!appointment) {
+      return { 
+        success: false, 
+        error: 'Appointment not found or you do not have permission to view it'
+      };
+    }
+    
+    return { success: true, appointment };
+  } catch (e) {
+    logError('getAppointmentDetails failed', e);
+    return { success: false, error: 'Error fetching appointment details' };
   } finally {
     perf.stop();
   }
@@ -1226,9 +1405,9 @@ export async function getDoctorPublicProfile(
       a.status === AppointmentStatus.COMPLETED
     );
     
-    // Generate random rating if not available
-    const rating = doctor.rating || Math.floor(Math.random() * 5) + 1;
-    const reviewCount = doctor.reviewCount || completedAppointments.length;
+    // Generate mock values for rating and review count
+    const rating = 4.5; // Mock rating value between 1-5
+    const reviewCount = completedAppointments.length;
     
     // Combine data for public profile
     const profile: z.infer<typeof DoctorProfileSchema> = {
@@ -1275,11 +1454,32 @@ export async function getDoctorPublicProfile(
  */
 export async function getDoctorAvailability(
   ctx: { uid: string; role: UserType; doctorId: string }
-): Promise<ResultOk<{ availability: z.infer<typeof DoctorProfileSchema>['weeklySchedule'] & { blockedDates: string[] } }> | ResultErr> {
+): Promise<ResultOk<{ 
+  availability: { 
+    weeklySchedule: Record<string, Array<{ startTime: string; endTime: string; isAvailable: boolean }>>; 
+    blockedDates: string[] 
+  },
+  doctorProfile: z.infer<typeof DoctorProfileSchema> & { id: string }
+}> | ResultErr> {
   const perf = trackPerformance('getDoctorAvailability');
   
   try {
     const { uid, role, doctorId } = ctx;
+    
+    // Validate with Zod schema
+    const validationSchema = z.object({
+      uid: z.string().min(1, "User ID is required"),
+      role: z.nativeEnum(UserType, { errorMap: () => ({ message: "Invalid user role" }) }),
+      doctorId: z.string().min(1, "Doctor ID is required")
+    });
+
+    const result = validationSchema.safeParse(ctx);
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: `Invalid request data: ${result.error.message}` 
+      };
+    }
     
     logInfo('getDoctorAvailability called', { uid, role, doctorId });
     
@@ -1291,33 +1491,40 @@ export async function getDoctorAvailability(
       return { success: false, error: 'Doctor not found' };
     }
     
-    // Check if doctor is verified
+    // Check if doctor is verified - FIXED: Now using enum instead of string
     if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
       return { success: false, error: 'Doctor is not verified' };
     }
     
-    // Get appointments to filter out booked slots
-    const appointments = await getAppointments();
-    const doctorAppointments = appointments.filter(a => 
-      a.doctorId === doctorId && 
-      [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(a.status)
-    );
-    
     // Format availability for the API response
-    const availability = {
-      weeklySchedule: doctor.weeklySchedule && typeof doctor.weeklySchedule === 'object' ? doctor.weeklySchedule : {
-        monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
-      },
-      blockedDates: Array.isArray(doctor.blockedDates) ? doctor.blockedDates : [],
-      bookedSlots: doctorAppointments.map(a => ({
-        date: a.appointmentDate,
-        startTime: a.startTime,
-        endTime: a.endTime,
-        status: a.status,
-      }))
+    const weeklySchedule = doctor.weeklySchedule && typeof doctor.weeklySchedule === 'object' 
+      ? doctor.weeklySchedule 
+      : {
+          monday: [], 
+          tuesday: [], 
+          wednesday: [], 
+          thursday: [], 
+          friday: [], 
+          saturday: [], 
+          sunday: []
+        };
+    
+    const blockedDates = Array.isArray(doctor.blockedDates) ? doctor.blockedDates : [];
+    
+    // Create a doctor profile with ID
+    const doctorWithId = {
+      ...doctor,
+      id: doctorId
     };
     
-    return { success: true, availability };
+    return { 
+      success: true, 
+      availability: {
+        weeklySchedule,
+        blockedDates
+      },
+      doctorProfile: doctorWithId
+    };
   } catch (e) {
     logError('getDoctorAvailability failed', e);
     return { success: false, error: 'Error fetching doctor availability' };
@@ -1755,13 +1962,15 @@ export async function sendDirectMessage(
  */
 export async function getMyDashboardStats(
   ctx: { uid: string; role: UserType }
-): Promise<ResultOk<{ 
-  upcomingCount: number; 
+): Promise<ResultOk<{
+  upcomingCount: number;
   pastCount: number;
   notifUnread: number;
-  totalPatients?: number; 
-  totalDoctors?: number;
-  pendingVerifications?: number;
+  adminStats?: { 
+    totalPatients: number;
+    totalDoctors: number;
+    pendingVerifications: number;
+  };
 }> | ResultErr> {
   const perf = trackPerformance('getMyDashboardStats');
   
@@ -1805,7 +2014,12 @@ export async function getMyDashboardStats(
     }).length;
     
     // For admin users, get additional stats
-    let adminStats = {};
+    let adminStats = role === UserType.ADMIN ? {
+      totalPatients: 0,
+      totalDoctors: 0,
+      pendingVerifications: 0
+    } : undefined;
+    
     if (role === UserType.ADMIN) {
       const users = await getUsers();
       const doctors = await getDoctors();
@@ -1828,7 +2042,7 @@ export async function getMyDashboardStats(
       upcomingCount, 
       pastCount, 
       notifUnread: unreadCount,
-      ...adminStats
+      adminStats
     };
   } catch (e) {
     logError('getMyDashboardStats failed', e);
@@ -1838,15 +2052,107 @@ export async function getMyDashboardStats(
   }
 }
 
+/**
+ * Get available appointment slots for a doctor on a specific date
+ */
+export async function getAvailableSlots(
+  ctx: { uid: string; role: UserType },
+  payload: { doctorId: string; date: string }
+): Promise<ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }> | ResultErr> {
+  const perf = trackPerformance('getAvailableSlots');
+  
+  try {
+    const { uid, role } = ctx;
+    
+    // Early validation with Zod schema - this is key to prevent destructuring undefined
+    const GetSlotsSchema = z.object({
+      doctorId: z.string().min(1, "Doctor ID is required"),
+      date: isoDateTimeStringSchema
+    });
+
+    const validationResult = GetSlotsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid slot query: ${validationResult.error.message}` 
+      };
+    }
+
+    // Extract validated data
+    const { doctorId, date } = validationResult.data;
+    
+    logInfo('getAvailableSlots called', { uid, role, doctorId, date });
+    
+    // Get doctor profile
+    const doctors = await getDoctors();
+    
+    // Try to find doctor by userId first
+    let doctor = doctors.find(d => d.userId === doctorId);
+    
+    // If not found by userId, try by id (document id)
+    if (!doctor) {
+      doctor = doctors.find(d => d.id === doctorId);
+    }
+    
+    if (!doctor) {
+      return { success: false, error: 'Doctor not found' };
+    }
+    
+    // Check if doctor is verified
+    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
+      return { success: false, error: 'Doctor is not verified' };
+    }
+    
+    // Get existing appointments
+    const appointments = await getAppointments();
+    
+    // Find appointments for this doctor
+    const doctorAppointments = appointments.filter(a => 
+      (a.doctorId === doctorId || a.doctorId === doctor?.userId) && 
+      a.status !== AppointmentStatus.CANCELED
+    );
+    
+    // Safely calculate available slots
+    try {
+      // Make sure doctor has the required properties to generate slots
+      if (!doctor.weeklySchedule) {
+        // Initialize with empty default schedule if needed
+        doctor.weeklySchedule = {
+          monday: [], tuesday: [], wednesday: [], 
+          thursday: [], friday: [], saturday: [], sunday: []
+        };
+      }
+      
+      if (!doctor.blockedDates) {
+        doctor.blockedDates = [];
+      }
+      
+      // Generate available slots
+      const availableSlots = getAvailableSlotsForDate(doctor, date, doctorAppointments);
+      
+      return { success: true, slots: availableSlots };
+    } catch (slotError) {
+      logError('Error calculating slots', slotError);
+      return { success: false, error: 'Error calculating available slots' };
+    }
+  } catch (e) {
+    logError('getAvailableSlots failed', e);
+    return { success: false, error: 'Error fetching available slots' };
+  } finally {
+    perf.stop();
+  }
+}
+
 // Define the LocalApi type
 export type LocalApi = {
-  login: (params: { email: string; password: string }) => ReturnType<typeof signIn>;
-  registerPatient: (payload: unknown) => ReturnType<typeof registerUser>;
-  registerDoctor: (payload: unknown) => ReturnType<typeof registerUser>;
-  getMyUserProfile: (ctx: { uid: string; role: UserType }) => ReturnType<typeof getMyUserProfile>;
+  login: (params: { email: string; password: string }) => Promise<ReturnType<typeof signIn>>;
+  registerPatient: typeof registerUser;
+  registerDoctor: typeof registerUser;
+  getMyUserProfile: typeof getMyUserProfile;
   updateMyUserProfile: typeof updateMyUserProfile;
   findDoctors: typeof findDoctors;
   getMyAppointments: typeof getMyAppointments;
+  getAppointmentDetails: typeof getAppointmentDetails;
   bookAppointment: typeof bookAppointment;
   cancelAppointment: typeof cancelAppointment;
   completeAppointment: typeof completeAppointment;
@@ -1855,6 +2161,7 @@ export type LocalApi = {
   markNotificationRead: typeof markNotificationRead;
   getDoctorPublicProfile: typeof getDoctorPublicProfile;
   getDoctorAvailability: typeof getDoctorAvailability;
+  getAvailableSlots: typeof getAvailableSlots;
   adminVerifyDoctor: typeof adminVerifyDoctor;
   adminGetAllUsers: typeof adminGetAllUsers;
   adminGetAllDoctors: typeof adminGetAllDoctors;
@@ -1866,16 +2173,16 @@ export type LocalApi = {
 };
 
 // Create a flat localApi object that directly exports all functions
-const localApi: LocalApi = {
+export const localApi: LocalApi = {
   login: (params: { email: string; password: string }) => 
     signIn(params.email, params.password),
   registerPatient: (payload: unknown) => registerUser(payload),
   registerDoctor: (payload: unknown) => registerUser(payload),
-  getMyUserProfile: (ctx: { uid: string; role: UserType }) => 
-    getMyUserProfile(ctx.uid),
+  getMyUserProfile,
   updateMyUserProfile,
   findDoctors,
   getMyAppointments,
+  getAppointmentDetails,
   bookAppointment,
   cancelAppointment,
   completeAppointment,
@@ -1884,6 +2191,7 @@ const localApi: LocalApi = {
   markNotificationRead,
   getDoctorPublicProfile,
   getDoctorAvailability,
+  getAvailableSlots,
   adminVerifyDoctor,
   adminGetAllUsers,
   adminGetAllDoctors,
@@ -1899,5 +2207,46 @@ setTimeout(() => {
   logValidation('4.9', 'success', 'All local backend functions implemented & manually verified');
 }, 1000);
 
-/* Default export makes star-import easy */
-export default localApi; 
+// Export default as the localApi object with all functions
+export default {
+  ...localApi,
+  // Ensure these functions are explicitly exported 
+  setDoctorAvailability,
+  getDoctorAvailability,
+  getAvailableSlots,
+  bookAppointment,
+  cancelAppointment,
+  completeAppointment,
+  getAppointmentDetails
+}; 
+
+/**
+ * Get mock user profile for test users
+ */
+export async function getMockUserProfile(
+  userId: string,
+  role: UserType
+): Promise<z.infer<typeof UserProfileSchema> & { id: string }> {
+  const timestamp = new Date().toISOString();
+  
+  return {
+    id: userId,
+    email: `${userId}@example.com`,
+    firstName: 'Test',
+    lastName: role === UserType.PATIENT ? 'Patient' : role === UserType.DOCTOR ? 'Doctor' : 'Admin',
+    phone: '555-123-4567',
+    userType: role,
+    accountStatus: 'ACTIVE',
+    isActive: true,
+    emailVerified: true,
+    profileCompleted: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    notificationSettings: {
+      email: true,
+      push: true,
+      sms: false
+    },
+    profilePictureUrl: null
+  };
+}

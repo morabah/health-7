@@ -4,44 +4,65 @@
  * Used by AuthContext to keep user logged in between page reloads
  */
 
-type SessionData = { uid: string; email?: string; role?: string } | null;
+import { UserType } from '@/types/enums';
+
+// Storage key for the session
+const SESSION_KEY = 'health-session';
 
 /**
  * Load session data from localStorage
+ * @returns The user session object or null if not found or parsing fails
  */
-export function loadSession(): SessionData {
-  if (typeof localStorage === 'undefined') {
-    console.warn('[localSession] localStorage is undefined');
-    return null;
+export const loadSession = (): { uid: string; email?: string; role: UserType } | null => {
+  if (typeof window === 'undefined') {
+    return null; // Return null when running on server
   }
+
   try {
-    const data = localStorage.getItem('healthAppSession');
-    console.log('[localSession] loadSession: loaded', data);
+    const data = localStorage.getItem(SESSION_KEY);
     if (!data) return null;
-    return JSON.parse(data);
-  } catch (e) {
-    console.error('[localSession] Failed to load session:', e);
+    
+    const parsed = JSON.parse(data);
+    
+    // Validate the parsed data has required fields
+    if (!parsed || typeof parsed !== 'object' || !parsed.uid || !parsed.role) {
+      return null;
+    }
+    
+    return {
+      uid: parsed.uid,
+      email: parsed.email,
+      role: parsed.role as UserType
+    };
+  } catch (error) {
+    console.error('Error loading session:', error);
     return null;
   }
-}
+};
 
 /**
  * Save session data to localStorage
+ * @param payload The session data to save, or null to clear the session
  */
-export function saveSession(data: SessionData): void {
-  if (typeof localStorage === 'undefined') {
-    console.warn('[localSession] localStorage is undefined');
-    return;
+export const saveSession = (payload: { uid: string; email?: string; role: UserType } | null): void => {
+  if (typeof window === 'undefined') {
+    return; // Do nothing when running on server
   }
+
   try {
-    if (data === null) {
-      localStorage.removeItem('healthAppSession');
-      console.log('[localSession] saveSession: removed session');
+    if (payload === null) {
+      localStorage.removeItem(SESSION_KEY);
     } else {
-      localStorage.setItem('healthAppSession', JSON.stringify(data));
-      console.log('[localSession] saveSession: saved', data);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
     }
-  } catch (e) {
-    console.error('[localSession] Failed to save session:', e);
+  } catch (error) {
+    console.error('Error saving session:', error);
   }
-}
+};
+
+/**
+ * Clear session data from localStorage
+ */
+export const clearSession = (): void => {
+  saveSession(null);
+};
