@@ -96,8 +96,8 @@ export default function ProtectedPage({
       lastRedirectTime.current = now;
       
       // Redirect to login with next parameter
-          const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
-      router.replace(`/auth/login${nextParam}`);
+      const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
+      router.replace(`/login${nextParam}`);
       return;
     }
 
@@ -132,6 +132,10 @@ export default function ProtectedPage({
 
     // Reset redirect flag when all checks pass
     redirectAttempted.current = false;
+    // Only reset the global flag if we set it in this component
+    if (isRedirecting()) {
+      setRedirecting(false);
+    }
   }, [user, profile, loading, allowedRoles, router, pathname, redirectIfAuth]);
 
   // Show loading spinner while authentication state is loading

@@ -64,6 +64,12 @@ export default function Navbar() {
     }
   }, []);
 
+  // Helper for navigation that combines router.push with menu closing
+  const navigateTo = useCallback((path: string) => {
+    close();
+    router.push(path);
+  }, [close, router]);
+
   // Compute role-aware paths using switch statement
   let dashPath = '/';
   let profPath = '/';
@@ -91,6 +97,7 @@ export default function Navbar() {
   // Handle logout with menu closing
   const handleLogout = async () => {
     await logout();
+    router.replace('/auth/login');
     // Menu will be automatically closed as the component unmounts during navigation
   };
 
@@ -123,7 +130,11 @@ export default function Navbar() {
   }) => (
     <Link
       href={href}
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault();
+        if (onClick) onClick();
+        navigateTo(href);
+      }}
       className={clsx(
         "rounded px-3 py-2 text-sm font-medium transition-colors hover:text-primary dark:hover:text-primary/80",
         isActive(href) && "text-primary font-semibold"
@@ -230,31 +241,37 @@ export default function Navbar() {
                         </div>
                         <div className="py-1">
                           <HeadlessMenu.Item>
-                            {({ active }) => (
-                              <Link
-                                href={dashPath}
+                            {({ active, close: closeMenu }) => (
+                              <button
+                                onClick={() => {
+                                  closeMenu();
+                                  navigateTo(dashPath);
+                                }}
                                 className={clsx(
                                   active ? 'bg-gray-100 dark:bg-slate-700' : '',
-                                  'flex items-center px-4 py-2 text-sm dark:text-white'
+                                  'flex w-full items-center px-4 py-2 text-sm dark:text-white'
                                 )}
                               >
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Dashboard
-                              </Link>
+                              </button>
                             )}
                           </HeadlessMenu.Item>
                           <HeadlessMenu.Item>
-                            {({ active }) => (
-                              <Link
-                                href={profPath}
+                            {({ active, close: closeMenu }) => (
+                              <button
+                                onClick={() => {
+                                  closeMenu();
+                                  navigateTo(profPath);
+                                }}
                                 className={clsx(
                                   active ? 'bg-gray-100 dark:bg-slate-700' : '',
-                                  'flex items-center px-4 py-2 text-sm dark:text-white'
+                                  'flex w-full items-center px-4 py-2 text-sm dark:text-white'
                                 )}
                               >
                                 <UserCircle className="mr-2 h-4 w-4" />
                                 Profile
-                              </Link>
+                              </button>
                             )}
                           </HeadlessMenu.Item>
                           <HeadlessMenu.Item>
@@ -282,16 +299,21 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <Link href="/auth/login">
-                    <Button variant="secondary" size="sm" disabled={loading}>
-                      Login
-                    </Button>
-                  </Link>
-                  <Link href="/auth/register">
-                    <Button size="sm" disabled={loading}>
-                      Register
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    disabled={loading}
+                    onClick={() => navigateTo('/login')}
+                  >
+                    Login
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    disabled={loading}
+                    onClick={() => navigateTo('/register')}
+                  >
+                    Register
+                  </Button>
                 </>
               )}
             </div>
@@ -356,12 +378,25 @@ export default function Navbar() {
               )}
               {!user && (
                 <div className="flex gap-2 pt-2">
-                  <Link href="/auth/login" onClick={close}>
-                    <Button variant="secondary" disabled={loading}>Login</Button>
-                    </Link>
-                  <Link href="/auth/register" onClick={close}>
-                    <Button disabled={loading}>Register</Button>
-                    </Link>
+                  <Button 
+                    variant="secondary" 
+                    disabled={loading}
+                    onClick={() => {
+                      close();
+                      navigateTo('/login');
+                    }}
+                  >
+                    Login
+                  </Button>
+                  <Button 
+                    disabled={loading}
+                    onClick={() => {
+                      close();
+                      navigateTo('/register');
+                    }}
+                  >
+                    Register
+                  </Button>
                 </div>
                 )}
             </div>

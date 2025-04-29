@@ -106,7 +106,12 @@ export default function CMSPage() {
       description: 'Review and verify doctor applications',
     },
     {
-      label: 'Data Validation',
+      label: 'API Validation',
+      href: '/cms/validation',
+      description: 'Test API functionality and endpoints',
+    },
+    {
+      label: 'Database Validation',
       href: '/cms-validation',
       description: 'Validate system data integrity',
     },
@@ -256,9 +261,9 @@ export default function CMSPage() {
             <div>
               <h2 className="text-lg font-semibold mb-1">Validation Tools</h2>
               <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Run system validation tests to ensure all API functions and core features are working correctly.
+                Run system validation tests to ensure all API functions, data integrity and core features are working correctly.
               </p>
-        </div>
+            </div>
           </Link>
         </Card>
       </div>

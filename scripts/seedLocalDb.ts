@@ -110,8 +110,8 @@ function buildSchedule(template: Record<string, string[]>): Record<string, { sta
   return schedule;
 }
 
-const doctors = doctorUsers.map((u, idx) =>
-  DoctorProfileSchema.parse({
+const doctors = doctorUsers.map((u, idx) => {
+  const doctorData = DoctorProfileSchema.parse({
     userId: u.id,
     specialty: faker.helpers.arrayElement(['Cardiology', 'Dermatology', 'Neurology']),
     licenseNumber: faker.string.alphanumeric({ length: 10 }),
@@ -138,12 +138,18 @@ const doctors = doctorUsers.map((u, idx) =>
     servicesOffered: 'General consultation',
     createdAt: iso(-30),
     updatedAt: iso(),
-  })
-);
+  });
+  
+  // Explicitly add id to ensure schema compliance
+  return {
+    ...doctorData,
+    id: u.id // Ensure id is always present and matches userId
+  };
+});
 
 // Patient profiles
-const patients = patientUsers.map((u, idx) =>
-  PatientProfileSchema.parse({
+const patients = patientUsers.map((u, idx) => {
+  const patientData = PatientProfileSchema.parse({
     userId: u.id,
     dateOfBirth: iso(-10_000 - idx * 1000),
     gender: idx === 0 ? Gender.FEMALE : Gender.MALE,
@@ -153,8 +159,14 @@ const patients = patientUsers.map((u, idx) =>
       BloodType.O_POSITIVE
     ]),
     medicalHistory: idx === 0 ? 'Allergic to penicillin' : null,
-  })
-);
+  });
+  
+  // Explicitly add id to ensure schema compliance
+  return {
+    ...patientData,
+    id: u.id // Ensure id is always present and matches userId
+  };
+});
 
 // Appointments – past & future, various statuses
 const appointments: Array<Appointment & { id: string }> = [
@@ -219,7 +231,7 @@ const appointments: Array<Appointment & { id: string }> = [
     appointmentDate: iso(-7),
     startTime: '11:30',
     endTime: '12:00',
-    status: AppointmentStatus.CANCELLED,
+    status: AppointmentStatus.CANCELED,
     appointmentType: AppointmentType.VIDEO,
     videoCallUrl: 'https://meet.demo/xyz',
     reason: 'Headache consultation',

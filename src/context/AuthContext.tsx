@@ -229,12 +229,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // Check if we need to redirect to dashboard
+        // Only redirect to dashboard if the user is on the login page or root
         if (profile && pathname) {
-          const dashPath = roleToDashboard(profile.userType);
+          const isLoginPage = pathname === '/login' || pathname === '/';
           
-          // Only redirect if not already on dashboard to avoid loops
-          if (pathname !== dashPath && !pathname.includes('/auth/')) {
+          if (isLoginPage) {
+            const dashPath = roleToDashboard(profile.userType);
             router.replace(dashPath);
           }
         }
@@ -266,12 +266,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-    loginInProgress.current = true;
+      loginInProgress.current = true;
       setLoading(true);
       clearError();
       
       // Use callApi for login
-      const res = await callApi('login', { email, password });
+      const res = await callApi('signIn', email, password);
       
       if (res.success) {
         // Create a strict User object with fields from the correct response structure
@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     } finally {
       setLoading(false);
-        loginInProgress.current = false;
+      loginInProgress.current = false;
     }
   }, [clearError, router]);
 
@@ -325,12 +325,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearCurrentAuthCtx();
     
     // Redirect to login page
-  if (isBrowser) {
+    if (isBrowser) {
       try {
-        router.replace('/auth/login');
+        router.replace('/login');
       } catch (e) {
         // Fallback to direct navigation if router fails
-        window.location.href = '/auth/login';
+        window.location.href = '/login';
       }
     }
   }, [router]);

@@ -97,7 +97,7 @@ export default function ProtectedPage({
       
       // Redirect to login
       const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
-      router.replace(`/auth/login${nextParam}`);
+      router.replace(`/login${nextParam}`);
       return;
     }
 
@@ -143,8 +143,9 @@ export default function ProtectedPage({
     );
   }
 
-  // If we need authentication but have no user, return null (redirect should happen in useEffect)
-  if (!user && !loading && !redirectIfAuth) {
+  // If we need authentication but have no user and are not on an auth page with redirectIfAuth,
+  // show nothing while we redirect
+  if (!user && !redirectIfAuth) {
     return null;
   }
 

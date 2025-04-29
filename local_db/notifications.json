@@ -1,32 +1,47 @@
 [
   {
-    "userId": "test-patient-verified-001",
-    "title": "Appointment Confirmed",
-    "message": "Your appointment with Dr. Emma Verified has been confirmed.",
+    "userId": "u-002",
+    "title": "New appointment",
+    "message": "You have a new appointment with Anita D'Amore on 5/2/2025.",
     "isRead": false,
-    "createdAt": "2025-04-28T02:47:11.568Z",
+    "createdAt": "2025-04-29T20:35:44.216Z",
     "type": "appointment_booked",
-    "relatedId": "appt-upcoming-002",
-    "id": "notif-appt-booked-001"
+    "relatedId": "a-001"
   },
   {
-    "userId": "test-patient-verified-001",
-    "title": "Welcome to Health App",
-    "message": "Thank you for registering. Complete your profile to get the most out of our services.",
-    "isRead": true,
-    "createdAt": "2025-04-21T02:47:11.570Z",
-    "type": "system",
-    "relatedId": null,
-    "id": "notif-system-003"
-  },
-  {
-    "id": "notif-m0r8kxqxpje1y5uw5kxff",
-    "userId": "test-doctor-verified-003",
-    "title": "Appointment Canceled",
-    "message": "Sarah Patient has canceled the appointment scheduled for 2025-05-05T21:00:00.000Z at 10:00 - Reason: hh.",
-    "type": "appointment_canceled",
+    "userId": "u-007",
+    "title": "Appointment confirmed",
+    "message": "Your appointment with Dr. Nelson Wisozk for 5/2/2025 is pending confirmation.",
     "isRead": false,
-    "createdAt": "2025-04-29T10:32:04.870Z",
-    "relatedId": "appt-upcoming-002"
+    "createdAt": "2025-04-29T20:35:44.216Z",
+    "type": "appointment_booked",
+    "relatedId": "a-001"
+  },
+  {
+    "userId": "u-008",
+    "title": "Welcome!",
+    "message": "Thanks for joining Health Appointment.",
+    "isRead": true,
+    "createdAt": "2025-04-28T20:35:44.216Z",
+    "type": "system_alert",
+    "relatedId": null
+  },
+  {
+    "userId": "u-000",
+    "title": "Verification pending",
+    "message": "Your doctor profile is under review. We will notify you once verified.",
+    "isRead": false,
+    "createdAt": "2025-04-24T20:35:44.216Z",
+    "type": "other",
+    "relatedId": "u-000"
+  },
+  {
+    "userId": "u-009",
+    "title": "Appointment confirmed",
+    "message": "Your appointment with Dr. Casey Hilll on 5/4/2025 is confirmed.",
+    "isRead": true,
+    "createdAt": "2025-04-28T20:35:44.216Z",
+    "type": "appointment_booked",
+    "relatedId": "a-003"
   }
 ]
