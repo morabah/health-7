@@ -6,7 +6,8 @@
     "isRead": false,
     "createdAt": "2025-04-29T20:35:44.216Z",
     "type": "appointment_booked",
-    "relatedId": "a-001"
+    "relatedId": "a-001",
+    "id": "n-000"
   },
   {
     "userId": "u-007",
@@ -15,7 +16,8 @@
     "isRead": false,
     "createdAt": "2025-04-29T20:35:44.216Z",
     "type": "appointment_booked",
-    "relatedId": "a-001"
+    "relatedId": "a-001",
+    "id": "n-001"
   },
   {
     "userId": "u-008",
@@ -24,7 +26,8 @@
     "isRead": true,
     "createdAt": "2025-04-28T20:35:44.216Z",
     "type": "system_alert",
-    "relatedId": null
+    "relatedId": null,
+    "id": "n-002"
   },
   {
     "userId": "u-000",
@@ -33,7 +36,8 @@
     "isRead": false,
     "createdAt": "2025-04-24T20:35:44.216Z",
     "type": "other",
-    "relatedId": "u-000"
+    "relatedId": "u-000",
+    "id": "n-003"
   },
   {
     "userId": "u-009",
@@ -42,6 +46,47 @@
     "isRead": true,
     "createdAt": "2025-04-28T20:35:44.216Z",
     "type": "appointment_booked",
-    "relatedId": "a-003"
+    "relatedId": "a-003",
+    "id": "n-004"
+  },
+  {
+    "id": "notif-efo79sceyhsr661oa020gm",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'Amore has booked an appointment on 2025-05-10 at 11:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T22:47:02.127Z",
+    "relatedId": "fff6rol2cxpav0ooymmbg"
+  },
+  {
+    "id": "notif-3iqelmkdfpe6h8w71m1tmd",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Casey Hilll on 2025-05-10 at 11:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T22:47:02.127Z",
+    "relatedId": "fff6rol2cxpav0ooymmbg"
+  },
+  {
+    "id": "notif-niq9xtwxm889c378dhtts",
+    "userId": "u-006",
+    "title": "New Appointment",
+    "message": "Anita D'Amore has booked an appointment on 2025-05-05 at 12:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T22:47:35.488Z",
+    "relatedId": "br0v06jdp8ukvsm36nkalk"
+  },
+  {
+    "id": "notif-bqkiu5seax5kyi2svkxj3g",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Reginald Larkin on 2025-05-05 at 12:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T22:47:35.488Z",
+    "relatedId": "br0v06jdp8ukvsm36nkalk"
   }
 ]

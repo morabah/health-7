@@ -41,6 +41,7 @@ import type {
 
 // Import z as a value, not just a type
 import { z } from 'zod';
+import { isoDateTimeStringSchema, isoDateOrDateTimeStringSchema } from '@/types/schemas';
 
 // Utility imports
 
@@ -558,7 +559,7 @@ export async function findDoctors(
           licenseDocumentUrl: typeof doc.licenseDocumentUrl === 'string' || doc.licenseDocumentUrl === null ? doc.licenseDocumentUrl : null,
           licenseDocumentPath: typeof doc.licenseDocumentPath === 'string' || doc.licenseDocumentPath === null ? doc.licenseDocumentPath : null,
           certificateUrl: typeof doc.certificateUrl === 'string' || doc.certificateUrl === null ? doc.certificateUrl : null,
-          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doc.certificatePath : null,
+          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doctor.certificatePath : null,
           educationHistory: Array.isArray(doc.educationHistory) ? doc.educationHistory : [],
           experience: Array.isArray(doc.experience) ? doc.experience : [],
           weeklySchedule: doc.weeklySchedule && typeof doc.weeklySchedule === 'object' ? doc.weeklySchedule : {
@@ -2067,7 +2068,7 @@ export async function getAvailableSlots(
     // Early validation with Zod schema - this is key to prevent destructuring undefined
     const GetSlotsSchema = z.object({
       doctorId: z.string().min(1, "Doctor ID is required"),
-      date: isoDateTimeStringSchema
+      date: isoDateOrDateTimeStringSchema
     });
 
     const validationResult = GetSlotsSchema.safeParse(payload);

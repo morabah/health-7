@@ -179,12 +179,8 @@ export const useAvailableSlots = () => {
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      
-      return callApi('getAvailableSlots', { 
-        uid: user.uid, 
-        role: getUserRole(user.role),
-        ...data
-      });
+      // Only pass doctorId and date; context is handled by apiClient
+      return callApi('getAvailableSlots', { doctorId: data.doctorId, date: data.date });
     }
   });
 };
@@ -205,11 +201,8 @@ export const useBookAppointment = () => {
       appointmentType: string;
     }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('bookAppointment', { 
-        uid: user.uid, 
-        role: UserType.PATIENT,
-        ...data
-      });
+      // Only pass booking data; context is handled by apiClient
+      return callApi('bookAppointment', { ...data });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] });

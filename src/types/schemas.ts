@@ -863,4 +863,11 @@ export const AdminCreateUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   userType: z.nativeEnum(UserType),
   // ... add any other required fields
-}); 
+});
+
+export const isoDateOrDateTimeStringSchema = z.string().refine(
+  (val) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(val) || // date only
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(val), // date-time
+  { message: 'Invalid ISO date or date-time string (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)' }
+); 
