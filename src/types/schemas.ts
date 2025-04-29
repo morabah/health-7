@@ -130,6 +130,9 @@ export const PatientProfileSchema = z.object({
                   .max(4000, "Medical history is too long (max 4000 characters)")
                   .nullable()
                   .describe("@PHI – Optional free-text medical history"),
+
+  /** @PHI Patient's address. Max 500 chars. */
+  address: z.string().max(500, "Address is too long").nullable().optional().describe("Patient's address"),
 });
 
 /** TypeScript type inferred from PatientProfileSchema. Represents patient-specific data. */

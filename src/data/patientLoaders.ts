@@ -34,11 +34,7 @@ export const useUpdatePatientProfile = () => {
   return useMutation({
     mutationFn: async (data: any) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('updateMyUserProfile', { 
-        uid: user.uid, 
-        role: UserType.PATIENT,
-        ...data
-      });
+      return callApi('updateMyUserProfile', { ...data });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientProfile'] });

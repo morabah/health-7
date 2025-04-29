@@ -33,11 +33,7 @@ export const useUpdateDoctorProfile = () => {
   return useMutation({
     mutationFn: async (data: z.infer<typeof UpdateProfileSchema>) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('updateMyUserProfile', { 
-        uid: user.uid, 
-        role: UserType.DOCTOR,
-        ...data
-      });
+      return callApi('updateMyUserProfile', { ...data });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctorProfile'] });

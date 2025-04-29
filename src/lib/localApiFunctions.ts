@@ -451,7 +451,7 @@ export async function updateMyUserProfile(
       }
       
       // Updates allowed on patient profile
-      const allowedPatientUpdates: (keyof z.infer<typeof PatientProfileSchema>)[] = ['dateOfBirth', 'gender', 'bloodType', 'medicalHistory'];
+      const allowedPatientUpdates: (keyof z.infer<typeof PatientProfileSchema>)[] = ['dateOfBirth', 'gender', 'bloodType', 'medicalHistory', 'address'];
       
       // Create updated patient object
       const patient = patients[patientIndex] as z.infer<typeof PatientProfileSchema>;
@@ -559,7 +559,7 @@ export async function findDoctors(
           licenseDocumentUrl: typeof doc.licenseDocumentUrl === 'string' || doc.licenseDocumentUrl === null ? doc.licenseDocumentUrl : null,
           licenseDocumentPath: typeof doc.licenseDocumentPath === 'string' || doc.licenseDocumentPath === null ? doc.licenseDocumentPath : null,
           certificateUrl: typeof doc.certificateUrl === 'string' || doc.certificateUrl === null ? doc.certificateUrl : null,
-          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doctor.certificatePath : null,
+          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doc.certificatePath : null,
           educationHistory: Array.isArray(doc.educationHistory) ? doc.educationHistory : [],
           experience: Array.isArray(doc.experience) ? doc.experience : [],
           weeklySchedule: doc.weeklySchedule && typeof doc.weeklySchedule === 'object' ? doc.weeklySchedule : {
