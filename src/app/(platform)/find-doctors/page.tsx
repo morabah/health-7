@@ -20,6 +20,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useFindDoctors } from '@/data/sharedLoaders';
+import { useDebounce } from '@/lib/useDebounce';
 import { logInfo, logError } from '@/lib/logger';
 
 // Define interface for doctor data
@@ -143,61 +144,39 @@ export default function FindDoctorsPage() {
     name: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { mutateAsync, data, error } = useFindDoctors();
-  
-  // Handle search form input changes
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const { mutateAsync, error } = useFindDoctors();
+
+  // Debounced search params
+  const debouncedSearchParams = useDebounce(searchParams, 300);
+
+  // Trigger search on initial load and whenever debounced search params change
+  useEffect(() => {
+    console.log('Dynamic search effect fired', debouncedSearchParams);
+    setIsLoading(true);
+    mutateAsync({
+      specialty: debouncedSearchParams.specialty || undefined,
+      location: debouncedSearchParams.location || undefined,
+      name: debouncedSearchParams.name || undefined
+    }).then(result => {
+      setDoctors(result.doctors || []);
+    }).finally(() => setIsLoading(false));
+  }, [debouncedSearchParams, mutateAsync]);
+
+  // Handle search form input changes (no direct search call)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setSearchParams((prev: SearchParams) => ({
-      ...prev,
-      [id]: value
-    }));
+    setSearchParams(prev => {
+      const updated = { ...prev, [id]: value };
+      console.log('Input changed:', updated);
+      return updated;
+    });
   };
-  
-  // Handle search submission
-  const handleSearch = async () => {
-    setIsLoading(true);
-    try {
-      await mutateAsync({
-        specialty: searchParams.specialty || undefined,
-        location: searchParams.location || undefined,
-        name: searchParams.name || undefined
-      });
-      
-      if (data?.success) {
-        logInfo('Doctors found', { count: data.doctors.length });
-      }
-    } catch (error) {
-      logError('Error searching for doctors', error);
-    } finally {
-      setIsLoading(false);
-    }
+
+  const handleClear = () => {
+    setSearchParams({ specialty: '', location: '', name: '' });
   };
-  
-  // Load all doctors once on initial mount
-  const initialized = useRef(false);
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    
-    // Initial search without filters
-    (async () => {
-      setIsLoading(true);
-      try {
-        await mutateAsync({});
-        logInfo('Initial doctors loaded', { count: data?.doctors?.length || 0 });
-      } catch (error) {
-        logError('Error loading initial doctors', error);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [mutateAsync]);
-  
-  // Get doctors from data
-  const doctors = data?.success ? data.doctors : [];
-  
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold dark:text-white">Find Doctors</h1>
@@ -239,10 +218,10 @@ export default function FindDoctorsPage() {
               />
             </div>
             
-            <Button 
-              variant="primary" 
-              className="w-full flex items-center justify-center" 
-              onClick={handleSearch}
+            <Button
+              variant="primary"
+              className="w-full flex items-center justify-center"
+              onClick={() => {}}
               disabled={isLoading}
             >
               {isLoading ? (
@@ -256,6 +235,14 @@ export default function FindDoctorsPage() {
                   Search Doctors
                 </>
               )}
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full mt-2"
+              onClick={handleClear}
+              disabled={isLoading}
+            >
+              Clear Filters
             </Button>
           </Card>
         </div>

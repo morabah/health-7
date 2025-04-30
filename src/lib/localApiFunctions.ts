@@ -559,7 +559,7 @@ export async function findDoctors(
           licenseDocumentUrl: typeof doc.licenseDocumentUrl === 'string' || doc.licenseDocumentUrl === null ? doc.licenseDocumentUrl : null,
           licenseDocumentPath: typeof doc.licenseDocumentPath === 'string' || doc.licenseDocumentPath === null ? doc.licenseDocumentPath : null,
           certificateUrl: typeof doc.certificateUrl === 'string' || doc.certificateUrl === null ? doc.certificateUrl : null,
-          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doc.certificatePath : null,
+          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doctor.certificatePath : null,
           educationHistory: Array.isArray(doc.educationHistory) ? doc.educationHistory : [],
           experience: Array.isArray(doc.experience) ? doc.experience : [],
           weeklySchedule: doc.weeklySchedule && typeof doc.weeklySchedule === 'object' ? doc.weeklySchedule : {
@@ -608,9 +608,15 @@ export async function findDoctors(
       }
     }
     
-    // Only return verified doctors for non-admin users
-    if (role !== UserType.ADMIN) {
-      filteredDocs = filteredDocs.filter(d => d.verificationStatus === VerificationStatus.VERIFIED && d.isActive);
+    // Only restrict for doctors; patients and admins see all active doctors
+    if (role === UserType.DOCTOR) {
+      filteredDocs = filteredDocs.filter(
+        d => d.verificationStatus === VerificationStatus.VERIFIED && d.isActive
+      );
+    } else if (role === UserType.PATIENT) {
+      filteredDocs = filteredDocs.filter(
+        d => d.isActive
+      );
     }
     
     // Sort by some criteria (can be expanded for more options)
@@ -656,6 +662,7 @@ export async function setDoctorAvailability(
   
   try {
     const { uid, role } = ctx;
+    console.log("setDoctorAvailability called with data:", data);
     
     // Validate with Zod schema
     const timeSlotSchema = z.object({
@@ -671,6 +678,7 @@ export async function setDoctorAvailability(
 
     const result = validationSchema.safeParse(data);
     if (!result.success) {
+      console.log("Validation failed:", result.error.message);
       return { 
         success: false, 
         error: `Invalid availability data: ${result.error.message}` 
@@ -695,6 +703,7 @@ export async function setDoctorAvailability(
     }
     
     const doctor = doctors[doctorIndex];
+    console.log("Found doctor profile:", doctor);
     
     // Track if any changes were made
     let hasChanges = false;
@@ -722,35 +731,65 @@ export async function setDoctorAvailability(
     };
     
     if (weeklySchedule) {
-      // Check if schedule is different
-      const currentScheduleJSON = JSON.stringify(updatedSchedule);
-      const newScheduleJSON = JSON.stringify(weeklySchedule);
-          
-      if (currentScheduleJSON !== newScheduleJSON) {
-        updatedSchedule = weeklySchedule as WeeklySchedule;
-            hasChanges = true;
-          }
-        }
+      // Filter the schedule to only include available slots
+      const typedSchedule: WeeklySchedule = {
+        monday: Array.isArray(weeklySchedule.monday) 
+          ? weeklySchedule.monday.filter(slot => slot.isAvailable === true) 
+          : [],
+        tuesday: Array.isArray(weeklySchedule.tuesday) 
+          ? weeklySchedule.tuesday.filter(slot => slot.isAvailable === true) 
+          : [],
+        wednesday: Array.isArray(weeklySchedule.wednesday) 
+          ? weeklySchedule.wednesday.filter(slot => slot.isAvailable === true) 
+          : [],
+        thursday: Array.isArray(weeklySchedule.thursday) 
+          ? weeklySchedule.thursday.filter(slot => slot.isAvailable === true) 
+          : [],
+        friday: Array.isArray(weeklySchedule.friday) 
+          ? weeklySchedule.friday.filter(slot => slot.isAvailable === true) 
+          : [],
+        saturday: Array.isArray(weeklySchedule.saturday) 
+          ? weeklySchedule.saturday.filter(slot => slot.isAvailable === true) 
+          : [],
+        sunday: Array.isArray(weeklySchedule.sunday) 
+          ? weeklySchedule.sunday.filter(slot => slot.isAvailable === true) 
+          : []
+      };
+      
+      updatedSchedule = typedSchedule;
+      hasChanges = true;
+      console.log("Updated schedule to:", updatedSchedule);
+    }
     
     // Handle blocked dates update
-    const currentBlockedDates = doctor.blockedDates || [];
+    const currentBlockedDates = Array.isArray(doctor.blockedDates) ? doctor.blockedDates : [];
     let blockedDatesChanged = false;
     
-    if (blockedDates && JSON.stringify(currentBlockedDates) !== JSON.stringify(blockedDates)) {
+    if (blockedDates) {
       blockedDatesChanged = true;
       hasChanges = true;
+      console.log("Updated blocked dates to:", blockedDates);
     }
     
     // Only update if changes were made
     if (hasChanges) {
-      doctors[doctorIndex] = {
+      const updatedDoctor = {
         ...doctor,
         weeklySchedule: updatedSchedule,
-        blockedDates: blockedDatesChanged ? blockedDates : currentBlockedDates,
+        blockedDates: blockedDatesChanged ? (blockedDates || []) : currentBlockedDates,
         updatedAt: nowIso()
       };
       
-      await saveDoctors(doctors);
+      doctors[doctorIndex] = updatedDoctor;
+      console.log("Saving updated doctor:", updatedDoctor);
+      
+      try {
+        await saveDoctors(doctors);
+        console.log("Doctors saved successfully");
+      } catch (saveError) {
+        console.error("Error saving doctors:", saveError);
+        return { success: false, error: 'Error saving doctor availability' };
+      }
       
       // Create a notification for the doctor
       const notifications = await getNotifications();
@@ -766,6 +805,8 @@ export async function setDoctorAvailability(
       };
       notifications.push(notification as Notification);
       await saveNotifications(notifications);
+    } else {
+      console.log("No changes detected, not updating");
     }
     
     // Return updated doctor profile with ID
@@ -1466,6 +1507,7 @@ export async function getDoctorAvailability(
   
   try {
     const { uid, role, doctorId } = ctx;
+    console.log("getDoctorAvailability called with:", { uid, role, doctorId });
     
     // Validate with Zod schema
     const validationSchema = z.object({
@@ -1478,13 +1520,11 @@ export async function getDoctorAvailability(
     if (!result.success) {
       return { 
         success: false, 
-        error: `Invalid request data: ${result.error.message}` 
+        error: `Invalid request: ${result.error.message}` 
       };
     }
     
-    logInfo('getDoctorAvailability called', { uid, role, doctorId });
-    
-    // Get doctor profile
+    // Get doctor data
     const doctors = await getDoctors();
     const doctor = doctors.find(d => d.userId === doctorId);
     
@@ -1492,34 +1532,45 @@ export async function getDoctorAvailability(
       return { success: false, error: 'Doctor not found' };
     }
     
-    // Check if doctor is verified - FIXED: Now using enum instead of string
-    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
-      return { success: false, error: 'Doctor is not verified' };
-    }
+    // Create a safe weeklySchedule object with default values if needed
+    const weeklySchedule = doctor.weeklySchedule || {
+      monday: [],
+      tuesday: [],
+      wednesday: [],
+      thursday: [],
+      friday: [],
+      saturday: [],
+      sunday: []
+    };
     
-    // Format availability for the API response
-    const weeklySchedule = doctor.weeklySchedule && typeof doctor.weeklySchedule === 'object' 
-      ? doctor.weeklySchedule 
-      : {
-          monday: [], 
-          tuesday: [], 
-          wednesday: [], 
-          thursday: [], 
-          friday: [], 
-          saturday: [], 
-          sunday: []
-        };
+    // Ensure each day has proper data
+    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+      if (!Array.isArray(weeklySchedule[day])) {
+        weeklySchedule[day] = [];
+      }
+    });
     
+    // Make sure all slots have isAvailable set to true (since we only save available slots)
+    Object.keys(weeklySchedule).forEach(day => {
+      weeklySchedule[day] = weeklySchedule[day].map(slot => ({
+        ...slot,
+        isAvailable: true
+      }));
+    });
+    
+    // Create a safe blockedDates array
     const blockedDates = Array.isArray(doctor.blockedDates) ? doctor.blockedDates : [];
     
-    // Create a doctor profile with ID
+    console.log("Returning doctor availability:", { weeklySchedule, blockedDates });
+    
+    // Return availability data
     const doctorWithId = {
       ...doctor,
       id: doctorId
     };
     
     return { 
-      success: true, 
+      success: true,
       availability: {
         weeklySchedule,
         blockedDates
@@ -1528,7 +1579,7 @@ export async function getDoctorAvailability(
     };
   } catch (e) {
     logError('getDoctorAvailability failed', e);
-    return { success: false, error: 'Error fetching doctor availability' };
+    return { success: false, error: 'Error retrieving doctor availability' };
   } finally {
     perf.stop();
   }

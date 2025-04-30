@@ -123,9 +123,8 @@ export const useFindDoctors = () => {
       if (!user?.uid) throw new Error('User not authenticated');
       return callApi('findDoctors', { 
         uid: user.uid, 
-        role: getUserRole(user.role),
-        ...searchParams
-      });
+        role: getUserRole(user.role)
+      }, searchParams);
     }
   });
 };

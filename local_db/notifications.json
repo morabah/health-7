@@ -88,5 +88,45 @@
     "isRead": false,
     "createdAt": "2025-04-29T22:47:35.488Z",
     "relatedId": "br0v06jdp8ukvsm36nkalk"
+  },
+  {
+    "id": "notif-ecdk2qh9e7pbtkdzc703p",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-07 at 14:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T23:27:08.282Z",
+    "relatedId": "svhpygckh1cowdowd8sw0m"
+  },
+  {
+    "id": "notif-f3qnky5n3cnqmxkk26wlr",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Casey Hilll on 2025-05-07 at 14:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-29T23:27:08.282Z",
+    "relatedId": "svhpygckh1cowdowd8sw0m"
+  },
+  {
+    "id": "notif-na7jb0lw74nt4s9r46glna",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-12 at 14:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T00:04:59.567Z",
+    "relatedId": "0h49danlcxk64dl2z9vi4u4"
+  },
+  {
+    "id": "notif-rkvfyphy11ipwn34c0x3",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Casey Hilll on 2025-05-12 at 14:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T00:04:59.567Z",
+    "relatedId": "0h49danlcxk64dl2z9vi4u4"
   }
 ]

@@ -5,7 +5,8 @@
     "gender": "FEMALE",
     "bloodType": "O+",
     "medicalHistory": "Allergic to penicillin\nefkfk",
-    "id": "u-007"
+    "id": "u-007",
+    "address": "rrre"
   },
   {
     "userId": "u-008",
@@ -13,7 +14,8 @@
     "gender": "MALE",
     "bloodType": "O+",
     "medicalHistory": null,
-    "id": "u-008"
+    "id": "u-008",
+    "address": null
   },
   {
     "userId": "u-009",
@@ -21,6 +23,7 @@
     "gender": "MALE",
     "bloodType": "B+",
     "medicalHistory": null,
-    "id": "u-009"
+    "id": "u-009",
+    "address": null
   }
 ]

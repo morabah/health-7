@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -11,11 +11,15 @@ import {
   Pill,
   Bell,
   Pencil,
+  UserCircle,
+  RefreshCw,
+  Edit2,
+  ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { logValidation, logError } from '@/lib/logger';
-import { useMyDashboard } from '@/data/sharedLoaders';
-import { usePatientProfile } from '@/data/patientLoaders';
+import { useMyDashboard, useNotifications } from '@/data/sharedLoaders';
+import { usePatientProfile, usePatientAppointments } from '@/data/patientLoaders';
 import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
 
@@ -27,13 +31,15 @@ const StatCard = ({
   value,
   Icon,
   isLoading = false,
+  className,
 }: {
   title: string;
   value: string | number;
   Icon: LucideIcon;
   isLoading?: boolean;
+  className?: string;
 }) => (
-  <Card className="flex items-center gap-4 p-4">
+  <Card className={`flex items-center gap-4 p-4 ${className || ''}`}>
     <Icon size={28} className="text-primary shrink-0" />
     <div>
       <p className="text-xs text-slate-500 dark:text-slate-400">{title}</p>
@@ -56,18 +62,39 @@ const StatCard = ({
  */
 export default function PatientDashboard() {
   // Use combined dashboard hook for stats
-  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useMyDashboard();
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError, refetch: refetchDashboard } = useMyDashboard();
   // Still need profile data for user info
-  const { data: profileData, isLoading: profileLoading, error: profileError } = usePatientProfile();
-  
+  const { data: profileData, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = usePatientProfile();
+  // Fetch real appointments
+  const { data: appointmentsData, isLoading: appointmentsLoading, error: appointmentsError, refetch: refetchAppointments } = usePatientAppointments();
+  // Real-time notifications
+  const { data: notificationsData, isLoading: notificationsLoading, refetch: refetchNotifications } = useNotifications();
+
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
   // Extract data from dashboard response
   const upcomingCount = dashboardData?.success ? dashboardData.upcomingCount : 0;
   const pastCount = dashboardData?.success ? dashboardData.pastCount : 0;
-  const notifUnread = dashboardData?.success ? dashboardData.notifUnread : 0;
-  const appointments = dashboardData?.success && dashboardData.appointments ? dashboardData.appointments : [];
-  
-  // Get upcoming appointments for the quick view
-  const upcomingAppointments = appointments.slice(0, 3); // Show maximum 3 appointments in the preview
+  const notifUnread = notificationsData?.success ? notificationsData.notifications.filter((n: any) => !n.isRead).length : 0;
+
+  // Get upcoming appointments for the quick view (from real data)
+  const allAppointments = appointmentsData?.success ? appointmentsData.appointments : [];
+  const now = new Date();
+  const upcomingAppointments = allAppointments
+    .filter((a: any) => new Date(`${a.appointmentDate}T${a.startTime}`) > now && a.status !== 'CANCELED')
+    .sort((a: any, b: any) => new Date(`${a.appointmentDate}T${a.startTime}`).getTime() - new Date(`${b.appointmentDate}T${b.startTime}`).getTime())
+    .slice(0, 3);
+
+  // Manual refresh handler
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchDashboard(),
+      refetchProfile(),
+      refetchAppointments(),
+      refetchNotifications(),
+    ]);
+    setLastUpdated(new Date());
+  };
 
   useEffect(() => {
     // Add validation that the dashboard is working correctly
@@ -79,133 +106,187 @@ export default function PatientDashboard() {
   }, []);
 
   // Show error if any API calls fail
-  if (dashboardError || profileError) {
+  if (dashboardError || profileError || appointmentsError) {
     return (
       <Alert variant="error">
-        Error loading dashboard data: {(dashboardError || profileError)?.toString()}
+        Error loading dashboard data: {(dashboardError || profileError || appointmentsError)?.toString()}
       </Alert>
     );
   }
 
-  return (
-    <div className="space-y-10">
-      {/* Welcome */}
-      <h1 className="text-2xl font-semibold dark:text-white">
-        Welcome,&nbsp;
-        {profileLoading ? (
-          <Spinner />
-        ) : profileData?.success ? (
-          `${profileData.firstName} ${profileData.lastName}`
-        ) : (
-          'Patient'
-        )}
-      </h1>
+  const userProfile = profileData?.userProfile || {};
+  const displayName = userProfile.firstName && userProfile.lastName
+    ? `${userProfile.firstName} ${userProfile.lastName}`
+    : 'Patient';
 
-      {/* Stats */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  return (
+    <div className="space-y-12">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-3xl shadow-lg bg-gradient-to-br from-blue-200/70 via-white/80 to-cyan-100/60 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-0">
+        <div className="flex flex-col md:flex-row items-center justify-between px-8 py-8 md:py-12">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-white/70 dark:bg-slate-800/80 backdrop-blur-md flex items-center justify-center shadow-md">
+              <UserCircle className="w-16 h-16 text-indigo-500 dark:text-indigo-300" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-1 tracking-tight">
+                Welcome, {profileLoading ? <Spinner className="inline-block ml-2" /> : displayName}
+              </h1>
+              <p className="text-base text-slate-500 dark:text-slate-400">Your health at a glance</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2 mt-6 md:mt-0">
+            <button onClick={handleRefresh} disabled={dashboardLoading || profileLoading || appointmentsLoading || notificationsLoading} className="rounded-full p-2 bg-white/70 dark:bg-slate-800/80 shadow hover:scale-110 transition-transform disabled:opacity-50">
+              <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
+            </button>
+            <span className="inline-block px-3 py-1 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 mt-1">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid - Glassmorphism */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         <StatCard 
-          title="Upcoming Appointments" 
+          title="Upcoming" 
           value={upcomingCount} 
           Icon={CalendarCheck} 
           isLoading={dashboardLoading} 
+          className="glass-card border-l-4 border-blue-400 hover:scale-105 transition-transform"
         />
         <StatCard 
-          title="Past Appointments" 
+          title="Past" 
           value={pastCount} 
           Icon={FileText} 
           isLoading={dashboardLoading} 
+          className="glass-card border-l-4 border-cyan-400 hover:scale-105 transition-transform"
         />
         <StatCard 
           title="Prescriptions" 
           value="0" 
           Icon={Pill} 
+          className="glass-card border-l-4 border-blue-200 hover:scale-105 transition-transform"
         />
         <StatCard 
           title="Notifications" 
           value={notifUnread} 
           Icon={Bell} 
-          isLoading={dashboardLoading} 
+          isLoading={notificationsLoading} 
+          className="glass-card border-l-4 border-cyan-200 hover:scale-105 transition-transform"
         />
       </section>
 
-      {/* Upcoming appointments */}
-      <Card>
-        <h2 className="text-xl font-semibold mb-4 dark:text-white">
-          Upcoming Appointments
-        </h2>
-        
-        {dashboardLoading ? (
-          <div className="py-6 text-center">
-            <Spinner />
-          </div>
-        ) : upcomingAppointments.length > 0 ? (
-          <div className="space-y-4">
-            {upcomingAppointments.map((appointment: Appointment) => (
-              <div key={appointment.id} className="p-3 border-b last:border-0">
-                <div className="flex justify-between">
-                  <h3 className="font-medium">{appointment.doctorName}</h3>
-                  <span className="text-sm text-slate-500">
-                    {appointment.doctorSpecialty}
-                  </span>
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="text-sm">
-                    {format(new Date(appointment.appointmentDate), 'PPP')} at {appointment.startTime}
-                  </span>
-                  <span className="text-sm text-primary">
-                    {appointment.appointmentType}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-6 text-center text-slate-500 dark:text-slate-400">
-            No upcoming appointments
-          </div>
-        )}
-        
-        <div className="mt-4 text-right">
-          <Link href="/patient/appointments">
-            <Button variant="outline" size="sm">
-              View All Appointments
-            </Button>
-          </Link>
-        </div>
-      </Card>
+      {/* Section Divider */}
+      <div className="border-t border-slate-200 dark:border-slate-700 my-8" />
 
-      {/* Profile info */}
-      <Card>
-        <h2 className="text-xl font-semibold mb-4 dark:text-white">
-          Profile Information
-        </h2>
-        
-        {profileLoading ? (
-          <div className="py-6 text-center">
-            <Spinner />
-          </div>
-        ) : profileData?.success ? (
-          <div className="space-y-2">
-            <p><strong>Name:</strong> {profileData.firstName} {profileData.lastName}</p>
-            <p><strong>Email:</strong> {profileData.email || 'Not provided'}</p>
-            <p><strong>Phone:</strong> {profileData.phone || 'Not provided'}</p>
-            {/* For patient-specific fields we would need to join with patient profile data */}
-          </div>
-        ) : (
-          <div className="py-6 text-center text-slate-500 dark:text-slate-400">
-            Failed to load profile
-          </div>
-        )}
-        
-        <div className="mt-4 text-right">
-          <Link href="/patient/profile">
-            <Button variant="secondary" size="sm">
-              <Pencil size={14} className="mr-1" />
-              Edit Profile
+      {/* Upcoming appointments - Carousel/Timeline */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold dark:text-white tracking-tight">Upcoming Appointments</h2>
+          <Link href="/patient/appointments">
+            <Button variant="outline" size="sm" className="flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </Link>
         </div>
-      </Card>
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700 -mx-2 px-2">
+          <div className="flex gap-4 md:grid md:grid-cols-3">
+            {appointmentsLoading ? (
+              <div className="flex-1 flex items-center justify-center min-h-[120px]">
+                <Spinner />
+              </div>
+            ) : upcomingAppointments.length > 0 ? (
+              upcomingAppointments.map((appointment: any) => (
+                <div key={appointment.id} className="min-w-[320px] max-w-full md:w-auto flex-1 glass-card rounded-xl p-5 flex flex-col gap-2 shadow-md hover:shadow-xl transition-shadow border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-12 h-12 rounded-full bg-blue-200 dark:bg-slate-700 flex items-center justify-center text-xl font-bold text-blue-700 dark:text-blue-200">
+                      {appointment.doctorName ? appointment.doctorName.split(' ').map((n: string) => n[0]).join('') : <UserCircle className="w-8 h-8" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">{appointment.doctorName}</span>
+                        <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 rounded px-2 py-0.5 ml-2">
+                          {appointment.doctorSpecialty}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{format(new Date(appointment.appointmentDate), 'PPP')} at {appointment.startTime}</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-200 ml-2">
+                          {appointment.appointmentType}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <Link href={`/book-appointment/${appointment.doctorId}`}>
+                      <button className="rounded-full p-2 bg-blue-500 hover:bg-blue-600 text-white shadow transition-colors" title="Book Again">
+                        <CalendarCheck className="w-5 h-5" />
+                      </button>
+                    </Link>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
+                      Status: {appointment.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex-1 flex items-center justify-center min-h-[120px] text-slate-500 dark:text-slate-400">
+                No upcoming appointments
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section Divider */}
+      <div className="border-t border-slate-200 dark:border-slate-700 my-8" />
+
+      {/* Profile info - Glass Card with FAB */}
+      <div className="relative">
+        <Card className="flex flex-col md:flex-row items-center gap-8 p-8 glass-card rounded-2xl">
+          <div className="w-24 h-24 rounded-full bg-blue-100 dark:bg-slate-700 flex items-center justify-center mb-4 md:mb-0">
+            <UserCircle className="w-20 h-20 text-indigo-500 dark:text-indigo-300" />
+          </div>
+          <div className="flex-1 space-y-2">
+            <h2 className="text-xl font-bold dark:text-white mb-2">Profile Information</h2>
+            {profileLoading ? (
+              <div className="py-6 text-center">
+                <Spinner />
+              </div>
+            ) : profileData?.success ? (
+              (() => {
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Name:</span>
+                      <span>{userProfile.firstName} {userProfile.lastName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Email:</span>
+                      <span>{userProfile.email || 'Not provided'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Phone:</span>
+                      <span>{userProfile.phone || 'Not provided'}</span>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="py-6 text-center text-slate-500 dark:text-slate-400">
+                Failed to load profile
+              </div>
+            )}
+          </div>
+        </Card>
+        {/* Floating Action Button for Edit Profile */}
+        <Link href="/patient/profile">
+          <button className="absolute top-4 right-4 md:top-8 md:right-8 z-10 rounded-full p-3 bg-blue-500 hover:bg-cyan-500 text-white shadow-lg transition-colors" title="Edit Profile">
+            <Edit2 className="w-5 h-5" />
+          </button>
+        </Link>
+      </div>
     </div>
   );
 } 

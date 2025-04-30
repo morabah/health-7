@@ -327,10 +327,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Redirect to login page
     if (isBrowser) {
       try {
-        router.replace('/login');
+        router.replace('/auth/login');
       } catch (e) {
         // Fallback to direct navigation if router fails
-        window.location.href = '/login';
+        window.location.href = '/auth/login';
       }
     }
   }, [router]);

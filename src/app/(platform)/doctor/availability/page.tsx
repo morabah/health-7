@@ -3,14 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
-import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { Calendar, Clock, Plus, Save, Trash2, Info } from 'lucide-react';
+import { Clock, Save } from 'lucide-react';
 import { useDoctorAvailability, useSetAvailability } from '@/data/doctorLoaders';
 import { logInfo, logValidation } from '@/lib/logger';
-import { format } from 'date-fns';
 
 // Days of the week
 const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -48,9 +45,9 @@ export default function DoctorAvailabilityPage() {
   
   // State for blocked dates
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
-  const uniqueBlockedDates = Array.from(new Set(blockedDates));
-  const [newBlockDate, setNewBlockDate] = useState('');
-  const [newBlockReason, setNewBlockReason] = useState('');
+  
+  // Add success/error message state
+  const [saveMessage, setSaveMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
   
   // Load doctor availability
   const { data, isLoading, error, refetch } = useDoctorAvailability();
@@ -59,18 +56,65 @@ export default function DoctorAvailabilityPage() {
   // Prevent re-initializing on every data update
   const initialized = useRef(false);
 
+  // Force refetch data on mount to always get latest
+  useEffect(() => {
+    refetch();
+    console.log("Component mounted - forcing data refetch");
+  }, [refetch]);
+  
   // Initialize state from API data only once on first success
   useEffect(() => {
-    if (!data?.success || initialized.current) return;
+    if (!data?.success) return;
+
     const { availability } = data;
-    const newSchedule = availability.weeklySchedule
-      ? { ...createDefaultSchedule(), ...availability.weeklySchedule }
-      : createDefaultSchedule();
+    console.log("Retrieved availability data:", availability);
+    
+    // Create a fresh default schedule
+    const defaultSchedule = createDefaultSchedule();
+    
+    // Map server data properly
+    const newSchedule: WeeklySchedule = { ...defaultSchedule };
+    
+    // Make sure we're actually using the availability data from the server
+    if (availability.weeklySchedule) {
+      // Loop through all weekdays to ensure complete data structure
+      weekdays.forEach(day => {
+        const dayKey = day as Weekday;
+        // Get server data for this day if it exists
+        const dayData = availability.weeklySchedule[dayKey] || [];
+        
+        if (dayData.length > 0) {
+          console.log(`Found availability for ${day}:`, dayData);
+          
+          // Map each time slot
+          newSchedule[dayKey] = timeSlots.map((time, index) => {
+            // Look for a matching slot by startTime
+            const existingSlot = dayData.find((slot: { startTime: string; endTime: string; isAvailable: boolean }) => 
+              slot.startTime === time
+            );
+            if (existingSlot) {
+              return {
+                startTime: existingSlot.startTime,
+                endTime: existingSlot.endTime || getNextTimeSlot(existingSlot.startTime),
+                isAvailable: existingSlot.isAvailable === true
+              };
+            }
+            // Use default if no matching slot
+            return defaultSchedule[dayKey][index];
+          });
+        }
+      });
+    }
+    
+    console.log("Mapped schedule for UI:", newSchedule);
+    
     const dedupedDates = Array.isArray(availability.blockedDates)
       ? Array.from(new Set(availability.blockedDates))
       : [];
+      
     setWeeklySchedule(newSchedule);
     setBlockedDates(dedupedDates.map(date => String(date)));
+    
     initialized.current = true;
     logValidation('4.10', 'success', 'Doctor availability component successfully loads real data');
   }, [data]);
@@ -95,37 +139,65 @@ export default function DoctorAvailabilityPage() {
   // Handle saving availability
   const handleSave = async () => {
     try {
-      const result = await setAvailabilityMutation.mutateAsync({
-        weeklySchedule,
+      setSaveMessage(null); // Clear previous messages
+      
+      // Clean the weeklySchedule to remove any slots missing startTime or endTime
+      const cleanWeeklySchedule: WeeklySchedule = weekdays.reduce((acc, day) => {
+        // Make sure all weekdays have their arrays initialized, even if empty
+        acc[day as Weekday] = (weeklySchedule[day as Weekday] || [])
+          .filter(slot => typeof slot.startTime === 'string' && typeof slot.endTime === 'string')
+          // Only keep slots that are marked as available
+          .filter(slot => slot.isAvailable === true)
+          .map(slot => ({
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            isAvailable: true
+          }));
+        return acc;
+      }, {} as WeeklySchedule);
+      
+      console.log("Saving schedule data:", {
+        weeklySchedule: cleanWeeklySchedule,
         blockedDates
       });
+      
+      // Log each day's availability for debugging
+      weekdays.forEach(day => {
+        console.log(`Day ${day} has ${cleanWeeklySchedule[day as Weekday].length} available slots:`, 
+          cleanWeeklySchedule[day as Weekday]);
+      });
+      
+      const result = await setAvailabilityMutation.mutateAsync({
+        weeklySchedule: cleanWeeklySchedule,
+        blockedDates: blockedDates || []
+      });
+      
+      console.log("Save result:", result);
       
       if (result.success) {
         logInfo('Doctor availability saved successfully');
         logValidation('4.11', 'success', 'Doctor availability setting is fully functional with real data');
+        // Reset initialized ref to force refresh and immediately refetch
+        setSaveMessage({
+          text: 'Your availability has been saved successfully!',
+          type: 'success'
+        });
+        initialized.current = false;
         await refetch();
       } else {
+        setSaveMessage({
+          text: `Error saving availability: ${result.error || 'Unknown error'}`,
+          type: 'error'
+        });
         logInfo(`Error saving availability: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
+      setSaveMessage({
+        text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        type: 'error'
+      });
       logInfo(`Error in availability mutation: ${err instanceof Error ? err.message : String(err)}`);
     }
-  };
-  
-  // Handle adding a blocked date
-  const handleAddBlockedDate = () => {
-    if (!newBlockDate) return;
-    
-    if (!blockedDates.includes(newBlockDate)) {
-      setBlockedDates([...blockedDates, newBlockDate]);
-      setNewBlockDate('');
-      setNewBlockReason('');
-    }
-  };
-  
-  // Handle removing a blocked date
-  const handleRemoveBlockedDate = (dateToRemove: string) => {
-    setBlockedDates(blockedDates.filter(date => date !== dateToRemove));
   };
   
   // Format day name for display
@@ -152,6 +224,13 @@ export default function DoctorAvailabilityPage() {
           Save Settings
         </Button>
       </div>
+      
+      {/* Success/Error Messages */}
+      {saveMessage && (
+        <Alert variant={saveMessage.type === 'success' ? 'success' : 'error'}>
+          {saveMessage.text}
+        </Alert>
+      )}
       
       {error && (
         <Alert variant="error">Error loading availability: {error instanceof Error ? error.message : String(error)}</Alert>
@@ -207,15 +286,14 @@ export default function DoctorAvailabilityPage() {
                           {time}
                         </td>
                         {weekdays.map(day => (
-                          <td key={`${day}-${time}`} className="py-2 px-2 text-center">
-                            <div className="flex justify-center">
-                              <input
-                                type="checkbox"
-                                checked={isAvailable(day, timeIndex)}
-                                onChange={() => toggleAvailability(day, timeIndex)}
-                                className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-slate-300 dark:border-slate-600 rounded"
-                              />
-                            </div>
+                          <td key={`${day}-${timeIndex}`} className="py-2 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isAvailable(day, timeIndex)}
+                              onChange={() => toggleAvailability(day, timeIndex)}
+                              aria-label={`Set ${day} ${time} as available`}
+                              className="h-5 w-5 text-primary-600 focus:ring-primary-500 border-slate-300 dark:border-slate-600 rounded"
+                            />
                           </td>
                         ))}
                       </tr>
@@ -223,82 +301,6 @@ export default function DoctorAvailabilityPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300">
-                <Info className="h-4 w-4 inline mr-1 text-info" />
-                Check the boxes for times when you&apos;re regularly available. This schedule will
-                repeat every week.
-              </div>
-            </div>
-          </Card>
-
-          {/* Block Specific Dates */}
-          <Card>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-primary" />
-                <h2 className="text-lg font-medium">Block Specific Dates</h2>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex flex-col md:flex-row gap-4 mb-4">
-                <div className="flex-grow md:max-w-xs">
-                  <Input
-                    id="block-date"
-                    type="date"
-                    label="Date to Block"
-                    value={newBlockDate}
-                    onChange={e => setNewBlockDate(e.target.value)}
-                  />
-                </div>
-                <div className="flex-grow">
-                  <Input
-                    id="block-reason"
-                    label="Reason (Optional)"
-                    placeholder="Vacation, Conference, etc."
-                    value={newBlockReason}
-                    onChange={e => setNewBlockReason(e.target.value)}
-                  />
-                </div>
-                <div className="flex-shrink-0 flex items-end">
-                  <Button onClick={handleAddBlockedDate} disabled={!newBlockDate}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Date
-                  </Button>
-                </div>
-              </div>
-
-              {/* Blocked Dates List */}
-              {uniqueBlockedDates.length > 0 ? (
-                <div className="space-y-2 mt-6">
-                  <h3 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Currently Blocked Dates:
-                  </h3>
-                  {uniqueBlockedDates.map((date: string) => (
-                    <div
-                      key={date}
-                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-md"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Badge variant="warning">
-                          {format(new Date(date), 'EEE, MMMM d, yyyy')}
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveBlockedDate(date)}
-                      >
-                        <Trash2 className="h-4 w-4 text-danger" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center p-6 text-slate-400 dark:text-slate-500">
-                  <Calendar className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                  <p>No blocked dates set</p>
-                </div>
-              )}
             </div>
           </Card>
         </>
