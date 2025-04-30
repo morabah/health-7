@@ -128,5 +128,265 @@
     "isRead": false,
     "createdAt": "2025-04-30T00:04:59.567Z",
     "relatedId": "0h49danlcxk64dl2z9vi4u4"
+  },
+  {
+    "id": "notif-mxd2llr895cpg4nagisla",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:43:52.691Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-whwo6xswz8u0gxkjn9yf",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:44:10.096Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-a2sk2uf0ziz5jomuv317",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:44:22.289Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-068os3cfsfhjbcu65mftdcu",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:56:36.150Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-3buecf26nnblhl1yjapog",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:57:13.281Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-oq8ypqxe9jsi6adyycx1on",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T10:58:20.983Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-6yew45hm2acf3bja3mfzcr",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:00:46.320Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-rxp7z4k551s275g7bpuz43h",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:06:43.227Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-4ja2cilfmzd5bdhqyvaz7i",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:06:53.499Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-hfhawbrubdlclg15vo7j",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:07:18.845Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-lec34h9zn99f69jwzr4nrq",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:07:30.288Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-2z3yvwa2qdhsbkzsdhkjon",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:07:45.754Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-9cvkwgxss3b2fomum24jsr",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:20:22.818Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-7pi8rp65f7gau3mvcikqcu",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:20:52.104Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-kt42o298fkgwv8vikgg48j",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:42:13.268Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-w8mpaovjqcepkfg4e55gv",
+    "userId": "u-005",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:42:17.569Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-g5d7w85zyfv74304pcz04q",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-14T11:44:01.837Z at 15:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:44:05.755Z",
+    "relatedId": "0jq89hwgfr9c1r3gvwr2q9"
+  },
+  {
+    "id": "notif-5f5zrrle3gwx7qrpyn1kqg",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-14T11:44:01.837Z at 15:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:44:05.755Z",
+    "relatedId": "0jq89hwgfr9c1r3gvwr2q9"
+  },
+  {
+    "id": "notif-zjfv5w0u92ipa844h5gltg",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-03T11:44:36.251Z at 10:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:44:44.324Z",
+    "relatedId": "r635548vybqcnatf355xq"
+  },
+  {
+    "id": "notif-xmx4qxeg1i7upbysi4jye",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-03T11:44:36.251Z at 10:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:44:44.324Z",
+    "relatedId": "r635548vybqcnatf355xq"
+  },
+  {
+    "id": "notif-yx7q82x30ngum9tu6x1sad",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-12T00:00:00.000Z at 14:30 - Reason: d.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:44:58.660Z",
+    "relatedId": "0h49danlcxk64dl2z9vi4u4"
+  },
+  {
+    "id": "notif-1ix4s7ihq8u8refzemy34o",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-07T00:00:00.000Z at 14:00 - Reason: d.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:45:08.461Z",
+    "relatedId": "svhpygckh1cowdowd8sw0m"
+  },
+  {
+    "id": "notif-7gldxsixs0psjjtxe2dx0g",
+    "userId": "u-006",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-05T00:00:00.000Z at 12:30 - Reason: d.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:45:13.658Z",
+    "relatedId": "br0v06jdp8ukvsm36nkalk"
+  },
+  {
+    "id": "notif-p3qmuyjsqhsrs7nj71nirr",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-10T00:00:00.000Z at 11:30 - Reason: d.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-04-30T11:45:17.393Z",
+    "relatedId": "fff6rol2cxpav0ooymmbg"
+  },
+  {
+    "id": "notif-d85t8miabl9ckdfibcogtv",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-07T13:36:26.831Z at 14:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T13:36:33.421Z",
+    "relatedId": "yfbs96tfahr6z4y9vra6"
+  },
+  {
+    "id": "notif-0dhlosl83ewgj5m7htymgvr",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-07T13:36:26.831Z at 14:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-04-30T13:36:33.421Z",
+    "relatedId": "yfbs96tfahr6z4y9vra6"
   }
 ]

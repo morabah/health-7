@@ -72,14 +72,14 @@
   {
     "email": "user5@demo.health",
     "phone": "+20100000055",
-    "firstName": "Casey",
-    "lastName": "Hilll",
+    "firstName": "mohamed",
+    "lastName": "rabah",
     "userType": "doctor",
     "isActive": true,
     "emailVerified": true,
     "phoneVerified": true,
     "createdAt": "2025-03-09T20:35:44.185Z",
-    "updatedAt": "2025-04-29T20:35:44.185Z",
+    "updatedAt": "2025-04-30T11:33:12.827Z",
     "id": "u-005",
     "userId": "u-005"
   },

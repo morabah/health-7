@@ -135,11 +135,13 @@ export const useSetAvailability = () => {
   return useMutation({
     mutationFn: async (data: z.infer<typeof SetDoctorAvailabilitySchema>) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('setDoctorAvailability', {
+      // Create the context object separate from the data payload
+      const context = {
         uid: user.uid,
-        role: UserType.DOCTOR,
-        ...data
-      });
+        role: UserType.DOCTOR
+      };
+      // Pass context as first argument and data as second argument
+      return callApi('setDoctorAvailability', context, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctorAvailability', user?.uid] });

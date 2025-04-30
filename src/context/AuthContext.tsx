@@ -4,10 +4,19 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { logInfo, logError } from '@/lib/logger';
-import { loadSession, saveSession } from '@/lib/localSession';
+import { 
+  loadSession, 
+  saveSession, 
+  getActiveSessions, 
+  loadSessionById, 
+  switchSession, 
+  clearAllSessions,
+  type SessionData,
+  getDetailedActiveSessions
+} from '@/lib/localSession';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { roleToDashboard } from '@/lib/router';
+import { roleToDashboard, APP_ROUTES } from '@/lib/router';
 import type { UserProfile, PatientProfile, DoctorProfile } from '@/types/schemas';
 import { setCurrentAuthCtx, clearCurrentAuthCtx } from '@/lib/apiAuthCtx';
 
@@ -103,6 +112,17 @@ interface User {
   uid: string;
   email?: string;
   role: UserType;
+  sessionId?: string;
+}
+
+// Type for a stored session
+export interface StoredSession {
+  sessionId: string;
+  uid: string;
+  email?: string;
+  role: UserType;
+  userProfile?: UserProfile;
+  lastActive: number;
 }
 
 // Define the Auth Context type
@@ -113,12 +133,15 @@ interface AuthContextType {
   doctorProfile: (DoctorProfile & { id: string }) | null;
   loading: boolean;
   error: string | null;
+  activeSessions: StoredSession[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   clearError: () => void;
   registerPatient: (payload: PatientRegistrationPayload) => Promise<unknown>;
   registerDoctor: (payload: DoctorRegistrationPayload) => Promise<unknown>;
+  switchToSession: (sessionId: string) => Promise<boolean>;
+  logoutAllSessions: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -160,10 +183,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile & { id: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeSessions, setActiveSessions] = useState<StoredSession[]>([]);
   const loginInProgress = useRef<boolean>(false);
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  // Load active sessions
+  const loadActiveSessions = useCallback(async () => {
+    if (!isBrowser) return;
+    
+    try {
+      // Use the improved getDetailedActiveSessions function which has better error handling
+      // and cleans up orphaned session IDs
+      const sessions = getDetailedActiveSessions();
+      
+      // Update the state with the detailed sessions
+      setActiveSessions(sessions.map(session => ({
+        sessionId: session.sessionId,
+        uid: session.uid,
+        email: session.email,
+        role: session.role,
+        lastActive: session.lastActive
+      })));
+      
+      logInfo('Active sessions loaded', { count: sessions.length });
+    } catch (error) {
+      logError('Failed to load active sessions', error);
+      // Don't clear the sessions array on error to prevent UI flickering
+    }
   }, []);
 
   // Initialize auth state from localStorage - runs once on mount
@@ -173,10 +222,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (session) {
         // Set user from session
-          setUser({
-            uid: session.uid,
-            email: session.email,
-          role: session.role
+        setUser({
+          uid: session.uid,
+          email: session.email,
+          role: session.role,
+          sessionId: session.sessionId
         });
         
         // Also set the auth context for API calls
@@ -184,10 +234,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(false);
       }
+      
+      // Load all active sessions
+      await loadActiveSessions();
     };
     
     initAuth();
-  }, []);
+  }, [loadActiveSessions]);
 
   // Define refreshProfile with race condition guard
   const refreshProfile = useCallback(async () => {
@@ -231,13 +284,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Only redirect to dashboard if the user is on the login page or root
         if (profile && pathname) {
-          const isLoginPage = pathname === '/login' || pathname === '/';
+          const isLoginPage = pathname === '/login' || pathname === '/' || pathname === '/auth/login';
           
           if (isLoginPage) {
             const dashPath = roleToDashboard(profile.userType);
             router.replace(dashPath);
           }
         }
+        
+        // Update the active sessions list after successful profile refresh
+        await loadActiveSessions();
       } else {
         const errorMsg = response.error || 'Failed to load profile';
         setError(errorMsg);
@@ -248,7 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       setAuthFetchInFlight(false);
     }
-  }, [user, profile, pathname, router]);
+  }, [user, profile, pathname, router, loadActiveSessions]);
 
   // Fetch user profile when user changes
   useEffect(() => {
@@ -256,6 +312,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile();
     }
   }, [user, refreshProfile]);
+
+  // Switch to a different user session
+  const switchToSession = useCallback(async (sessionId: string): Promise<boolean> => {
+    if (!sessionId) {
+      logError('Invalid session ID provided for switching');
+      setError('Invalid session ID');
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      clearError();
+      
+      logInfo('Session switch - attempting to switch to session:', { sessionId });
+      
+      // Try to switch to the session
+      const success = switchSession(sessionId);
+      
+      if (!success) {
+        logError('Failed to switch sessions - switchSession returned false');
+        setError('Failed to switch to the selected session');
+        return false;
+      }
+      
+      // Load the session data
+      const session = loadSessionById(sessionId);
+      
+      if (!session) {
+        logError('Failed to load session data after switch');
+        setError('Failed to load the session data');
+        return false;
+      }
+      
+      logInfo('Session switch - session data loaded successfully', { 
+        uid: session.uid,
+        role: session.role,
+        sessionId: session.sessionId
+      });
+      
+      // Update the user state
+      setUser({
+        uid: session.uid,
+        email: session.email,
+        role: session.role,
+        sessionId: session.sessionId
+      });
+      
+      // Update auth context for API calls
+      setCurrentAuthCtx({ uid: session.uid, role: session.role });
+      
+      // Clear current profile data
+      setProfile(null);
+      setPatientProfile(null);
+      setDoctorProfile(null);
+      
+      // Force a profile refresh after a short delay to ensure state updates have propagated
+      setTimeout(() => {
+        refreshProfile().catch(err => {
+          logError('Error refreshing profile after session switch', err);
+        });
+      }, 100);
+      
+      // Update active sessions list
+      await loadActiveSessions();
+      
+      return true;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error switching session';
+      logError('Error in switchToSession:', errorMsg);
+      setError(errorMsg);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [clearError, refreshProfile, loadActiveSessions]);
 
   // Login function
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
@@ -274,21 +405,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await callApi('signIn', email, password);
       
       if (res.success) {
-        // Create a strict User object with fields from the correct response structure
+        // Create a User object with fields from the correct response structure
         const userData: User = {
           uid: res.user.id,
           email: res.user.email,
           role: res.userProfile.userType as UserType
         };
         
-        // Save session to localStorage
-        saveSession(userData);
+        // Save session to localStorage - this returns the new session ID
+        const sessionId = saveSession(userData);
+        
+        if (sessionId) {
+          userData.sessionId = sessionId;
+        }
         
         // Update React state
         setUser(userData);
         
         // Set auth context for API calls
         setCurrentAuthCtx({ uid: userData.uid, role: userData.role });
+        
+        // Update the active sessions list
+        await loadActiveSessions();
         
         // Redirect to dashboard page based on user role
         const dashboardPath = roleToDashboard(res.userProfile.userType);
@@ -308,7 +446,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       loginInProgress.current = false;
     }
-  }, [clearError, router]);
+  }, [clearError, router, loadActiveSessions]);
 
   // Logout function
   const logout = useCallback(() => {
@@ -324,13 +462,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear auth context for API calls
     clearCurrentAuthCtx();
     
+    // Update active sessions
+    loadActiveSessions();
+    
     // Redirect to login page
     if (isBrowser) {
       try {
-        router.replace('/auth/login');
+        router.replace(APP_ROUTES.LOGIN);
       } catch (e) {
         // Fallback to direct navigation if router fails
-        window.location.href = '/auth/login';
+        window.location.href = APP_ROUTES.LOGIN;
+      }
+    }
+  }, [router, loadActiveSessions]);
+
+  // Logout from all sessions
+  const logoutAllSessions = useCallback(() => {
+    // Clear all sessions in localStorage
+    clearAllSessions();
+    
+    // Clear React state
+    setUser(null);
+    setProfile(null);
+    setPatientProfile(null);
+    setDoctorProfile(null);
+    setActiveSessions([]);
+    
+    // Clear auth context for API calls
+    clearCurrentAuthCtx();
+    
+    // Redirect to login page
+    if (isBrowser) {
+      try {
+        router.replace(APP_ROUTES.LOGIN);
+      } catch (e) {
+        // Fallback to direct navigation if router fails
+        window.location.href = APP_ROUTES.LOGIN;
       }
     }
   }, [router]);
@@ -383,18 +550,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Create the context value object
   const contextValue: AuthContextType = {
-        user,
-        profile,
-        patientProfile,
-        doctorProfile,
+    user,
+    profile,
+    patientProfile,
+    doctorProfile,
     loading,
-        error,
-        login,
-        logout,
+    error,
+    activeSessions,
+    login,
+    logout,
     clearError,
-        refreshProfile,
-        registerPatient,
-    registerDoctor
+    refreshProfile,
+    registerPatient,
+    registerDoctor,
+    switchToSession,
+    logoutAllSessions
   };
   
   // Update global auth store for mock login helper

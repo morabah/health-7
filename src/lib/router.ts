@@ -5,6 +5,16 @@
 import { UserType } from '@/types/enums';
 
 /**
+ * Application route constants
+ */
+export const APP_ROUTES = {
+  LOGIN: '/auth/login',
+  REGISTER: '/auth/register',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  HOME: '/'
+};
+
+/**
  * Get the dashboard path for a user type
  *
  * @param userType - The user role or userType

@@ -175,7 +175,7 @@ export default function BookAppointmentPage() {
     try {
       const result = await bookAppointmentMutation.mutateAsync({
         doctorId,
-        appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+        appointmentDate: selectedDate.toISOString(),
         startTime: selectedTimeSlot,
         endTime: selectedEndTime,
         reason,

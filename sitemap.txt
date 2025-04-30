@@ -5,6 +5,8 @@
 │   ├── contact/                    →  GET  /contact     | Contact form *
 │   └── find-doctors/               →  GET  /find-doctors| Search card grid *
 │
+├── login/                          →  GET  /login       | Redirects to /auth/login *
+│
 ├── (auth)                          # Public, but hidden when authed
 │   ├── login/                      →  /auth/login                 *
 │   ├── register/
