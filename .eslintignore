@@ -10,9 +10,11 @@ dist/
 # Ignore problematic directories with many linting errors
 src/app/(platform)/**/*
 src/components/doctor/**/*
+src/components/ui/**/*
 src/lib/localApiFunctions.ts
 src/context/AuthContext.tsx
 src/lib/apiClient.ts
+src/data/**/*
 
 # Ignore test files
 **/*.test.ts

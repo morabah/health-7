@@ -25,7 +25,7 @@ export default function CompleteAppointmentModal({
   onClose,
   appt,
   onConfirm,
-  isSubmitting = false
+  isSubmitting = false,
 }: CompleteAppointmentModalProps) {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -59,13 +59,11 @@ export default function CompleteAppointmentModal({
 
   if (!appt) return null;
 
+  // Create a no-op function for when the modal should not close
+  const handleClose = !isSubmitting ? onClose : () => {};
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={!isSubmitting ? onClose : undefined}
-      title="Complete Appointment"
-      className="max-w-lg"
-    >
+    <Modal isOpen={isOpen} onClose={handleClose} title="Complete Appointment" className="max-w-lg">
       <form onSubmit={handleSubmit}>
         <div className="space-y-4">
           {/* Appointment Summary */}
@@ -74,7 +72,7 @@ export default function CompleteAppointmentModal({
               <Calendar className="h-4 w-4 mr-2 text-primary" />
               Appointment Details
             </h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="flex items-start gap-2">
                 <User className="h-4 w-4 text-slate-500 mt-0.5" />
@@ -83,7 +81,7 @@ export default function CompleteAppointmentModal({
                   <div className="font-medium">{appt.patientName || 'Unknown Patient'}</div>
                 </div>
               </div>
-              
+
               <div className="flex items-start gap-2">
                 <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
                 <div>
@@ -93,7 +91,7 @@ export default function CompleteAppointmentModal({
                   </div>
                 </div>
               </div>
-              
+
               {appt.reason && (
                 <div className="sm:col-span-2 flex items-start gap-2">
                   <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
@@ -107,7 +105,10 @@ export default function CompleteAppointmentModal({
           </div>
 
           <div>
-            <label htmlFor="appointment-notes" className="block text-sm font-medium mb-1 flex items-center">
+            <label
+              htmlFor="appointment-notes"
+              className="block text-sm font-medium mb-1 flex items-center"
+            >
               <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
               Appointment Notes
             </label>
@@ -118,7 +119,7 @@ export default function CompleteAppointmentModal({
               onChange={handleChange}
               rows={6}
               disabled={isSubmitting}
-              error={error ? true : false}
+              error={error || ''}
               className="w-full"
             />
             {error && (
@@ -128,7 +129,7 @@ export default function CompleteAppointmentModal({
               </div>
             )}
             <p className="mt-1 text-xs text-slate-500">
-              These notes will be saved to the patient's medical record.
+              These notes will be saved to the patient&apos;s medical record.
             </p>
           </div>
 
@@ -139,7 +140,7 @@ export default function CompleteAppointmentModal({
             <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Spinner className="mr-2" size="sm" />
+                  <Spinner className="mr-2" />
                   Completing...
                 </>
               ) : (
@@ -151,4 +152,4 @@ export default function CompleteAppointmentModal({
       </form>
     </Modal>
   );
-} 
+}
