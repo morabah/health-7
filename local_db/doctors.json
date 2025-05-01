@@ -79,38 +79,67 @@
     "educationHistory": [],
     "experience": [],
     "weeklySchedule": {
-      "monday": [
+      "monday": [],
+      "tuesday": [
+        {
+          "startTime": "08:00",
+          "endTime": "09:00",
+          "isAvailable": true
+        },
         {
           "startTime": "14:00",
-          "endTime": "20:00",
+          "endTime": "15:00",
           "isAvailable": true
         }
       ],
-      "tuesday": [],
       "wednesday": [
         {
-          "startTime": "14:00",
-          "endTime": "20:00",
+          "startTime": "12:00",
+          "endTime": "13:00",
           "isAvailable": true
-        }
-      ],
-      "thursday": [],
-      "friday": [],
-      "saturday": [
+        },
         {
-          "startTime": "10:00",
-          "endTime": "14:00",
+          "startTime": "15:00",
+          "endTime": "16:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "17:00",
+          "endTime": "18:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "18:00",
+          "endTime": "19:00",
           "isAvailable": true
         }
       ],
+      "thursday": [
+        {
+          "startTime": "16:00",
+          "endTime": "17:00",
+          "isAvailable": true
+        }
+      ],
+      "friday": [
+        {
+          "startTime": "09:00",
+          "endTime": "10:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "11:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ],
+      "saturday": [],
       "sunday": []
     },
     "timezone": "Africa/Cairo",
-    "blockedDates": [
-      "2025-06-29T20:35:44.186Z"
-    ],
+    "blockedDates": [],
     "createdAt": "2025-03-30T20:35:44.186Z",
-    "updatedAt": "2025-04-29T20:35:44.186Z",
+    "updatedAt": "2025-05-01T02:06:14.457Z",
     "id": "u-001"
   },
   {

@@ -138,5 +138,19 @@
     "updatedAt": "2025-04-29T20:35:44.185Z",
     "id": "u-009",
     "userId": "u-009"
+  },
+  {
+    "id": "admin-1odsk03suhp9odjbe13fr8",
+    "userId": "admin-1odsk03suhp9odjbe13fr8",
+    "email": "admin@example.com",
+    "firstName": "System",
+    "lastName": "Admin",
+    "userType": "admin",
+    "isActive": true,
+    "emailVerified": true,
+    "phoneVerified": true,
+    "createdAt": "2025-05-01T02:33:39.293Z",
+    "updatedAt": "2025-05-01T02:33:39.293Z",
+    "phone": null
   }
 ]

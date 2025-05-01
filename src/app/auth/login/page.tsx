@@ -70,7 +70,7 @@ export default function LoginPage() {
         } else {
           setIsLoading(false);
           setError('Invalid credentials. Please try again.');
-          logError('Login failed', { email });
+          logInfo('Login attempt failed', { email });
         }
       } catch (loginErr) {
         console.error('Login error details:', loginErr);
@@ -161,13 +161,19 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="text-center mt-4 text-sm text-slate-500">
-          <p>Test Accounts (use with password &quot;password123&quot;):</p>
-          <ul className="mt-2 space-y-1">
-            <li>Patient: test-patient@example.com</li>
-            <li>Doctor: test-doctor@example.com</li>
-            <li>Admin: admin@example.com</li>
+        <div className="text-center mt-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800">
+          <h3 className="font-medium text-primary mb-2">Existing Database Accounts</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Use database accounts with password <span className="font-semibold">password123</span></p>
+          <ul className="mt-2 space-y-1 text-sm">
+            <li><span className="font-medium">Doctor:</span> user0@demo.health (Gerald Reynolds-Miller)</li>
+            <li><span className="font-medium">Doctor:</span> user5@demo.health (Mohamed Rabah)</li>
+            <li><span className="font-medium">Patient:</span> user7@demo.health (Anita D'Amoree)</li>
+            <li><span className="font-medium">Patient:</span> user8@demo.health (Traci Schowalter-Haag)</li>
           </ul>
+          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Special account:</p>
+            <p className="text-sm"><span className="font-medium">Admin:</span> admin@example.com with password <span className="font-semibold">Targo2000!</span></p>
+          </div>
         </div>
       </Card>
     </div>

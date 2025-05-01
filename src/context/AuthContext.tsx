@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { logInfo, logError } from '@/lib/logger';
+import { logInfo, logError, logWarn } from '@/lib/logger';
 import { 
   loadSession, 
   saveSession, 
@@ -19,6 +19,7 @@ import { UserType } from '@/types/enums';
 import { roleToDashboard, APP_ROUTES } from '@/lib/router';
 import type { UserProfile, PatientProfile, DoctorProfile } from '@/types/schemas';
 import { setCurrentAuthCtx, clearCurrentAuthCtx } from '@/lib/apiAuthCtx';
+import { generateId } from '@/lib/localApiCore';
 
 // Constants
 const isBrowser = typeof window !== 'undefined';
@@ -388,65 +389,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearError, refreshProfile, loadActiveSessions]);
 
-  // Login function
+  // Login handler
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    // Prevent double execution
-    if (loginInProgress.current) {
-      logInfo('Login already in progress, skipping duplicate request');
-      return false;
-    }
-    
+    setLoading(true);
+    setError('');
+
     try {
-      loginInProgress.current = true;
-      setLoading(true);
-      clearError();
+      logInfo('auth-event', { action: 'login-attempt', email, timestamp: new Date().toISOString() });
       
-      // Use callApi for login
-      const res = await callApi('signIn', email, password);
+      // We'll use the 'login' method which our apiClient will map to signIn
+      const result = await callApi('login', email, password);
       
-      if (res.success) {
-        // Create a User object with fields from the correct response structure
-        const userData: User = {
-          uid: res.user.id,
-          email: res.user.email,
-          role: res.userProfile.userType as UserType
-        };
-        
-        // Save session to localStorage - this returns the new session ID
-        const sessionId = saveSession(userData);
-        
-        if (sessionId) {
-          userData.sessionId = sessionId;
-        }
-        
-        // Update React state
-        setUser(userData);
-        
-        // Set auth context for API calls
-        setCurrentAuthCtx({ uid: userData.uid, role: userData.role });
-        
-        // Update the active sessions list
-        await loadActiveSessions();
-        
-        // Redirect to dashboard page based on user role
-        const dashboardPath = roleToDashboard(res.userProfile.userType);
-        if (dashboardPath) {
-          router.replace(dashboardPath);
-        }
-        
-        return true;
-      } else {
-        setError(res.error || 'Login failed');
+      if (!result.success) {
+        setError(result.error || 'Login failed');
+        logInfo('Login unsuccessful', { email, reason: result.error || 'Unknown reason' });
         return false;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error during login');
+
+      // Store session data in localStorage
+      const { user, userProfile, roleProfile } = result;
+      
+      // Create session to store
+      const session: StoredSession = {
+        sessionId: generateId(),
+        uid: user.id,
+        email: userProfile.email || '',
+        role: userProfile.userType,
+        lastActive: Date.now()
+      };
+
+      // Store session in localStorage
+      saveSession(session);
+      
+      // Update state
+      setUser({
+        uid: user.id,
+        email: user.email,
+        role: userProfile.userType,
+        sessionId: session.sessionId
+      });
+      
+      // Set auth context for API calls
+      setCurrentAuthCtx({ uid: user.id, role: userProfile.userType });
+      
+      // Update the profile state
+      setProfile(userProfile);
+      
+      // Update role-specific profile
+      if (userProfile.userType === UserType.PATIENT && roleProfile) {
+        setPatientProfile(roleProfile as PatientProfile & {id: string});
+      } else if (userProfile.userType === UserType.DOCTOR && roleProfile) {
+        setDoctorProfile(roleProfile as DoctorProfile & {id: string});
+      }
+      
+      // Update the active sessions
+      await loadActiveSessions();
+      
+      // Redirect to dashboard page based on user role
+      const dashboardPath = roleToDashboard(userProfile.userType);
+      if (dashboardPath) {
+        router.replace(dashboardPath);
+      }
+      
+      // Log successful login
+      logInfo('auth-event', { action: 'login-success', email });
+      
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error during login';
+      logError('Login error', message);
+      setError(message);
       return false;
     } finally {
       setLoading(false);
-      loginInProgress.current = false;
     }
-  }, [clearError, router, loadActiveSessions]);
+  }, [router, loadActiveSessions]);
 
   // Logout function
   const logout = useCallback(() => {

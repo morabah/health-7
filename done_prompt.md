@@ -401,7 +401,7 @@ Successfully implemented a comprehensive API client that properly routes API cal
 
 3. **AuthContext Integration:**
    - Connected React's AuthContext with the API auth context utilities
-   - Ensured login operation properly sets auth context for API calls
+   - Ensured login operation properly sets auth context for subsequent API calls
    - Added proper ctx clearing during logout
 
 ### Key Improvements:
@@ -1112,7 +1112,7 @@ This ensures all data in the application is properly validated according to the 
 - Remove debugging logs when no longer needed.
 - Consider paginating or lazy-loading results if doctor list grows very large.
 
-# Prompt Completed: Enhance Doctor Dashboard
+# Prompt Completed: Enhance Doctor Dashboard 
 
 ## Changes Made
 - Used a `displayName` variable for the doctor (shows 'Dr. First Last' or 'Doctor' as fallback).
@@ -1221,7 +1221,19 @@ This ensures all data in the application is properly validated according to the 
   - Fixed linter errors related to button sizes and variants
   - Made the UI fully responsive and consistent
 
-### Files Modified:
+- Enhanced the modals for appointment actions:
+  - Updated CompleteAppointmentModal with improved UI and detailed appointment info
+  - Enhanced CancelAppointmentModal with warning indicators and clearer layout
+  - Added loading states to both modals during submission
+  - Improved validation and error handling in modal forms
+
+- Added functional improvements:
+  - Integrated modal actions with the proper API mutation hooks
+  - Implemented proper disabling of UI during submissions
+  - Added improved date formatting for better readability
+  - Enhanced error handling throughout the components
+
+### Files Changed
 - `src/app/(platform)/doctor/dashboard/page.tsx`
 
 ### Reason for Change:
@@ -1294,3 +1306,99 @@ This ensures all data in the application is properly validated according to the 
 - The account switching functionality now properly handles user session changes
 
 All sign in, sign out, and account switching functionality now works correctly. Authentication routing is properly implemented and resolves to the correct paths without conflicts.
+
+## Prompt: Redesign Doctor Dashboard 
+
+### Actions Taken
+- Completely redesigned the doctor dashboard with a modern, clean UI and improved data visualization:
+  - Created a more visually appealing header section with profile information
+  - Designed modern statistics cards with intuitive icons and visual indicators
+  - Improved the appointment cards with better spacing and organization
+  - Added a dedicated "Upcoming Week" section to show next 7 days' appointments
+  - Enhanced notification displays with visual indicators for unread status
+  - Implemented responsive grid layouts that work well on all device sizes
+  - Added loading states and better empty state visualizations
+
+- Enhanced the modals for appointment actions:
+  - Updated CompleteAppointmentModal with improved UI and detailed appointment info
+  - Enhanced CancelAppointmentModal with warning indicators and clearer layout
+  - Added loading states to both modals during submission
+  - Improved validation and error handling in modal forms
+
+- Added functional improvements:
+  - Integrated modal actions with the proper API mutation hooks
+  - Implemented proper disabling of UI during submissions
+  - Added improved date formatting for better readability
+  - Enhanced error handling throughout the components
+
+### Files Changed
+- `src/app/(platform)/doctor/dashboard/page.tsx` (complete redesign)
+- `src/components/doctor/CompleteAppointmentModal.tsx` (enhanced UI and functionality)
+- `src/components/doctor/CancelAppointmentModal.tsx` (enhanced UI and functionality)
+
+### Status
+- Doctor dashboard has a completely new, modern design
+- All functionality works with real data from the API
+- UI is responsive and works well on all device sizes
+- Modals have improved UX with loading states and better validation
+
+## Prompt: Fix getAvailableSlots API Error
+
+### Actions Taken
+- Fixed the `useAvailableSlots` hook in `src/data/sharedLoaders.ts` to correctly pass the context object with user ID and role to the API
+- Modified the `getAvailableSlots` function in `src/lib/localApiFunctions.ts` to better handle and validate the input parameters
+- Updated the `apiClient.ts` file to add special handling for the `getAvailableSlots` method to ensure proper context is passed
+- Enhanced error handling in the book appointment page to provide more detailed error messages and better handle empty slot arrays
+- Added additional logging to help diagnose issues with availability slot fetching
+
+### Files Changed
+- `src/data/sharedLoaders.ts`: Fixed the useAvailableSlots hook to pass context properly
+- `src/lib/localApiFunctions.ts`: Improved validation and error handling in getAvailableSlots
+- `src/lib/apiClient.ts`: Added special case handling for getAvailableSlots
+- `src/app/(platform)/book-appointment/[doctorId]/page.tsx`: Enhanced error handling and user feedback
+
+### Status
+- The getAvailableSlots API now works correctly when fetching available appointment slots
+- Error handling is more robust with better error messages
+- The booking flow provides appropriate feedback when no slots are available
+- All changes maintain compatibility with the existing API structure
+
+## Prompt: Fix Patient Dashboard Appointments Display
+
+### Actions Taken
+- Fixed the patient dashboard to correctly display upcoming appointment numbers and upcoming appointments section
+- Resolved date parsing issues in the filter function for appointments by properly handling different date formats
+- Fixed the `getMyDashboardStats` function in `localApiFunctions.ts` to properly parse appointment dates and handle case-insensitive status checks
+- Updated the appointment filtering logic to handle both uppercase and lowercase status values ("CANCELED" vs "canceled")
+- Improved the sorting of appointments to ensure they appear in chronological order
+
+### Files Changed
+- `src/app/(platform)/patient/dashboard/page.tsx`: Updated appointment filtering and sorting logic
+- `src/lib/localApiFunctions.ts`: Improved date handling in the `getMyDashboardStats` function
+
+## Prompt: Fix Console Log Freezing Issue
+
+### Actions Taken
+- Implemented a logger throttling mechanism in `src/lib/logger.ts` to prevent excessive logging:
+  - Added a rate limiter that caps logs to 50 per second
+  - Added special handling for high-volume log sources (getAvailableSlots, getMyNotifications, etc.)
+  - Implemented a warning when logging is throttled
+
+- Reduced logging verbosity in API calls:
+  - Created a LOW_NOISE_METHODS list in `src/lib/apiClient.ts` to identify high-frequency API calls
+  - Updated the API client to skip detailed logging for these methods
+  - Reduced the artificial delay for GET methods in development mode
+
+- Updated the `getAvailableSlots` function in `src/lib/localApiFunctions.ts`:
+  - Minimized debug logging to prevent overwhelming the console
+  - Added conditional logging based on environment
+
+- Enhanced the `useAvailableSlots` hook in `src/data/sharedLoaders.ts`:
+  - Disabled retry logic to reduce redundant API calls
+  - Added caching with a 5-minute timeout to prevent repeated calls
+
+### Files Changed
+- `src/lib/logger.ts`: Added throttling mechanism
+- `src/lib/apiClient.ts`: Reduced logging for high-frequency API calls
+- `src/lib/localApiFunctions.ts`: Minimized debug logging
+- `src/data/sharedLoaders.ts`: Enhanced hook with caching

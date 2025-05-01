@@ -293,7 +293,11 @@ export default function Navbar() {
                         <div className="px-4 py-3">
                           <p className="text-sm dark:text-white">Signed in as</p>
                           <p className="truncate text-sm font-medium text-primary">
-                            {profile?.email || user.email}
+                            {profile?.firstName && profile?.lastName 
+                              ? role === UserType.DOCTOR 
+                                ? `Dr. ${profile.firstName} ${profile.lastName}` 
+                                : `${profile.firstName} ${profile.lastName}`
+                              : profile?.email || user.email}
                           </p>
                         </div>
                         <div className="py-1">

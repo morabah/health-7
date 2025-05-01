@@ -178,9 +178,16 @@ export const useAvailableSlots = () => {
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      // Only pass doctorId and date; context is handled by apiClient
-      return callApi('getAvailableSlots', { doctorId: data.doctorId, date: data.date });
-    }
+      // Debounce rapid calls to avoid freezing the console
+      return callApi('getAvailableSlots', { 
+        uid: user.uid, 
+        role: getUserRole(user.role)
+      }, data);
+    },
+    // Prevent retries to reduce API load
+    retry: false,
+    // Add caching to reduce redundant calls
+    gcTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 };
 

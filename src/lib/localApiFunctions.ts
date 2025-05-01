@@ -260,16 +260,53 @@ export async function signIn(
     const users = await getUsers();
     const userMatch = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
+    // Special case for admin@example.com auto-creation
+    if (email === 'admin@example.com' && (password === 'Targo2000!' || password === 'password123')) {
+      logInfo('Admin auto-login detected, creating admin user if needed');
+      
+      // If admin user doesn't exist yet, create one
+      if (!userMatch) {
+        const adminUserId = 'admin-' + generateId();
+        const adminUser = {
+          id: adminUserId,
+          userId: adminUserId,
+          email: 'admin@example.com',
+          firstName: 'System',
+          lastName: 'Admin',
+          userType: UserType.ADMIN,
+          isActive: true,
+          emailVerified: true,
+          phoneVerified: true,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          phone: null
+        };
+        
+        // Save the admin user to the database
+        await saveUsers([...users, adminUser]);
+        
+        // Return success with the admin user
+        return {
+          success: true,
+          user: { id: adminUserId, email: adminUser.email },
+          userProfile: adminUser,
+          roleProfile: null,
+        };
+      }
+      
+      // If admin user already exists, continue with normal flow
+    }
+
     if (!userMatch) {
-      logWarn('signIn failed: email not found', { email });
+      logWarn('Login attempt: email not found', { email });
       return { success: false, error: 'Invalid email or password' };
     }
     
     /* 3  validate password (hard-coded for now) */
-    if (password !== 'password123' && password !== 'password') {
-      logWarn('signIn failed: incorrect password', { email });
+    if (password !== 'password123' && password !== 'password' && password !== 'Targo2000!') {
+      logWarn('Login attempt: incorrect password', { email });
       return { success: false, error: 'Invalid email or password' };
-      }
+    }
       
     // Support automatic mock user generation in dev
     if (userMatch.userType === UserType.ADMIN && email === 'admin@example.com') {
@@ -559,7 +596,7 @@ export async function findDoctors(
           licenseDocumentUrl: typeof doc.licenseDocumentUrl === 'string' || doc.licenseDocumentUrl === null ? doc.licenseDocumentUrl : null,
           licenseDocumentPath: typeof doc.licenseDocumentPath === 'string' || doc.licenseDocumentPath === null ? doc.licenseDocumentPath : null,
           certificateUrl: typeof doc.certificateUrl === 'string' || doc.certificateUrl === null ? doc.certificateUrl : null,
-          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doctor.certificatePath : null,
+          certificatePath: typeof doc.certificatePath === 'string' || doc.certificatePath === null ? doc.certificatePath : null,
           educationHistory: Array.isArray(doc.educationHistory) ? doc.educationHistory : [],
           experience: Array.isArray(doc.experience) ? doc.experience : [],
           weeklySchedule: doc.weeklySchedule && typeof doc.weeklySchedule === 'object' ? doc.weeklySchedule : {
@@ -2055,14 +2092,24 @@ export async function getMyDashboardStats(
     // Calculate upcomingCount: appointments that are in future and not cancelled
     const now = new Date();
     const upcomingCount = myAppointments.filter(a => {
-      const apptDate = new Date(`${a.appointmentDate}T${a.startTime}`);
-      return apptDate > now && a.status !== AppointmentStatus.CANCELED;
+      // Handle different date formats
+      const appointmentDate = a.appointmentDate.includes('T') 
+        ? new Date(a.appointmentDate) 
+        : new Date(`${a.appointmentDate}T${a.startTime}`);
+      
+      const status = a.status.toLowerCase();
+      return appointmentDate > now && status !== 'canceled';
     }).length;
     
     // Calculate pastCount: appointments that are in past or completed
     const pastCount = myAppointments.filter(a => {
-      const apptDate = new Date(`${a.appointmentDate}T${a.startTime}`);
-      return apptDate < now || a.status === AppointmentStatus.COMPLETED;
+      // Handle different date formats
+      const appointmentDate = a.appointmentDate.includes('T') 
+        ? new Date(a.appointmentDate) 
+        : new Date(`${a.appointmentDate}T${a.startTime}`);
+      
+      const status = a.status.toLowerCase();
+      return appointmentDate < now || status === 'completed';
     }).length;
     
     // For admin users, get additional stats
@@ -2116,24 +2163,27 @@ export async function getAvailableSlots(
   try {
     const { uid, role } = ctx;
     
-    // Early validation with Zod schema - this is key to prevent destructuring undefined
-    const GetSlotsSchema = z.object({
-      doctorId: z.string().min(1, "Doctor ID is required"),
-      date: isoDateOrDateTimeStringSchema
-    });
-
-    const validationResult = GetSlotsSchema.safeParse(payload);
-    if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid slot query: ${validationResult.error.message}` 
-      };
+    // Minimize logging to prevent console freeze
+    // Only log core info, not full payload
+    if (process.env.NODE_ENV !== 'production') {
+      logInfo('getAvailableSlots called', { doctorId: payload?.doctorId });
     }
-
-    // Extract validated data
-    const { doctorId, date } = validationResult.data;
     
-    logInfo('getAvailableSlots called', { uid, role, doctorId, date });
+    // Validate required parameters
+    if (!payload) {
+      return { success: false, error: 'Missing payload data' };
+    }
+    
+    if (!payload.doctorId) {
+      return { success: false, error: 'Doctor ID is required' };
+    }
+    
+    if (!payload.date) {
+      return { success: false, error: 'Date is required' };
+    }
+    
+    // Extract validated data
+    const { doctorId, date } = payload;
     
     // Get doctor profile
     const doctors = await getDoctors();

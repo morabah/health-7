@@ -388,5 +388,35 @@
     "isRead": false,
     "createdAt": "2025-04-30T13:36:33.421Z",
     "relatedId": "yfbs96tfahr6z4y9vra6"
+  },
+  {
+    "id": "notif-d0df1ghpfnncwxfx110t",
+    "userId": "u-001",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-05-01T01:58:12.843Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-47viugk3yt9l11f3g20s0f",
+    "userId": "u-001",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-05-01T02:05:58.442Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-t90gafove8yeg80luij9p",
+    "userId": "u-001",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-05-01T02:06:14.483Z",
+    "relatedId": null
   }
 ]

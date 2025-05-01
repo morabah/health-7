@@ -81,8 +81,25 @@ export default function PatientDashboard() {
   const allAppointments = appointmentsData?.success ? appointmentsData.appointments : [];
   const now = new Date();
   const upcomingAppointments = allAppointments
-    .filter((a: any) => new Date(`${a.appointmentDate}T${a.startTime}`) > now && a.status !== 'CANCELED')
-    .sort((a: any, b: any) => new Date(`${a.appointmentDate}T${a.startTime}`).getTime() - new Date(`${b.appointmentDate}T${b.startTime}`).getTime())
+    .filter((a: any) => {
+      // Convert appointment date to a proper Date object
+      const appointmentDate = a.appointmentDate.includes('T') 
+        ? new Date(a.appointmentDate) 
+        : new Date(`${a.appointmentDate}T${a.startTime}`);
+      
+      return appointmentDate > now && a.status !== 'CANCELED' && a.status !== 'canceled';
+    })
+    .sort((a: any, b: any) => {
+      const dateA = a.appointmentDate.includes('T') 
+        ? new Date(a.appointmentDate) 
+        : new Date(`${a.appointmentDate}T${a.startTime}`);
+      
+      const dateB = b.appointmentDate.includes('T') 
+        ? new Date(b.appointmentDate) 
+        : new Date(`${b.appointmentDate}T${b.startTime}`);
+      
+      return dateA.getTime() - dateB.getTime();
+    })
     .slice(0, 3);
 
   // Manual refresh handler

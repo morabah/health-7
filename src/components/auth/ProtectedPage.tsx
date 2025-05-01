@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Spinner from '@/components/ui/Spinner';
 import { useAuth } from '@/context/AuthContext';
 import { logInfo, logError } from '@/lib/logger';
-import { roleToDashboard } from '@/lib/router';
+import { roleToDashboard, APP_ROUTES } from '@/lib/router';
 import type { UserType } from '@/types/enums';
 
 // Add TypeScript declaration for global state
@@ -97,7 +97,7 @@ export default function ProtectedPage({
       
       // Redirect to login
       const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
-      router.replace(`/login${nextParam}`);
+      router.replace(`${APP_ROUTES.LOGIN}${nextParam}`);
       return;
     }
 

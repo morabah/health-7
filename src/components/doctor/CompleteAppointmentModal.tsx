@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
-import Alert from '@/components/ui/Alert';
-
+import { Clock, CheckCircle, AlertCircle, User, Calendar, ClipboardList } from 'lucide-react';
+import Spinner from '@/components/ui/Spinner';
 import type { Appointment } from '@/types/schemas';
 
-interface CompleteModalProps {
+interface CompleteAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   appt: Appointment | null;
-  onConfirm: (appointmentId: string, notes: string) => Promise<void>;
+  onConfirm: (appointmentId: string, notes: string) => void;
+  isSubmitting?: boolean;
 }
 
 /**
@@ -25,123 +25,130 @@ export default function CompleteAppointmentModal({
   onClose,
   appt,
   onConfirm,
-}: CompleteModalProps) {
+  isSubmitting = false
+}: CompleteAppointmentModalProps) {
   const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  // Reset state when modal opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      // Small delay to avoid visual flickering during close animation
-      const timer = setTimeout(() => {
-        setNotes('');
-        setLoading(false);
-        setError(null);
-      }, 200);
-      return () => clearTimeout(timer);
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+    if (error) setError('');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Simple validation
+    if (!notes.trim()) {
+      setError('Please add appointment notes before completing');
+      return;
     }
-  }, [isOpen]);
 
-  // Handle confirmation with loading state and error handling
-  const handleConfirm = async () => {
-    if (!appt) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      await onConfirm(appt.id, notes.trim());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete appointment');
-      setLoading(false);
+    if (appt?.id) {
+      onConfirm(appt.id, notes);
     }
   };
+
+  // Reset form when modal opens or closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setNotes('');
+      setError('');
+    }
+  }, [isOpen]);
 
   if (!appt) return null;
 
   return (
-    <Transition.Root appear show={isOpen} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-50"
-        onClose={() => !loading && onClose()}
-      >
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <Dialog.Panel className="w-full max-w-md rounded-lg bg-white dark:bg-slate-800 p-6 shadow-xl">
-              <div className="flex items-center space-x-2 text-success mb-4">
-                <CheckCircle className="h-6 w-6" />
-                <Dialog.Title className="text-lg font-medium">
-                  Complete Appointment
-                </Dialog.Title>
-              </div>
-
-              <div className="mt-2">
-                {error && (
-                  <Alert variant="error" className="mb-4">
-                    {error}
-                  </Alert>
-                )}
-
-                <p className="text-slate-600 dark:text-slate-300 mb-4">
-                  Are you sure you want to mark your appointment with <strong>{appt.patientName}</strong> on{' '}
-                  <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
-                  <strong>{appt.startTime}</strong> as completed?
-                </p>
-
-                <Textarea
-                  id="completion-notes"
-                  label="Appointment Notes (optional)"
-                  placeholder="Add any notes about the appointment..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={loading}
-                  rows={3}
-                  className="mb-4"
-                />
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <Button
-                    variant="secondary"
-                    onClick={onClose}
-                    disabled={loading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleConfirm}
-                    isLoading={loading}
-                  >
-                    Complete Appointment
-                  </Button>
+    <Modal
+      isOpen={isOpen}
+      onClose={!isSubmitting ? onClose : undefined}
+      title="Complete Appointment"
+      className="max-w-lg"
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          {/* Appointment Summary */}
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md">
+            <h3 className="font-medium mb-3 flex items-center">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              Appointment Details
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex items-start gap-2">
+                <User className="h-4 w-4 text-slate-500 mt-0.5" />
+                <div>
+                  <div className="text-slate-500">Patient</div>
+                  <div className="font-medium">{appt.patientName || 'Unknown Patient'}</div>
                 </div>
               </div>
-            </Dialog.Panel>
-          </Transition.Child>
+              
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
+                <div>
+                  <div className="text-slate-500">Date & Time</div>
+                  <div className="font-medium">
+                    {new Date(appt.appointmentDate).toLocaleDateString()} at {appt.startTime}
+                  </div>
+                </div>
+              </div>
+              
+              {appt.reason && (
+                <div className="sm:col-span-2 flex items-start gap-2">
+                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
+                  <div>
+                    <div className="text-slate-500">Reason for Visit</div>
+                    <div className="font-medium">{appt.reason}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="appointment-notes" className="block text-sm font-medium mb-1 flex items-center">
+              <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+              Appointment Notes
+            </label>
+            <Textarea
+              id="appointment-notes"
+              placeholder="Enter detailed notes about the appointment..."
+              value={notes}
+              onChange={handleChange}
+              rows={6}
+              disabled={isSubmitting}
+              error={error ? true : false}
+              className="w-full"
+            />
+            {error && (
+              <div className="mt-1 text-sm text-red-500 flex items-center">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                {error}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              These notes will be saved to the patient's medical record.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2" size="sm" />
+                  Completing...
+                </>
+              ) : (
+                <>Complete Appointment</>
+              )}
+            </Button>
+          </div>
         </div>
-      </Dialog>
-    </Transition.Root>
+      </form>
+    </Modal>
   );
 } 

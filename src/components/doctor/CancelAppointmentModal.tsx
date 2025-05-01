@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, Fragment, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
-import Alert from '@/components/ui/Alert';
+import { Clock, AlertCircle, User, Calendar, ClipboardList, XCircle } from 'lucide-react';
+import Spinner from '@/components/ui/Spinner';
 import type { Appointment } from '@/types/schemas';
 
-interface CancelModalProps {
+interface CancelAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   appt: Appointment | null;
-  onConfirm: (id: string, reason: string) => Promise<void>;
+  onConfirm: (appointmentId: string, reason: string) => void;
+  isSubmitting?: boolean;
 }
 
 /**
@@ -24,129 +25,141 @@ export default function CancelAppointmentModal({
   onClose,
   appt,
   onConfirm,
-}: CancelModalProps) {
+  isSubmitting = false
+}: CancelAppointmentModalProps) {
   const [reason, setReason] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  // Reset state when modal opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      // Small delay to avoid visual flickering during close animation
-      const timer = setTimeout(() => {
-        setReason('');
-        setLoading(false);
-        setError(null);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setReason(e.target.value);
+    if (error) setError('');
+  };
 
-  // Handle confirmation with loading state and error handling
-  const handleConfirm = async () => {
-    if (!appt) return;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Simple validation
     if (!reason.trim()) {
       setError('Please provide a reason for cancellation');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      await onConfirm(appt.id, reason.trim());
-      // Success is handled in the parent component
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel appointment');
-      setLoading(false);
+    if (appt?.id) {
+      onConfirm(appt.id, reason);
     }
   };
+
+  // Reset form when modal opens or closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setReason('');
+      setError('');
+    }
+  }, [isOpen]);
 
   if (!appt) return null;
 
   return (
-    <Transition.Root appear show={isOpen} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-50"
-        onClose={() => !loading && onClose()}
-      >
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <Dialog.Panel className="w-full max-w-md rounded-lg bg-white dark:bg-slate-800 p-6 shadow-xl">
-              <div className="flex items-center space-x-2 text-danger mb-4">
-                <XCircle className="h-6 w-6" />
-                <Dialog.Title className="text-lg font-medium">
-                  Cancel Appointment
-                </Dialog.Title>
+    <Modal
+      isOpen={isOpen}
+      onClose={!isSubmitting ? onClose : undefined}
+      title="Cancel Appointment"
+      className="max-w-lg"
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          {/* Warning Alert */}
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 p-4 rounded-md text-sm">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Are you sure you want to cancel this appointment?</p>
+                <p className="mt-1">This action cannot be undone and the patient will be notified.</p>
               </div>
+            </div>
+          </div>
 
-              {error && (
-                <Alert variant="error" className="mb-4">
-                  {error}
-                </Alert>
-              )}
-
-              <div className="mt-2">
-                <p className="text-slate-600 dark:text-slate-300 mb-4">
-                  Are you sure you want to cancel your appointment with patient <strong>{appt.patientName}</strong> on{' '}
-                  <strong>{new Date(appt.appointmentDate).toLocaleDateString()}</strong> at{' '}
-                  <strong>{appt.startTime}</strong>?
-                </p>
-
-                <Textarea
-                  id="cancellation-reason"
-                  label="Reason for cancellation"
-                  placeholder="Please provide a reason for cancelling this appointment..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  disabled={loading}
-                  required
-                  rows={3}
-                  className="mb-4"
-                />
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <Button
-                    variant="secondary"
-                    onClick={onClose}
-                    disabled={loading}
-                  >
-                    Keep Appointment
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={handleConfirm}
-                    isLoading={loading}
-                  >
-                    Confirm Cancellation
-                  </Button>
+          {/* Appointment Summary */}
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md">
+            <h3 className="font-medium mb-3 flex items-center">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              Appointment Details
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex items-start gap-2">
+                <User className="h-4 w-4 text-slate-500 mt-0.5" />
+                <div>
+                  <div className="text-slate-500">Patient</div>
+                  <div className="font-medium">{appt.patientName || 'Unknown Patient'}</div>
                 </div>
               </div>
-            </Dialog.Panel>
-          </Transition.Child>
+              
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
+                <div>
+                  <div className="text-slate-500">Date & Time</div>
+                  <div className="font-medium">
+                    {new Date(appt.appointmentDate).toLocaleDateString()} at {appt.startTime}
+                  </div>
+                </div>
+              </div>
+              
+              {appt.reason && (
+                <div className="sm:col-span-2 flex items-start gap-2">
+                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
+                  <div>
+                    <div className="text-slate-500">Reason for Visit</div>
+                    <div className="font-medium">{appt.reason}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="cancellation-reason" className="block text-sm font-medium mb-1 flex items-center">
+              <XCircle className="h-4 w-4 mr-2 text-red-500" />
+              Reason for Cancellation
+            </label>
+            <Textarea
+              id="cancellation-reason"
+              placeholder="Please explain why you need to cancel this appointment..."
+              value={reason}
+              onChange={handleChange}
+              rows={4}
+              disabled={isSubmitting}
+              error={error ? true : false}
+              className="w-full"
+            />
+            {error && (
+              <div className="mt-1 text-sm text-red-500 flex items-center">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                {error}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              This reason will be shared with the patient.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Keep Appointment
+            </Button>
+            <Button type="submit" variant="danger" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2" size="sm" />
+                  Cancelling...
+                </>
+              ) : (
+                <>Cancel Appointment</>
+              )}
+            </Button>
+          </div>
         </div>
-      </Dialog>
-    </Transition.Root>
+      </form>
+    </Modal>
   );
 } 

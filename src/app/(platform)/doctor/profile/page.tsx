@@ -141,7 +141,16 @@ export default function DoctorProfilePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Doctor Profile</h1>
+        <div>
+          <h1 className="text-2xl font-bold">
+            {profile.firstName && profile.lastName 
+              ? `Dr. ${profile.firstName} ${profile.lastName}` 
+              : "Doctor Profile"}
+          </h1>
+          {profile.specialty && (
+            <p className="text-slate-500">{profile.specialty}</p>
+          )}
+        </div>
         <Button
           variant={isEditing ? "secondary" : "primary"}
           onClick={() => setIsEditing(!isEditing)}

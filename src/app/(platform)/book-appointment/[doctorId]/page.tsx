@@ -118,20 +118,26 @@ export default function BookAppointmentPage() {
       
       try {
         const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        logInfo('Fetching available slots', { doctorId, date: formattedDate });
+        
         const result = await availableSlotsMutation.mutateAsync({
           doctorId,
           date: formattedDate
         });
         
         if (result.success) {
-          setAvailableTimeSlots(result.slots);
+          setAvailableTimeSlots(result.slots || []);
+          if ((result.slots || []).length === 0) {
+            setError('No available time slots found for this date. Please select another date.');
+          }
         } else {
           setError(`Failed to load available slots: ${result.error}`);
-          logError('Failed to fetch available slots', { doctorId, date: selectedDate.toISOString(), error: result.error });
+          logError('Failed to fetch available slots', { doctorId, date: formattedDate, error: result.error });
           setAvailableTimeSlots([]);
         }
       } catch (err) {
-        setError('Error loading available time slots. Please try again.');
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(`Error loading available time slots: ${errorMessage}. Please try again.`);
         logError('Error in fetchAvailableSlots', err);
         setAvailableTimeSlots([]);
       } finally {
