@@ -2,12 +2,12 @@
 
 import type { z } from 'zod';
 import { logInfo, logWarn, logError } from '@/lib/logger';
-import { 
-  UserProfileSchema, 
-  PatientProfileSchema, 
-  DoctorProfileSchema, 
-  AppointmentSchema, 
-  NotificationSchema
+import {
+  UserProfileSchema,
+  PatientProfileSchema,
+  DoctorProfileSchema,
+  AppointmentSchema,
+  NotificationSchema,
 } from '@/types/schemas';
 // Import localDb module statically
 import * as localDb from './localDb';
@@ -15,10 +15,10 @@ import * as localDb from './localDb';
 /**
  * Represents a field validation error in a document
  */
-export interface FieldError { 
-  field: string; 
-  message: string; 
-  received: unknown; 
+export interface FieldError {
+  field: string;
+  message: string;
+  received: unknown;
 }
 
 /**
@@ -46,66 +46,82 @@ export interface ValidationSummary {
   validDocuments: number;
   invalidDocuments: number;
   errorDocuments: number;
-  commonErrors: {[field: string]: number};
+  commonErrors: { [field: string]: number };
 }
 
 /**
  * Fetches all documents from a collection in the local database
  * and validates each against a Zod schema.
- * 
+ *
  * @param collectionName - The name of the collection to validate
  * @param schema - The Zod schema to validate against
  * @param verbose - Whether to log detailed validation information
  * @returns Promise resolving to validation results for each document
  */
-export async function validateCollectionData<
-  TSchema extends z.ZodType<unknown>
->(
+export async function validateCollectionData<TSchema extends z.ZodType<unknown>>(
   collectionName: string,
   schema: TSchema,
   verbose: boolean = false
 ): Promise<CollectionValidationResult> {
   logInfo(`Starting validation for collection: ${collectionName}`);
   const results: CollectionValidationResult = [];
-  
+
   try {
     // Fetch data from local database
     const data = await getLocalData(collectionName);
-    
+
     if (!data || !Array.isArray(data)) {
-      return [{ 
-        id: 'N/A', 
-        collection: collectionName, 
-        status: 'error', 
-        fetchError: `No documents found or invalid data type in ${collectionName}` 
-      }];
+      return [
+        {
+          id: 'N/A',
+          collection: collectionName,
+          status: 'error',
+          fetchError: `No documents found or invalid data type in ${collectionName}`,
+        },
+      ];
     }
-    
+
     logInfo(`Fetched ${data.length} documents from ${collectionName}`);
-    
+
     // Validate each document
     for (const doc of data) {
       // doc is unknown, so we must narrow its type for safe property access
       if (typeof doc === 'object' && doc !== null && 'id' in doc) {
         const { id, ...rest } = doc as { id: string } & Record<string, unknown>;
         const result = schema.safeParse(rest);
+        const isValid = result.success;
+
+        // Add warning log for invalid documents
+        if (!isValid) {
+          logWarn(`Invalid document found in ${collectionName}: ${id}`, {
+            errors: result.error.issues.map(issue => ({
+              path: issue.path,
+              message: issue.message,
+            })),
+          });
+        }
+
         results.push({
           id,
           collection: collectionName,
-          status: result.success ? 'valid' : 'invalid',
-          errors: result.success ? [] : result.error.issues.map(issue => ({
-            field: issue.path.join('.'),
-            message: issue.message,
-            received: Array.isArray(issue.path) && issue.path.length > 0
-              ? issue.path.reduce<{ [key: string]: unknown }>((obj, key) =>
-                  typeof obj === 'object' && obj !== null && key in obj
-                    ? (obj as Record<string, unknown>)[key as string]
+          status: isValid ? 'valid' : 'invalid',
+          errors: isValid
+            ? []
+            : result.error.issues.map(issue => ({
+                field: issue.path.join('.'),
+                message: issue.message,
+                received:
+                  Array.isArray(issue.path) && issue.path.length > 0
+                    ? issue.path.reduce<unknown>((obj, key) => {
+                        if (typeof obj === 'object' && obj !== null && key in obj) {
+                          return (obj as Record<string, unknown>)[key as string];
+                        }
+                        return undefined;
+                      }, rest)
                     : undefined,
-                rest)
-              : undefined
-          })),
+              })),
         });
-        if (verbose) {
+        if (verbose && isValid) {
           logInfo(`✓ Valid: ${collectionName}/${id}`);
         }
       } else {
@@ -123,21 +139,21 @@ export async function validateCollectionData<
     logInfo(`Validation summary for ${collectionName}:`, summary);
   } catch (error: unknown) {
     logError(`Error fetching or validating collection ${collectionName}`, error);
-    results.push({ 
-      id: 'N/A', 
-      collection: collectionName, 
-      status: 'error', 
-      fetchError: error instanceof Error ? error.message : String(error)
+    results.push({
+      id: 'N/A',
+      collection: collectionName,
+      status: 'error',
+      fetchError: error instanceof Error ? error.message : String(error),
     });
   }
-  
+
   logInfo(`Validation finished for collection: ${collectionName}`);
   return results;
 }
 
 /**
  * Generates a summary of validation results for a collection
- * 
+ *
  * @param results - The validation results for the collection
  * @param collectionName - The name of the collection
  * @returns A summary of the validation results
@@ -152,7 +168,7 @@ export function generateValidationSummary(
     validDocuments: 0,
     invalidDocuments: 0,
     errorDocuments: 0,
-    commonErrors: {}
+    commonErrors: {},
   };
 
   results.forEach(result => {
@@ -160,7 +176,7 @@ export function generateValidationSummary(
       summary.validDocuments++;
     } else if (result.status === 'invalid') {
       summary.invalidDocuments++;
-      
+
       // Track common field errors
       result.errors?.forEach(error => {
         const field = error.field;
@@ -176,7 +192,7 @@ export function generateValidationSummary(
 
 /**
  * Validates multiple collections against their respective schemas
- * 
+ *
  * @param collections - Array of collection names to validate
  * @param verbose - Whether to log detailed validation information
  * @returns Promise resolving to an object with results for each collection
@@ -184,26 +200,26 @@ export function generateValidationSummary(
 export async function validateMultipleCollections(
   collections: string[],
   verbose: boolean = false
-): Promise<{[collection: string]: CollectionValidationResult}> {
-  const results: {[collection: string]: CollectionValidationResult} = {};
-  
+): Promise<{ [collection: string]: CollectionValidationResult }> {
+  const results: { [collection: string]: CollectionValidationResult } = {};
+
   for (const collection of collections) {
     const schema = getSchemaForCollection(collection);
-    
+
     if (!schema) {
       logWarn(`No schema found for collection: ${collection}`);
       continue;
     }
-    
+
     results[collection] = await validateCollectionData(collection, schema, verbose);
   }
-  
+
   return results;
 }
 
 /**
  * Helper function to get the appropriate schema for a collection
- * 
+ *
  * @param collectionName - The name of the collection
  * @returns The Zod schema for the collection or undefined if not found
  */
@@ -226,7 +242,7 @@ export function getSchemaForCollection(collectionName: string): z.ZodType<unknow
 
 /**
  * Helper function to read data from the local database
- * 
+ *
  * @param collectionName - The name of the collection
  * @returns Promise resolving to the data or null if not found
  */
@@ -245,4 +261,4 @@ async function getLocalData(collectionName: string): Promise<unknown[] | null> {
     default:
       return null;
   }
-} 
+}
