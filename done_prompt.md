@@ -1402,3 +1402,30 @@ All sign in, sign out, and account switching functionality now works correctly. 
 - `src/lib/apiClient.ts`: Reduced logging for high-frequency API calls
 - `src/lib/localApiFunctions.ts`: Minimized debug logging
 - `src/data/sharedLoaders.ts`: Enhanced hook with caching
+
+## Prompt: Update Login Page and Fix Admin Authentication
+
+### Actions Taken
+- Updated the login page to show real database accounts instead of test accounts:
+  - Added clear information about available user accounts from the database
+  - Listed actual doctor and patient accounts with their names
+  - Included the admin account with the correct login credentials
+- Fixed the admin user authentication in localApiFunctions.ts:
+  - Updated the admin account creation logic to accept both "password123" and "Targo2000!" as valid passwords
+  - Implemented automatic admin user creation when these credentials are used
+- Fixed login redirect issues:
+  - Updated ProtectedPage.tsx to use APP_ROUTES.LOGIN from router.ts instead of hardcoded "/login" path
+  - Removed duplicate login directory at src/app/(auth)/login that was causing routing confusion
+- Enhanced error handling for incorrect credentials
+
+### Files Changed
+- `src/app/auth/login/page.tsx` (updated with database account information)
+- `src/lib/localApiFunctions.ts` (fixed admin authentication)
+- `src/components/auth/ProtectedPage.tsx` (fixed login redirect path)
+- Deleted `src/app/(auth)/login/page.tsx` (removed duplicate login page)
+
+### Status
+- Login functionality works correctly with all database accounts
+- Admin login creates an admin account automatically when correct credentials are used
+- Login redirect paths are consistent throughout the application
+- Clear user information is displayed on the login page for easy access
