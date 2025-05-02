@@ -22,6 +22,7 @@ import {
 import { useFindDoctors } from '@/data/sharedLoaders';
 import { useDebounce } from '@/lib/useDebounce';
 import { logInfo, logError } from '@/lib/logger';
+import { reportError } from '@/lib/errorMonitoring';
 
 // Define interface for doctor data
 interface Doctor {
@@ -145,22 +146,63 @@ export default function FindDoctorsPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const { mutateAsync, error } = useFindDoctors();
+  const [error, setError] = useState<string | null>(null);
+  const { mutateAsync, error: apiError } = useFindDoctors();
+  const hasInitialSearch = useRef(false);
 
   // Debounced search params
   const debouncedSearchParams = useDebounce(searchParams, 300);
 
   // Trigger search on initial load and whenever debounced search params change
   useEffect(() => {
-    console.log('Dynamic search effect fired', debouncedSearchParams);
-    setIsLoading(true);
-    mutateAsync({
-      specialty: debouncedSearchParams.specialty || undefined,
-      location: debouncedSearchParams.location || undefined,
-      name: debouncedSearchParams.name || undefined
-    }).then(result => {
-      setDoctors(result.doctors || []);
-    }).finally(() => setIsLoading(false));
+    const fetchDoctors = async () => {
+      try {
+        console.log('Dynamic search effect fired', { specialty: debouncedSearchParams.specialty, location: debouncedSearchParams.location, name: debouncedSearchParams.name });
+        // Only call the API if at least one search field is filled, or on initial load
+        if (debouncedSearchParams.specialty || debouncedSearchParams.location || debouncedSearchParams.name || !hasInitialSearch.current) {
+          setIsLoading(true);
+          // Set flag to indicate we've done at least one search
+          hasInitialSearch.current = true;
+          
+          const result = await mutateAsync({
+            specialty: debouncedSearchParams.specialty || undefined,
+            location: debouncedSearchParams.location || undefined,
+            name: debouncedSearchParams.name || undefined
+          });
+          
+          if (result?.success) {
+            setDoctors(result.doctors || []);
+            setError(null);
+          } else {
+            setDoctors([]);
+            setError(result?.error || 'Failed to find doctors');
+          }
+        }
+      } catch (err: unknown) {
+        // Handle errors without triggering the infinite loop
+        const errorMessage = typeof err === 'object' && err !== null && 'message' in err 
+          ? String(err.message) 
+          : String(err);
+        
+        setDoctors([]);
+        setError(`Error searching for doctors: ${errorMessage}`);
+        
+        // Log but don't throw
+        console.log('Error in doctor search:', errorMessage);
+        reportError(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Use a debounced function to prevent excessive API calls
+    const handler = setTimeout(() => {
+      fetchDoctors();
+    }, 250); // Reduced from 500ms for more responsive search
+
+    return () => {
+      clearTimeout(handler);
+    };
   }, [debouncedSearchParams, mutateAsync]);
 
   // Handle search form input changes (no direct search call)

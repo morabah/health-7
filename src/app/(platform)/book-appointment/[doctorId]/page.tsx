@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
 import Spinner from '@/components/ui/Spinner';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import {
   CalendarDays,
   Clock,
@@ -16,6 +17,7 @@ import {
   MapPin,
   VideoIcon,
   Calendar,
+  AlertOctagon,
 } from 'lucide-react';
 import { logInfo, logValidation, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +27,8 @@ import { format, addDays } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
 import type { DoctorProfile, TimeSlot } from '@/types/schemas';
+import withErrorBoundary from '@/components/ui/withErrorBoundary';
+import useErrorHandler from '@/hooks/useErrorHandler';
 
 // Define the merged doctor profile type based on API response
 interface DoctorPublicProfile
@@ -39,11 +43,49 @@ interface DoctorPublicProfile
   experience?: { position: string; hospital: string; duration: string }[];
 }
 
-export default function BookAppointmentPage() {
+// Create a custom fallback UI specific to the booking page
+const BookingErrorFallback = () => (
+  <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 text-center">
+      <AlertOctagon className="mx-auto mb-4 h-12 w-12 text-red-500" />
+      <h2 className="text-xl font-bold mb-2">Unable to Load Booking Page</h2>
+      <p className="mb-4 text-slate-600 dark:text-slate-300">
+        We encountered an error while trying to load the doctor's appointment booking page.
+        This could be due to network issues or the doctor may no longer be available.
+      </p>
+      <div className="flex justify-center space-x-4 mt-6">
+        <Link href="/find-doctors">
+          <Button variant="primary">Find Another Doctor</Button>
+        </Link>
+        <Button 
+          variant="outline" 
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+function BookAppointmentPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const doctorId = params?.doctorId as string;
+  
+  // Use our enhanced error handler
+  const { 
+    handleError, 
+    tryCatch, 
+    ErrorComponent, 
+    clearError,
+    isErrorVisible
+  } = useErrorHandler({
+    component: 'BookAppointmentPage',
+    defaultCategory: 'appointment',
+    autoDismiss: false
+  });
 
   // Fetch doctor profile and availability
   const {
@@ -79,12 +121,34 @@ export default function BookAppointmentPage() {
   );
   const [reason, setReason] = useState('');
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [uiError, setUiError] = useState<string | null>(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<
     Array<{ startTime: string; endTime: string }>
   >([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectableDates, setSelectableDates] = useState<Date[]>([]);
+
+  // Check for query errors and handle them with the error handler
+  useEffect(() => {
+    if (doctorError) {
+      handleError(doctorError, {
+        message: 'Unable to load doctor profile',
+        category: 'data',
+        severity: 'error',
+        context: { doctorId },
+        retryable: true
+      });
+    }
+    if (availabilityError) {
+      handleError(availabilityError, {
+        message: 'Unable to load doctor availability',
+        category: 'data',
+        severity: 'error',
+        context: { doctorId },
+        retryable: true
+      });
+    }
+  }, [doctorError, availabilityError, handleError, doctorId]);
 
   // Generate dates for the next 14 days
   const generateDates = () => {
@@ -124,37 +188,52 @@ export default function BookAppointmentPage() {
     }
   }, [availabilityData]);
 
-  // Update to get available slots from the API when date changes
+  // Update to get available slots from the API when date changes using our enhanced error handling
   useEffect(() => {
     const fetchAvailableSlots = async () => {
       if (!selectedDate || !doctorId) return;
 
       setSlotsLoading(true);
-      setError(null);
+      setUiError(null);
+      clearError();
 
-      try {
-        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        logInfo('Fetching available slots', { doctorId, date: formattedDate });
-
-        const result = await availableSlotsMutation.mutateAsync({
-          doctorId,
-          date: formattedDate,
-        });
-
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Use our enhanced error handling with tryCatch
+      const result = await tryCatch(
+        async () => {
+          logInfo('Fetching available slots', { doctorId, date: formattedDate });
+          
+          return await availableSlotsMutation.mutateAsync({
+            doctorId,
+            date: formattedDate,
+          });
+        },
+        {
+          action: 'fetchAvailableSlots',
+          message: `Unable to load available time slots for ${formatDate(selectedDate)}`,
+          category: 'appointment',
+          severity: 'warning',
+          context: { doctorId, date: formattedDate },
+          retryable: true
+        }
+      );
+      
+      if (result) {
         if (result.success) {
           if (!result.slots || !Array.isArray(result.slots)) {
-            setError('Invalid response format from server. Please try again later.');
+            setUiError('Invalid response format from server. Please try again later.');
             logError('Invalid slots response format', { doctorId, date: formattedDate, result });
             setAvailableTimeSlots([]);
           } else if (result.slots.length === 0) {
             setAvailableTimeSlots([]);
-            setError(
+            setUiError(
               `No available appointment slots for ${formatDate(selectedDate)}. This could be because the doctor's schedule is full or they don't have office hours on this day. Please select another date.`
             );
             logInfo('No slots available', { doctorId, date: formattedDate });
           } else {
             setAvailableTimeSlots(result.slots);
-            setError(null);
+            setUiError(null);
             logInfo('Slots loaded successfully', {
               doctorId,
               date: formattedDate,
@@ -163,7 +242,7 @@ export default function BookAppointmentPage() {
           }
         } else {
           const errorMessage = result.error || 'Unknown error';
-          setError(`Failed to load available slots: ${errorMessage}`);
+          setUiError(`Failed to load available slots: ${errorMessage}`);
           logError('Failed to fetch available slots', {
             doctorId,
             date: formattedDate,
@@ -171,20 +250,12 @@ export default function BookAppointmentPage() {
           });
           setAvailableTimeSlots([]);
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setError(
-          `Error loading available time slots: ${errorMessage}. Please try again later or select a different date.`
-        );
-        logError('Error in fetchAvailableSlots', {
-          error: err,
-          doctorId,
-          date: format(selectedDate, 'yyyy-MM-dd'),
-        });
+      } else {
+        // tryCatch returned null, meaning it already handled the error
         setAvailableTimeSlots([]);
-      } finally {
-        setSlotsLoading(false);
       }
+      
+      setSlotsLoading(false);
     };
 
     if (selectedDate && doctorId) {
@@ -194,8 +265,8 @@ export default function BookAppointmentPage() {
       setSelectedTimeSlot(null);
       setSelectedEndTime(null);
     }
-    // Only run this effect when the date or doctorId changes, not on every availableSlotsMutation change
-  }, [selectedDate, doctorId]);
+    // Only run this effect when the date or doctorId changes
+  }, [selectedDate, doctorId, tryCatch, clearError]);
 
   // Check if a date is selectable
   const isDateSelectable = (date: Date) => {
@@ -209,30 +280,49 @@ export default function BookAppointmentPage() {
     return format(date, 'EEE, MMM d, yyyy');
   };
 
-  // Handle booking submission
+  // Handle booking submission with enhanced error handling
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedDate || !selectedTimeSlot || !selectedEndTime) {
-      setError('Please select a date and time for your appointment');
+      setUiError('Please select a date and time for your appointment');
       return;
     }
 
-    setError(null);
+    setUiError(null);
+    clearError();
 
-    try {
-      const result = await bookAppointmentMutation.mutateAsync({
-        doctorId,
-        appointmentDate: selectedDate.toISOString(),
-        startTime: selectedTimeSlot,
-        endTime: selectedEndTime,
-        reason,
-        appointmentType: appointmentType,
-      });
+    // Use our enhanced error handling with tryCatch
+    const result = await tryCatch(
+      async () => {
+        return await bookAppointmentMutation.mutateAsync({
+          doctorId,
+          appointmentDate: selectedDate.toISOString(),
+          startTime: selectedTimeSlot,
+          endTime: selectedEndTime,
+          reason,
+          appointmentType: appointmentType,
+        });
+      },
+      {
+        action: 'bookAppointment',
+        message: 'Unable to book appointment',
+        category: 'appointment',
+        severity: 'error',
+        context: { 
+          doctorId, 
+          date: selectedDate.toISOString(), 
+          startTime: selectedTimeSlot,
+          appointmentType
+        },
+        retryable: true
+      }
+    );
 
+    if (result) {
       if (result.success) {
         setSuccess(true);
-        setError(null);
+        setUiError(null);
         logInfo('appointment', {
           action: 'book-appointment-success',
           doctorId,
@@ -252,26 +342,36 @@ export default function BookAppointmentPage() {
           router.push('/patient/appointments?justBooked=1');
         }, 1500);
       } else {
-        setError(result.error || 'Failed to book appointment');
+        setUiError(result.error || 'Failed to book appointment');
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'An error occurred while booking your appointment';
-      setError(errorMessage);
-      logError('Error in handleBookAppointment', err);
     }
+    // If result is null, the error has already been handled by tryCatch
   };
 
   const isLoading = doctorLoading || availabilityLoading;
   const doctor = doctorData?.success ? doctorData.doctor : null;
 
+  // Show the error display for critical errors
+  if (isErrorVisible) {
+    return <ErrorComponent />;
+  }
+
+  // Show a simpler UI for data loading errors
   if (doctorError || availabilityError) {
     return (
-      <Alert variant="error">
-        {doctorError instanceof Error
-          ? doctorError.message
-          : String(doctorError || availabilityError)}
-      </Alert>
+      <div className="container mx-auto p-6">
+        <ErrorDisplay
+          error={doctorError || availabilityError}
+          message={doctorError ? "Couldn't load doctor profile" : "Couldn't load doctor availability"}
+          category="data"
+          onRetry={() => window.location.reload()}
+        />
+        <div className="mt-6 flex justify-center">
+          <Link href="/find-doctors">
+            <Button variant="primary">Find Another Doctor</Button>
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -287,7 +387,15 @@ export default function BookAppointmentPage() {
         </Link>
       </div>
 
-      {error && <Alert variant="error">{error}</Alert>}
+      {/* Show UI errors with our ErrorDisplay component */}
+      {uiError && (
+        <ErrorDisplay
+          error={uiError}
+          category="appointment"
+          severity="warning"
+          onDismiss={() => setUiError(null)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Doctor Info Sidebar */}
@@ -548,3 +656,11 @@ export default function BookAppointmentPage() {
     </div>
   );
 }
+
+// Export with error boundary
+export default withErrorBoundary(BookAppointmentPage, {
+  fallback: <BookingErrorFallback />,
+  onError: (error) => {
+    logError('BookAppointmentPage error boundary caught error', error);
+  }
+});

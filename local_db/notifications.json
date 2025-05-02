@@ -468,5 +468,25 @@
     "isRead": false,
     "createdAt": "2025-05-02T02:20:14.123Z",
     "relatedId": "0vb5nafbxh7j08lk6ssrytt8"
+  },
+  {
+    "id": "notif-jshi5l8h53o7b97refqwao",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-16T03:05:38.312Z at 09:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-02T03:05:42.776Z",
+    "relatedId": "k537r03g7ihe6w2gpbczi"
+  },
+  {
+    "id": "notif-87mz1m75ywb8nequ4hmlmk",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-16T03:05:38.312Z at 09:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-02T03:05:42.776Z",
+    "relatedId": "k537r03g7ihe6w2gpbczi"
   }
 ]

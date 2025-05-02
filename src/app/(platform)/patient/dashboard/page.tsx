@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Edit2,
   ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { logValidation, logError } from '@/lib/logger';
@@ -22,6 +23,8 @@ import { useMyDashboard, useNotifications } from '@/data/sharedLoaders';
 import { usePatientProfile, usePatientAppointments } from '@/data/patientLoaders';
 import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
+import withErrorBoundary from '@/components/ui/withErrorBoundary';
+import useErrorHandler from '@/hooks/useErrorHandler';
 
 /**
  * Re-usable Stat card
@@ -55,12 +58,41 @@ const StatCard = ({
 );
 
 /**
+ * Dashboard error fallback component
+ */
+const DashboardErrorFallback = () => (
+  <div className="max-w-3xl mx-auto p-6">
+    <Card className="p-8 text-center">
+      <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
+      <h2 className="text-2xl font-bold mb-4">Dashboard Error</h2>
+      <p className="text-slate-600 dark:text-slate-300 mb-6">
+        We encountered a problem loading your dashboard data. This could be due to connectivity issues or a temporary service disruption.
+      </p>
+      <div className="flex justify-center space-x-4">
+        <Button onClick={() => window.location.reload()} variant="primary">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Reload Dashboard
+        </Button>
+        <Link href="/">
+          <Button variant="outline">
+            Go to Home
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  </div>
+);
+
+/**
  * Patient Dashboard Page
  * Main control center for patients to view their information and upcoming appointments
  * 
  * @returns Patient dashboard component
  */
-export default function PatientDashboard() {
+function PatientDashboard() {
+  // Error handler hook - use simple mode to maintain tuple return type
+  const [_, handleError] = useErrorHandler({ simpleMode: true });
+
   // Use combined dashboard hook for stats
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError, refetch: refetchDashboard } = useMyDashboard();
   // Still need profile data for user info
@@ -71,6 +103,25 @@ export default function PatientDashboard() {
   const { data: notificationsData, isLoading: notificationsLoading, refetch: refetchNotifications } = useNotifications();
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  // Handle critical errors with the error boundary
+  useEffect(() => {
+    const criticalError = dashboardError || profileError || appointmentsError;
+    if (criticalError) {
+      // Log the error first
+      logError('Critical error in patient dashboard', { error: criticalError });
+      
+      // Only propagate to error boundary for persistent/serious errors
+      const errorMessage = criticalError instanceof Error ? criticalError.message : String(criticalError);
+      if (errorMessage.includes('authentication') || 
+          errorMessage.includes('network') || 
+          errorMessage.includes('permission') ||
+          errorMessage.includes('token') ||
+          errorMessage.includes('server')) {
+        handleError(criticalError);
+      }
+    }
+  }, [dashboardError, profileError, appointmentsError, handleError]);
 
   // Extract data from dashboard response
   const upcomingCount = dashboardData?.success ? dashboardData.upcomingCount : 0;
@@ -104,13 +155,18 @@ export default function PatientDashboard() {
 
   // Manual refresh handler
   const handleRefresh = async () => {
-    await Promise.all([
-      refetchDashboard(),
-      refetchProfile(),
-      refetchAppointments(),
-      refetchNotifications(),
-    ]);
-    setLastUpdated(new Date());
+    try {
+      await Promise.all([
+        refetchDashboard(),
+        refetchProfile(),
+        refetchAppointments(),
+        refetchNotifications(),
+      ]);
+      setLastUpdated(new Date());
+    } catch (err) {
+      logError('Error refreshing dashboard data', err);
+      handleError(err);
+    }
   };
 
   useEffect(() => {
@@ -122,13 +178,28 @@ export default function PatientDashboard() {
     }
   }, []);
 
-  // Show error if any API calls fail
+  // Show error if any API calls fail, but handle non-critical errors here
   if (dashboardError || profileError || appointmentsError) {
-    return (
-      <Alert variant="error">
-        Error loading dashboard data: {(dashboardError || profileError || appointmentsError)?.toString()}
-      </Alert>
-    );
+    const error = dashboardError || profileError || appointmentsError;
+    const errorMessage = error instanceof Error ? error.message : String(error || 'Unknown error');
+    
+    // Only show an error alert for non-critical errors that don't trigger the boundary
+    if (!errorMessage.includes('authentication') && 
+        !errorMessage.includes('network') && 
+        !errorMessage.includes('permission') &&
+        !errorMessage.includes('token') &&
+        !errorMessage.includes('server')) {
+      return (
+        <Alert variant="error" className="mb-6">
+          <h3 className="font-semibold mb-2">Error loading dashboard data</h3>
+          <p>{errorMessage}</p>
+          <Button size="sm" variant="primary" className="mt-2" onClick={handleRefresh}>
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Try Again
+          </Button>
+        </Alert>
+      );
+    }
   }
 
   const userProfile = profileData?.userProfile || {};
@@ -306,4 +377,12 @@ export default function PatientDashboard() {
       </div>
     </div>
   );
-} 
+}
+
+// Export with error boundary
+export default withErrorBoundary(PatientDashboard, {
+  fallback: <DashboardErrorFallback />,
+  onError: (error) => {
+    logError('PatientDashboard error boundary caught error', error);
+  }
+}); 

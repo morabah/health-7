@@ -873,4 +873,31 @@ export const isoDateOrDateTimeStringSchema = z.string().refine(
     /^\d{4}-\d{2}-\d{2}$/.test(val) || // date only
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(val), // date-time
   { message: 'Invalid ISO date or date-time string (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)' }
-); 
+);
+
+/**
+ * Zod schema for Todo items
+ */
+export const TodoItemSchema = z.object({
+  id: z.string().describe("Unique identifier for the todo item"),
+  text: z.string().min(1, "Todo text is required").describe("The content of the todo item"),
+  completed: z.boolean().default(false).describe("Whether the todo item is completed"),
+  category: z.string().nullable().optional().describe("Optional category for the todo item"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM").describe("Priority level of the todo item"),
+  dueDate: isoDateTimeStringSchema.nullable().optional().describe("Optional due date for the todo item"),
+  createdAt: isoDateTimeStringSchema.describe("When the todo item was created"),
+  updatedAt: isoDateTimeStringSchema.describe("When the todo item was last updated"),
+  userId: z.string().nullable().optional().describe("ID of the user who created this todo (if user-specific)"),
+  userType: z.nativeEnum(UserType).nullable().optional().describe("Type of user (if user-specific)"),
+});
+
+/**
+ * Zod schema for a collection of Todo items
+ */
+export const TodoListSchema = z.array(TodoItemSchema);
+
+/** TypeScript type for a single Todo item */
+export type TodoItem = z.infer<typeof TodoItemSchema>;
+
+/** TypeScript type for a list of Todo items */
+export type TodoList = z.infer<typeof TodoListSchema>; 

@@ -152,5 +152,19 @@
     "createdAt": "2025-05-01T02:33:39.293Z",
     "updatedAt": "2025-05-01T02:33:39.293Z",
     "phone": null
+  },
+  {
+    "id": "stbgu09d7t05vtu0r67tp",
+    "email": "morabah@gmail.com",
+    "firstName": "Mohamed",
+    "lastName": "Rabah",
+    "userType": "patient",
+    "isActive": true,
+    "emailVerified": false,
+    "phoneVerified": false,
+    "phone": null,
+    "createdAt": "2025-05-02T08:15:42.479Z",
+    "updatedAt": "2025-05-02T08:15:42.479Z",
+    "profilePictureUrl": null
   }
 ]

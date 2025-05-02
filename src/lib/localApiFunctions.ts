@@ -1565,11 +1565,9 @@ export async function markNotificationRead(
 /**
  * Get a doctor's public profile
  */
-export async function getDoctorPublicProfile(ctx: {
-  uid: string;
-  role: UserType;
-  doctorId: string;
-}): Promise<ResultOk<{ doctor: z.infer<typeof DoctorProfileSchema> }> | ResultErr> {
+export async function getDoctorPublicProfile(
+  ctx: { uid: string; role: UserType; doctorId: string }
+): Promise<ResultOk<{ doctor: z.infer<typeof DoctorProfileSchema> }> | ResultErr> {
   const perf = trackPerformance('getDoctorPublicProfile');
 
   try {
@@ -1581,14 +1579,14 @@ export async function getDoctorPublicProfile(ctx: {
     const doctors = await getDoctors();
     const users = await getUsers();
 
-    const doctor = doctors.find(d => d.userId === doctorId);
+    const doc = doctors.find(d => d.userId === doctorId);
 
-    if (!doctor) {
+    if (!doc) {
       return { success: false, error: 'Doctor not found' };
     }
 
     // Check if doctor is verified (unless admin)
-    if (doctor.verificationStatus !== VerificationStatus.VERIFIED && role !== UserType.ADMIN) {
+    if (doc.verificationStatus !== VerificationStatus.VERIFIED && role !== UserType.ADMIN) {
       return { success: false, error: 'Doctor is not verified' };
     }
 
@@ -1611,59 +1609,24 @@ export async function getDoctorPublicProfile(ctx: {
 
     // Combine data for public profile
     const profile: z.infer<typeof DoctorProfileSchema> = {
-      userId: doctor.userId,
-      specialty: doctor.specialty ?? '',
-      yearsOfExperience:
-        typeof doctor.yearsOfExperience === 'number' ? doctor.yearsOfExperience : 0,
-      bio: typeof doctor.bio === 'string' || doctor.bio === null ? doctor.bio : null,
-      verificationStatus: doctor.verificationStatus ?? VerificationStatus.PENDING,
-      verificationNotes:
-        typeof doctor.verificationNotes === 'string' || doctor.verificationNotes === null
-          ? doctor.verificationNotes
-          : null,
-      adminNotes: typeof doctor.adminNotes === 'string' ? doctor.adminNotes : undefined,
-      location:
-        typeof doctor.location === 'string' || doctor.location === null ? doctor.location : null,
-      education:
-        typeof doctor.education === 'string' || doctor.education === null ? doctor.education : null,
-      servicesOffered:
-        typeof doctor.servicesOffered === 'string' || doctor.servicesOffered === null
-          ? doctor.servicesOffered
-          : null,
-      languages: Array.isArray(doctor.languages) ? doctor.languages : [],
-      consultationFee:
-        typeof doctor.consultationFee === 'number' || doctor.consultationFee === null
-          ? doctor.consultationFee
-          : null,
-      profilePictureUrl:
-        typeof doctor.profilePictureUrl === 'string' || doctor.profilePictureUrl === null
-          ? doctor.profilePictureUrl
-          : null,
-      profilePicturePath:
-        typeof doctor.profilePicturePath === 'string' || doctor.profilePicturePath === null
-          ? doctor.profilePicturePath
-          : null,
-      licenseDocumentUrl:
-        typeof doctor.licenseDocumentUrl === 'string' || doctor.licenseDocumentUrl === null
-          ? doctor.licenseDocumentUrl
-          : null,
-      licenseDocumentPath:
-        typeof doctor.licenseDocumentPath === 'string' || doctor.licenseDocumentPath === null
-          ? doctor.licenseDocumentPath
-          : null,
-      certificateUrl:
-        typeof doctor.certificateUrl === 'string' || doctor.certificateUrl === null
-          ? doctor.certificateUrl
-          : null,
-      certificatePath:
-        typeof doctor.certificatePath === 'string' || doctor.certificatePath === null
-          ? doctor.certificatePath
-          : null,
-      educationHistory: Array.isArray(doctor.educationHistory) ? doctor.educationHistory : [],
-      experience: Array.isArray(doctor.experience) ? doctor.experience : [],
+      userId: doc.userId,
+      specialty: doc.specialty ?? '',
+      yearsOfExperience: typeof doc.yearsOfExperience === 'number' ? doc.yearsOfExperience : 0,
+      bio: doc.bio,
+      verificationStatus: doc.verificationStatus,
+      verificationNotes: doc.verificationNotes,
+      adminNotes: doc.adminNotes,
+      rating: typeof doc.rating === 'number' ? doc.rating : 0,
+      reviewCount: typeof doc.reviewCount === 'number' ? doc.reviewCount : 0,
+      languages: Array.isArray(doc.languages) ? doc.languages : [],
+      servicesOffered: Array.isArray(doc.servicesOffered) ? doc.servicesOffered : [],
+      location: typeof doc.location === 'string' ? doc.location : '',
+      consultationFee: typeof doc.consultationFee === 'number' ? doc.consultationFee : 0,
+      education: Array.isArray(doc.educationHistory) ? doc.educationHistory : [],
+      experience: Array.isArray(doc.experience) ? doc.experience : [],
       weeklySchedule:
-        doctor.weeklySchedule && typeof doctor.weeklySchedule === 'object'
-          ? doctor.weeklySchedule
+        doc.weeklySchedule && typeof doc.weeklySchedule === 'object'
+          ? doc.weeklySchedule
           : {
               monday: [],
               tuesday: [],
@@ -1673,10 +1636,10 @@ export async function getDoctorPublicProfile(ctx: {
               saturday: [],
               sunday: [],
             },
-      timezone: typeof doctor.timezone === 'string' ? doctor.timezone : 'UTC',
-      blockedDates: Array.isArray(doctor.blockedDates) ? doctor.blockedDates : [],
-      createdAt: typeof doctor.createdAt === 'string' ? doctor.createdAt : new Date().toISOString(),
-      updatedAt: typeof doctor.updatedAt === 'string' ? doctor.updatedAt : new Date().toISOString(),
+      timezone: typeof doc.timezone === 'string' ? doc.timezone : 'UTC',
+      blockedDates: Array.isArray(doc.blockedDates) ? doc.blockedDates : [],
+      createdAt: typeof doc.createdAt === 'string' ? doc.createdAt : new Date().toISOString(),
+      updatedAt: typeof doc.updatedAt === 'string' ? doc.updatedAt : new Date().toISOString(),
     };
 
     return { success: true, doctor: profile };
@@ -2354,131 +2317,167 @@ export async function getMyDashboardStats(ctx: { uid: string; role: UserType }):
 export async function getAvailableSlots(
   ctx: { uid: string; role: UserType },
   payload: { doctorId: string; date: string }
-): Promise<
-  | ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }>
-  | ResultErr
-> {
+): Promise<ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }> | ResultErr> {
   const perf = trackPerformance('getAvailableSlots');
-
+  
   try {
     // Validate context first - this is essential for authorization
     if (!ctx || typeof ctx !== 'object') {
       logError('getAvailableSlots - Invalid context', { ctx });
       return { success: false, error: 'Invalid authentication context' };
     }
-
+    
     const { uid, role } = ctx;
-
+    
     if (!uid || typeof uid !== 'string') {
       logError('getAvailableSlots - Missing uid in context', { ctx });
       return { success: false, error: 'User ID is required' };
     }
 
+    if (!role) {
+      logError('getAvailableSlots - Missing role in context', { uid, ctx });
+      return { success: false, error: 'User role is required' };
+    }
+    
     // Minimize logging to prevent console freeze
     // Only log core info, not full payload
-    logInfo('getAvailableSlots called', {
-      uid: uid.substring(0, 6) + '...',
-      role,
-      doctorId: payload?.doctorId,
+    logInfo('getAvailableSlots called', { 
+      uid: uid.substring(0, 6) + '...', 
+      role, 
+      doctorId: payload?.doctorId 
     });
-
+    
     // Validate required parameters
     if (!payload || typeof payload !== 'object') {
       logError('getAvailableSlots - Missing payload', { uid, role });
       return { success: false, error: 'Missing payload data' };
     }
-
+    
     if (!payload.doctorId) {
       logError('getAvailableSlots - Missing doctorId', { uid, role, payload });
       return { success: false, error: 'Doctor ID is required' };
     }
-
+    
     if (!payload.date) {
       logError('getAvailableSlots - Missing date', { uid, role, doctorId: payload.doctorId });
       return { success: false, error: 'Date is required' };
     }
-
+    
+    // Validate date format
+    try {
+      const dateObj = new Date(payload.date);
+      if (isNaN(dateObj.getTime())) {
+        logError('getAvailableSlots - Invalid date format', { 
+          uid, role, doctorId: payload.doctorId, date: payload.date 
+        });
+        return { success: false, error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.' };
+      }
+    } catch (dateError) {
+      logError('getAvailableSlots - Date parsing error', { 
+        uid, role, doctorId: payload.doctorId, date: payload.date, error: dateError 
+      });
+      return { success: false, error: 'Invalid date format' };
+    }
+    
     // Extract validated data
     const { doctorId, date } = payload;
-
+    
     // Get doctor profile
-    const doctors = await getDoctors();
-
-    // Try to find doctor by userId first
-    let doctor = doctors.find(d => d.userId === doctorId);
-
-    // If not found by userId, try by id (document id)
-    if (!doctor) {
-      doctor = doctors.find(d => d.id === doctorId);
-    }
-
-    if (!doctor) {
-      logError('getAvailableSlots - Doctor not found', { uid, role, doctorId });
-      return { success: false, error: 'Doctor not found' };
-    }
-
-    // Check if doctor is verified
-    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
-      logError('getAvailableSlots - Doctor not verified', {
-        uid,
-        role,
-        doctorId,
-        status: doctor.verificationStatus,
-      });
-      return { success: false, error: 'Doctor is not verified' };
-    }
-
-    // Get existing appointments
-    const appointments = await getAppointments();
-
-    // Find appointments for this doctor
-    const doctorAppointments = appointments.filter(
-      a =>
-        (a.doctorId === doctorId || a.doctorId === doctor?.userId) &&
-        a.status !== AppointmentStatus.CANCELED
-    );
-
-    // Safely calculate available slots
     try {
-      // Make sure doctor has the required properties to generate slots
-      if (!doctor.weeklySchedule) {
-        logInfo('getAvailableSlots - Initializing empty schedule', { doctorId });
-        // Initialize with empty default schedule if needed
-        doctor.weeklySchedule = {
-          monday: [],
-          tuesday: [],
-          wednesday: [],
-          thursday: [],
-          friday: [],
-          saturday: [],
-          sunday: [],
-        };
+      const doctors = await getDoctors();
+      
+      // Try to find doctor by userId first
+      let doctor = doctors.find(d => d.userId === doctorId);
+      
+      // If not found by userId, try by id (document id)
+      if (!doctor) {
+        doctor = doctors.find(d => d.id === doctorId);
       }
-
-      if (!doctor.blockedDates) {
-        doctor.blockedDates = [];
+      
+      if (!doctor) {
+        logError('getAvailableSlots - Doctor not found', { uid, role, doctorId });
+        return { success: false, error: 'Doctor not found' };
       }
-
-      // Import at file level to avoid dynamic import issues
-      // Generate available slots
-      const availableSlots = getAvailableSlotsForDate(doctor, date, doctorAppointments);
-
-      logInfo('getAvailableSlots - Slots generated successfully', {
-        doctorId,
-        date,
-        slotCount: availableSlots.length,
+      
+      // Check if doctor is verified
+      if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
+        logError('getAvailableSlots - Doctor not verified', { 
+          uid, role, doctorId, 
+          status: doctor.verificationStatus 
+        });
+        return { success: false, error: 'Doctor is not verified' };
+      }
+      
+      // Get existing appointments
+      const appointments = await getAppointments();
+      
+      // Find appointments for this doctor
+      const doctorAppointments = appointments.filter(a => 
+        (a.doctorId === doctorId || a.doctorId === doctor?.userId) && 
+        a.status !== AppointmentStatus.CANCELED
+      );
+      
+      // Safely calculate available slots
+      try {
+        // Make sure doctor has the required properties to generate slots
+        if (!doctor.weeklySchedule) {
+          logInfo('getAvailableSlots - Initializing empty schedule', { doctorId });
+          // Initialize with empty default schedule if needed
+          doctor.weeklySchedule = {
+            monday: [], tuesday: [], wednesday: [], 
+            thursday: [], friday: [], saturday: [], sunday: []
+          };
+        }
+        
+        if (!doctor.blockedDates) {
+          doctor.blockedDates = [];
+        }
+        
+        // Make sure getAvailableSlotsForDate is imported at the file level, not dynamically
+        if (typeof getAvailableSlotsForDate !== 'function') {
+          logError('getAvailableSlots - getAvailableSlotsForDate is not a function', { 
+            doctorId, 
+            getAvailableSlotsForDateType: typeof getAvailableSlotsForDate
+          });
+          return { success: false, error: 'Internal error: Slot calculation function unavailable' };
+        }
+        
+        // Generate available slots
+        const availableSlots = getAvailableSlotsForDate(doctor, date, doctorAppointments);
+        
+        if (!Array.isArray(availableSlots)) {
+          logError('getAvailableSlots - getAvailableSlotsForDate did not return an array', {
+            doctorId,
+            date,
+            resultType: typeof availableSlots
+          });
+          return { success: false, error: 'Internal error: Invalid slot calculation result' };
+        }
+        
+        logInfo('getAvailableSlots - Slots generated successfully', { 
+          doctorId, 
+          date, 
+          slotCount: availableSlots.length 
+        });
+        
+        return { success: true, slots: availableSlots };
+      } catch (slotError) {
+        logError('Error calculating slots', {
+          error: slotError,
+          doctorId,
+          date,
+          hasWeeklySchedule: !!doctor.weeklySchedule,
+          hasBlockedDates: !!doctor.blockedDates
+        });
+        return { success: false, error: 'Error calculating available slots' };
+      }
+    } catch (dbError) {
+      logError('getAvailableSlots - Database error', { 
+        error: dbError, 
+        doctorId, 
+        date 
       });
-
-      return { success: true, slots: availableSlots };
-    } catch (slotError) {
-      logError('Error calculating slots', {
-        error: slotError,
-        doctorId,
-        date,
-        hasWeeklySchedule: !!doctor.weeklySchedule,
-        hasBlockedDates: !!doctor.blockedDates,
-      });
-      return { success: false, error: 'Error calculating available slots' };
+      return { success: false, error: 'Error accessing doctor data' };
     }
   } catch (e) {
     logError('getAvailableSlots failed', e);

@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Trash2, Check, Plus, GripVertical } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trash2, Check, Plus, GripVertical, Loader2 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-type TodoItem = {
-  id: string;
-  text: string;
-  completed: boolean;
-};
+import { logError } from '@/lib/logger';
+import { 
+  getAllTodos, 
+  createTodo, 
+  updateTodo, 
+  deleteTodo, 
+  updateTodoOrder 
+} from '@/data/todoLoaders';
+import type { TodoItem } from '@/types/schemas';
 
 interface TodoProps {
   title?: string;
   initialTodos?: TodoItem[];
+  userId?: string;
+  showLoader?: boolean;
 }
 
 // Sortable Todo Item component
@@ -77,9 +82,16 @@ function SortableTodoItem({ todo, onToggle, onDelete }: {
   );
 }
 
-export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoProps) {
+export default function Todo({ 
+  title = 'Todo List', 
+  initialTodos = [], 
+  userId,
+  showLoader = true
+}: TodoProps) {
   const [todos, setTodos] = useState<TodoItem[]>(initialTodos);
   const [newTodoText, setNewTodoText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // DnD sensors setup
   const sensors = useSensors(
@@ -89,27 +101,100 @@ export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoPro
     })
   );
 
-  const addTodo = () => {
-    if (!newTodoText.trim()) return;
+  // Load todos on component mount
+  useEffect(() => {
+    async function loadTodos() {
+      try {
+        setIsLoading(true);
+        const loadedTodos = await getAllTodos(userId);
+        setTodos(loadedTodos);
+      } catch (error) {
+        logError('Failed to load todos', { error });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    // Only load if we don't have initialTodos
+    if (initialTodos.length === 0) {
+      loadTodos();
+    } else {
+      setIsLoading(false);
+    }
+  }, [initialTodos.length, userId]);
+
+  const addTodo = async () => {
+    if (!newTodoText.trim() || isSaving) return;
     
-    const newTodo: TodoItem = {
-      id: Date.now().toString(),
-      text: newTodoText.trim(),
-      completed: false
-    };
-    
-    setTodos([...todos, newTodo]);
-    setNewTodoText('');
+    try {
+      setIsSaving(true);
+      
+      const now = new Date().toISOString();
+      const todoData = {
+        text: newTodoText.trim(),
+        completed: false,
+        priority: "MEDIUM",
+        createdAt: now,
+        updatedAt: now,
+        userId: userId || null,
+      } as const;
+      
+      const newTodo = await createTodo(todoData, userId);
+      setTodos(prev => [...prev, newTodo]);
+      setNewTodoText('');
+    } catch (error) {
+      logError('Error adding todo', { error });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const toggleTodo = (id: string) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+  const toggleTodo = async (id: string) => {
+    if (isSaving) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Find the todo to toggle
+      const todo = todos.find(t => t.id === id);
+      if (!todo) return;
+      
+      // Update optimistically in UI
+      setTodos(todos.map(todo => 
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      ));
+      
+      // Update in the backend
+      await updateTodo(id, { completed: !todo.completed });
+    } catch (error) {
+      logError('Error toggling todo', { error });
+      // Revert on error
+      const loadedTodos = await getAllTodos(userId);
+      setTodos(loadedTodos);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter(todo => todo.id !== id));
+  const deleteTodoItem = async (id: string) => {
+    if (isSaving) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Update optimistically in UI
+      setTodos(todos.filter(todo => todo.id !== id));
+      
+      // Delete in the backend
+      await deleteTodo(id);
+    } catch (error) {
+      logError('Error deleting todo', { error });
+      // Revert on error
+      const loadedTodos = await getAllTodos(userId);
+      setTodos(loadedTodos);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -118,17 +203,48 @@ export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoPro
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setTodos((items) => {
-        const oldIndex = items.findIndex(item => item.id === active.id);
-        const newIndex = items.findIndex(item => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
-      });
+      try {
+        setIsSaving(true);
+        
+        // Update optimistically in UI
+        setTodos((items) => {
+          const oldIndex = items.findIndex(item => item.id === active.id);
+          const newIndex = items.findIndex(item => item.id === over.id);
+          return arrayMove(items, oldIndex, newIndex);
+        });
+        
+        // Get the new order of IDs
+        const orderedIds = todos.map(todo => todo.id);
+        
+        // Update the order in the backend
+        await updateTodoOrder(orderedIds);
+      } catch (error) {
+        logError('Error reordering todos', { error });
+        // Revert on error
+        const loadedTodos = await getAllTodos(userId);
+        setTodos(loadedTodos);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
+
+  // Show loading state
+  if (isLoading && showLoader) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold mb-4">{title}</h2>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-600">Loading todos...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full max-w-md">
@@ -142,13 +258,23 @@ export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoPro
           value={newTodoText}
           onChange={(e) => setNewTodoText(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={isSaving}
         />
         <button
-          className="bg-blue-500 text-white rounded-r-md px-4 py-2 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`${
+            isSaving 
+              ? 'bg-blue-300 cursor-not-allowed' 
+              : 'bg-blue-500 hover:bg-blue-600'
+          } text-white rounded-r-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
           onClick={addTodo}
           aria-label="Add task"
+          disabled={isSaving}
         >
-          <Plus size={20} />
+          {isSaving ? (
+            <Loader2 size={20} className="animate-spin" />
+          ) : (
+            <Plus size={20} />
+          )}
         </button>
       </div>
       
@@ -170,7 +296,7 @@ export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoPro
                   key={todo.id} 
                   todo={todo} 
                   onToggle={toggleTodo} 
-                  onDelete={deleteTodo} 
+                  onDelete={deleteTodoItem} 
                 />
               ))}
             </ul>
@@ -181,6 +307,7 @@ export default function Todo({ title = 'Todo List', initialTodos = [] }: TodoPro
       {todos.length > 0 && (
         <div className="mt-4 text-sm text-gray-500">
           {todos.filter(todo => todo.completed).length} of {todos.length} tasks completed
+          {isSaving && <span className="ml-2">(Saving...)</span>}
         </div>
       )}
     </div>
