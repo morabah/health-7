@@ -6,17 +6,19 @@ import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { VerificationStatus } from '@/types/enums';
 
 interface VerificationFormProps {
   currentStatus: VerificationStatus;
   onSubmit: (payload: { status: VerificationStatus; notes: string }) => Promise<void>;
+  disableVerify?: boolean;
 }
 
 export default function VerificationForm({ 
   currentStatus, 
-  onSubmit 
+  onSubmit,
+  disableVerify = false
 }: VerificationFormProps) {
   const [status, setStatus] = useState(currentStatus);
   const [notes, setNotes] = useState('');
@@ -27,6 +29,7 @@ export default function VerificationForm({
   const canSubmit = () => {
     if (status === currentStatus) return false;
     if (status === VerificationStatus.REJECTED && !notes.trim()) return false;
+    if (status === VerificationStatus.VERIFIED && disableVerify) return false;
     return true;
   };
 
@@ -63,6 +66,13 @@ export default function VerificationForm({
           <Alert variant="success" className="mb-4">
             <CheckCircle className="h-4 w-4 mr-2" />
             Doctor verification status updated successfully.
+          </Alert>
+        )}
+        
+        {status === VerificationStatus.VERIFIED && disableVerify && (
+          <Alert variant="warning" className="mb-4">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            You must complete all checklist items before verifying this doctor.
           </Alert>
         )}
         

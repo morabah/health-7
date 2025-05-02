@@ -47,4 +47,28 @@ export function formatTimestamp(date: Date | string = new Date()): string {
 export function getRelativeTime(dateString: string): string {
   // In a real implementation, use date-fns formatDistanceToNow
   return `${formatDate(dateString)} (placeholder for relative time)`;
+}
+
+/**
+ * Format a date string or Date object to a datetime string
+ * Format: YYYY-MM-DD HH:MM:SS
+ */
+export function formatDateTime(dateString: string | Date | undefined): string {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return '';
+  }
 } 
