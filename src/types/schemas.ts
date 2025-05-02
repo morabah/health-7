@@ -901,3 +901,92 @@ export type TodoItem = z.infer<typeof TodoItemSchema>;
 
 /** TypeScript type for a list of Todo items */
 export type TodoList = z.infer<typeof TodoListSchema>; 
+
+/**
+ * Zod schema for patient registration payload.
+ * Used for validating user input during patient registration.
+ */
+export const PatientRegistrationSchema = z.object({
+  email: z.string()
+    .email("Please enter a valid email address")
+    .min(5, "Email is too short")
+    .max(100, "Email is too long"),
+  
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100, "Password is too long")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one uppercase letter, one lowercase letter, and one number"),
+  
+  userType: z.nativeEnum(UserType),
+  
+  firstName: z.string()
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name is too long"),
+  
+  lastName: z.string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name is too long"),
+  
+  dateOfBirth: z.string()
+    .refine(val => {
+      // Check if the string is a valid date
+      const date = new Date(val);
+      if (isNaN(date.getTime())) return false;
+      
+      // Check if patient is at least 18 years old
+      const today = new Date();
+      const eighteenYearsAgo = new Date(today);
+      eighteenYearsAgo.setFullYear(today.getFullYear() - 18);
+      
+      return date <= eighteenYearsAgo;
+    }, "You must be at least 18 years old"),
+  
+  gender: genderSchema,
+  
+  // Optional fields
+  bloodType: z.string().optional(),
+  medicalHistory: z.string().optional(),
+});
+
+/**
+ * Zod schema for doctor registration payload.
+ * Used for validating user input during doctor registration.
+ */
+export const DoctorRegistrationSchema = z.object({
+  email: z.string()
+    .email("Please enter a valid email address")
+    .min(5, "Email is too short")
+    .max(100, "Email is too long"),
+  
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100, "Password is too long")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one uppercase letter, one lowercase letter, and one number"),
+  
+  userType: z.nativeEnum(UserType),
+  
+  firstName: z.string()
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name is too long"),
+  
+  lastName: z.string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name is too long"),
+  
+  specialty: z.string()
+    .min(3, "Specialty must be at least 3 characters")
+    .max(100, "Specialty is too long"),
+  
+  licenseNumber: z.string()
+    .min(5, "License number must be at least 5 characters")
+    .max(50, "License number is too long"),
+  
+  yearsOfExperience: z.number()
+    .int("Experience must be a whole number")
+    .min(0, "Experience cannot be negative")
+    .max(70, "Please enter a valid years of experience"),
+});
+
+// Export TypeScript types inferred from the schemas
+export type PatientRegistrationPayload = z.infer<typeof PatientRegistrationSchema>;
+export type DoctorRegistrationPayload = z.infer<typeof DoctorRegistrationSchema>; 

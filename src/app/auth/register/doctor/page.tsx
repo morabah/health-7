@@ -13,6 +13,8 @@ import Alert from '@/components/ui/Alert';
 import { ChevronLeft, Eye, EyeOff, Upload } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
+import { DoctorRegistrationSchema, type DoctorRegistrationPayload } from '@/types/schemas';
+import { z } from 'zod';
 
 /**
  * Doctor registration form component
@@ -42,39 +44,47 @@ export default function DoctorRegisterPage() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   
   /**
-   * Validate form inputs
+   * Validate form data using Zod schema
    */
-  const validateForm = () => {
+  const validateForm = (): boolean => {
     const errors: {[key: string]: string} = {};
     
-    if (!firstName.trim()) errors.firstName = 'First name is required';
-    if (!lastName.trim()) errors.lastName = 'Last name is required';
-    
-    if (!email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Please enter a valid email';
-    }
-    
-    if (!phone) {
-      errors.phone = 'Phone number is required';
-    } else if (!/^\+?[\d\s()-]{10,15}$/.test(phone)) {
-      errors.phone = 'Please enter a valid phone number';
-    }
-    
-    if (!password) {
-      errors.password = 'Password is required';
-    } else if (password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
-    }
-    
+    // Basic confirmation password check
     if (password !== confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
     }
     
-    if (!specialty) errors.specialty = 'Specialty is required';
-    if (!licenseNumber) errors.licenseNumber = 'License number is required';
-    if (!experience) errors.experience = 'Years of experience is required';
+    // Parse experience as a number for validation
+    const experienceNum = parseInt(experience || '0', 10);
+    
+    // Create the registration payload
+    const registrationData: Partial<DoctorRegistrationPayload> = {
+      email,
+      password,
+      userType: UserType.DOCTOR,
+      firstName,
+      lastName,
+      specialty,
+      licenseNumber,
+      yearsOfExperience: isNaN(experienceNum) ? 0 : experienceNum,
+    };
+    
+    // Validate using Zod schema
+    const result = DoctorRegistrationSchema.safeParse(registrationData);
+    
+    if (!result.success) {
+      // Extract and format Zod validation errors
+      const formattedErrors = result.error.format();
+      
+      // Convert Zod errors to our format
+      Object.entries(formattedErrors).forEach(([key, value]) => {
+        // Safely access _errors with proper type checking
+        const fieldErrors = value as z.ZodFormattedError<any>;
+        if (key !== '_errors' && fieldErrors._errors.length > 0) {
+          errors[key] = fieldErrors._errors[0];
+        }
+      });
+    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -112,8 +122,8 @@ export default function DoctorRegisterPage() {
       });
       
       if (result && typeof result === 'object' && 'success' in result && result.success) {
-        // Registration successful, redirect to verification page
-        router.push('/auth/pending-verification');
+        // Registration successful, redirect to success page
+        router.push(`/auth/registration-success?type=${UserType.DOCTOR}&email=${encodeURIComponent(email)}`);
       } else {
         // Handle unsuccessful registration
         const errorMessage = result && typeof result === 'object' && 'error' in result 

@@ -458,5 +458,53 @@
     "createdAt": "2025-03-30T20:35:44.187Z",
     "updatedAt": "2025-04-29T20:35:44.187Z",
     "id": "u-006"
+  },
+  {
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "specialty": "",
+    "licenseNumber": "",
+    "yearsOfExperience": 0,
+    "verificationStatus": "pending",
+    "blockedDates": [],
+    "weeklySchedule": {
+      "monday": [],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [
+        {
+          "startTime": "08:00",
+          "endTime": "09:00",
+          "isAvailable": true
+        }
+      ],
+      "friday": [
+        {
+          "startTime": "10:00",
+          "endTime": "11:00",
+          "isAvailable": true
+        }
+      ],
+      "saturday": [],
+      "sunday": []
+    },
+    "educationHistory": [],
+    "experience": [],
+    "bio": null,
+    "verificationNotes": null,
+    "profilePictureUrl": null,
+    "profilePicturePath": null,
+    "licenseDocumentUrl": null,
+    "licenseDocumentPath": null,
+    "certificateUrl": null,
+    "certificatePath": null,
+    "servicesOffered": null,
+    "location": null,
+    "education": null,
+    "languages": [],
+    "consultationFee": null,
+    "timezone": "UTC",
+    "createdAt": "2025-05-02T08:47:06.700Z",
+    "updatedAt": "2025-05-02T08:54:17.733Z",
+    "id": "htggr2d1eeevik1kcux1ed"
   }
 ]

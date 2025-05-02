@@ -5,6 +5,10 @@ import { z } from 'zod';
 import type { VerificationStatus } from '@/types/enums';
 import { UserType } from '@/types/enums';
 
+// For development only - a simple password store
+// In a real app, passwords would be hashed and stored in a secure database
+export const userPasswords: Record<string, string> = {};
+
 // Type definition for extended doctor profile to include rating and reviewCount
 export interface ExtendedDoctorProfile {
   userId: string;

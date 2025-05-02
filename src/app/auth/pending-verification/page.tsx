@@ -6,9 +6,9 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Alert from '@/components/ui/Alert';
-import { CheckCircle, Mail, ArrowLeft, RefreshCw } from 'lucide-react';
+import { CheckCircle, Mail, ArrowLeft, RefreshCw, Clock, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { logInfo } from '@/lib/logger';
+import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 
 /**
@@ -17,19 +17,69 @@ import { UserType } from '@/types/enums';
  */
 export default function PendingVerificationPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateUserVerificationStatus } = useAuth();
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
   
-  // Check if user is already verified - for now we just redirect based on role
-  // Firebase email verification would be implemented in a production version
+  // Enhanced local dev simulation
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'processing' | 'verified'>('pending');
+  const [verificationProgress, setVerificationProgress] = useState(0);
+
+  /**
+   * Simulates a user manually verifying their email for local development
+   */
+  const simulateManualVerification = async () => {
+    if (verificationStatus !== 'pending' || !user) return;
+    
+    try {
+      setVerificationStatus('processing');
+      
+      // Simulate a progress indicator
+      const interval = setInterval(() => {
+        setVerificationProgress(prev => {
+          const newProgress = prev + 10;
+          if (newProgress >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          return newProgress;
+        });
+      }, 300);
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Update user verification status in Auth context
+      if (updateUserVerificationStatus) {
+        await updateUserVerificationStatus(true);
+      }
+      
+      setVerificationStatus('verified');
+      logInfo('User manually verified their email (local dev simulation)');
+      
+      // Redirect after a brief delay to show success state
+      setTimeout(() => {
+        const destination = user.role === UserType.DOCTOR 
+          ? '/doctor/dashboard' 
+          : '/patient/dashboard';
+        
+        router.push(destination);
+      }, 1500);
+      
+    } catch (error) {
+      logError('Error in manual verification simulation', error);
+      setResendError('Verification simulation failed');
+      setVerificationStatus('pending');
+      setVerificationProgress(0);
+    }
+  };
+  
+  // Check if user is already verified
   useEffect(() => {
     if (user) {
       // If user is already active, redirect to the appropriate dashboard
-      const isVerified = true; // Simplified for local development
-      
-      if (isVerified) {
+      if (user.emailVerified) {
         const destination = user.role === UserType.DOCTOR 
           ? '/doctor/dashboard' 
           : '/patient/dashboard';
@@ -41,7 +91,7 @@ export default function PendingVerificationPage() {
   }, [user, router]);
   
   // Handler for resending verification email
-  // This is a stub for local development
+  // Enhanced for more realistic local development simulation
   const handleResendVerification = async () => {
     setIsResending(true);
     setResendSuccess(false);
@@ -49,10 +99,22 @@ export default function PendingVerificationPage() {
     
     try {
       // In a real app, we would call Firebase or another auth provider here
-      // For local development, we'll just simulate success
+      // For local development, we'll just simulate with a delay
       await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Randomly simulate occasional failures (10% chance)
+      if (Math.random() < 0.1) {
+        throw new Error('Failed to send verification email. Server temporarily unavailable.');
+      }
+      
       setResendSuccess(true);
       logInfo('Verification email resent successfully');
+      
+      // Reset success message after 5 seconds
+      setTimeout(() => {
+        setResendSuccess(false);
+      }, 5000);
+      
     } catch (error) {
       // Handle error
       const errorMessage = error instanceof Error ? error.message : 'Failed to resend verification email';
@@ -88,6 +150,54 @@ export default function PendingVerificationPage() {
     );
   }
   
+  // Render the verified state (after manual verification in local dev)
+  if (verificationStatus === 'verified') {
+    return (
+      <div className="max-w-lg mx-auto p-6">
+        <Card className="p-8 text-center">
+          <div className="mb-6">
+            <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
+          </div>
+          <h1 className="text-2xl font-bold mb-4">Email Verified!</h1>
+          <p className="text-slate-600 dark:text-slate-300 mb-6">
+            Your email has been successfully verified. You'll be redirected to your dashboard shortly.
+          </p>
+          <div className="flex justify-center">
+            <Link href={user.role === UserType.DOCTOR ? '/doctor/dashboard' : '/patient/dashboard'}>
+              <Button variant="primary">Go to Dashboard</Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Render the verification in progress state  
+  if (verificationStatus === 'processing') {
+    return (
+      <div className="max-w-lg mx-auto p-6">
+        <Card className="p-8 text-center">
+          <div className="mb-6">
+            <Clock className="w-16 h-16 mx-auto text-primary animate-pulse" />
+          </div>
+          <h1 className="text-2xl font-bold mb-4">Verifying Your Email</h1>
+          <p className="text-slate-600 dark:text-slate-300 mb-6">
+            Please wait while we verify your email address...
+          </p>
+          
+          {/* Progress bar */}
+          <div className="w-full bg-slate-200 rounded-full h-2.5 mb-6">
+            <div 
+              className="bg-primary h-2.5 rounded-full transition-all duration-300" 
+              style={{ width: `${verificationProgress}%` }}
+            ></div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Normal pending verification state
   return (
     <div className="max-w-lg mx-auto p-6">
       <Card className="p-8">
@@ -124,6 +234,31 @@ export default function PendingVerificationPage() {
               <li>Once verified, you'll be able to access your account</li>
             </ol>
           </div>
+          
+          {/* LOCAL DEV ONLY: Manual verification option */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="border-t border-b border-slate-200 dark:border-slate-700 py-4 my-4">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg text-sm">
+                <div className="flex items-start">
+                  <Lock className="w-5 h-5 mr-2 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-yellow-800 dark:text-yellow-300">Development Mode</h3>
+                    <p className="mt-1 text-slate-600 dark:text-slate-300">
+                      In development mode, you can simulate email verification without actually receiving an email.
+                    </p>
+                    <Button 
+                      onClick={simulateManualVerification}
+                      variant="primary"
+                      size="sm"
+                      className="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
+                      Simulate Email Verification
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
             <p className="text-center text-slate-600 dark:text-slate-300 mb-4">

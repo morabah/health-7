@@ -11,7 +11,10 @@ Health Appointment System Sitemap
    /register - Registration options (src/app/(auth)/register/page.tsx)
    /register/patient - Patient registration (src/app/(auth)/register/patient/page.tsx)
    /register/doctor - Doctor registration (src/app/(auth)/register/doctor/page.tsx)
+   /registration-success - Success page shown after registration (src/app/(auth)/registration-success/page.tsx)
+   /pending-verification - Email verification pending page (src/app/(auth)/pending-verification/page.tsx)
    /forgot-password - Password recovery (src/app/(auth)/forgot-password/page.tsx)
+   /reset-password - Reset password page (src/app/(auth)/reset-password/page.tsx)
 
 3. PLATFORM ROUTES - SHARED
    /notifications - User notifications center (src/app/(platform)/notifications/page.tsx)

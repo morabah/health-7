@@ -114,6 +114,7 @@ interface User {
   email?: string;
   role: UserType;
   sessionId?: string;
+  emailVerified?: boolean;
 }
 
 // Type for a stored session
@@ -143,6 +144,7 @@ interface AuthContextType {
   registerDoctor: (payload: DoctorRegistrationPayload) => Promise<unknown>;
   switchToSession: (sessionId: string) => Promise<boolean>;
   logoutAllSessions: () => void;
+  updateUserVerificationStatus?: (verified: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -565,6 +567,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
   }, [login, clearError, error]);
 
+  // Update user's email verification status (for local development simulation)
+  const updateUserVerificationStatus = useCallback(async (verified: boolean) => {
+    if (!user) return;
+    
+    try {
+      // Set loading state
+      setLoading(true);
+      
+      // Update user object to include emailVerified status
+      setUser(prev => prev ? { ...prev, emailVerified: verified } : null);
+      
+      // In a real app with Firebase, we would call:
+      // await updateEmailVerificationStatus(user.uid, verified);
+      
+      // For local development, we'll just simulate a successful update
+      // by updating the user profile in localStorage
+      if (isBrowser) {
+        const currentSession = loadSession();
+        if (currentSession) {
+          // Update session with emailVerified flag
+          const updatedSession = {
+            ...currentSession,
+            emailVerified: verified
+          };
+          
+          // Save updated session
+          saveSession(updatedSession);
+          
+          logInfo('Updated user verification status in local storage', { verified });
+        }
+      }
+      
+      // Refresh the profile to get updated data
+      await refreshProfile();
+      
+    } catch (error) {
+      setError('Failed to update verification status');
+      logError('Error updating verification status', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, refreshProfile]);
+
   // Create the context value object
   const contextValue: AuthContextType = {
     user,
@@ -576,12 +621,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     activeSessions,
     login,
     logout,
-    clearError,
     refreshProfile,
+    clearError,
     registerPatient,
     registerDoctor,
     switchToSession,
-    logoutAllSessions
+    logoutAllSessions,
+    updateUserVerificationStatus,
   };
   
   // Update global auth store for mock login helper

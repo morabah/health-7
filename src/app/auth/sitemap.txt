@@ -1,0 +1,10 @@
+# Auth Routes
+
+/auth/login - User login page
+/auth/register - Registration type selection (patient or doctor)
+/auth/register/patient - Patient registration form
+/auth/register/doctor - Doctor registration form
+/auth/registration-success - Success page shown after registration
+/auth/pending-verification - Email verification pending page
+/auth/forgot-password - Forgot password page
+/auth/reset-password - Reset password page 

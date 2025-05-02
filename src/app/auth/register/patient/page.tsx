@@ -12,6 +12,8 @@ import Alert from '@/components/ui/Alert';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
+import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
+import { z } from 'zod';
 
 /**
  * Patient registration form component
@@ -37,49 +39,44 @@ export default function PatientRegisterPage() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   
   /**
-   * Validate form inputs
+   * Validate form data using Zod schema
    */
-  const validateForm = () => {
+  const validateForm = (): boolean => {
     const errors: {[key: string]: string} = {};
     
-    if (!firstName.trim()) errors.firstName = 'First name is required';
-    if (!lastName.trim()) errors.lastName = 'Last name is required';
-    
-    if (!email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Please enter a valid email';
-    }
-    
-    if (phone && !/^\+?[\d\s()-]{10,15}$/.test(phone)) {
-      errors.phone = 'Please enter a valid phone number';
-    }
-    
-    if (!password) {
-      errors.password = 'Password is required';
-    } else if (password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
-    }
-    
+    // Basic confirmation password check
     if (password !== confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
     }
+
+    // Create the registration payload
+    const registrationData: Partial<PatientRegistrationPayload> = {
+      email,
+      password,
+      userType: UserType.PATIENT,
+      firstName,
+      lastName,
+      dateOfBirth,
+      // Convert the gender string to the correct type
+      gender: gender as any, // Using any as a temporary workaround
+    };
     
-    if (!dateOfBirth) {
-      errors.dateOfBirth = 'Date of birth is required';
-    } else {
-      const birthDate = new Date(dateOfBirth);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
+    // Validate using Zod schema
+    const result = PatientRegistrationSchema.safeParse(registrationData);
+    
+    if (!result.success) {
+      // Extract and format Zod validation errors
+      const formattedErrors = result.error.format();
       
-      if (age < 18) {
-        errors.dateOfBirth = 'You must be at least 18 years old';
-      } else if (age > 120) {
-        errors.dateOfBirth = 'Please enter a valid date of birth';
-      }
+      // Convert Zod errors to our format
+      Object.entries(formattedErrors).forEach(([key, value]) => {
+        // Safely access _errors with proper type checking
+        const fieldErrors = value as z.ZodFormattedError<any>;
+        if (key !== '_errors' && fieldErrors._errors.length > 0) {
+          errors[key] = fieldErrors._errors[0];
+        }
+      });
     }
-    
-    if (!gender) errors.gender = 'Please select your gender';
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -117,8 +114,8 @@ export default function PatientRegisterPage() {
       });
       
       if (result && typeof result === 'object' && 'success' in result && result.success) {
-        // Registration successful, redirect to verification page
-        router.push('/auth/pending-verification');
+        // Registration successful, redirect to success page
+        router.push(`/auth/registration-success?type=${UserType.PATIENT}&email=${encodeURIComponent(email)}`);
       } else {
         // Handle unsuccessful registration
         const errorMessage = result && typeof result === 'object' && 'error' in result 

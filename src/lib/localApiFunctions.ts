@@ -28,7 +28,8 @@ import {
   generateId,
   nowIso,
   sleep,
-  RegisterSchema, // Re-added import of RegisterSchema
+  RegisterSchema,
+  userPasswords, // Add userPasswords import
 } from './localApiCore';
 import {
   Gender,
@@ -87,6 +88,10 @@ export async function registerUser(
     /* 3  assemble objects */
     const uid = generateId();
     const timestamp = nowIso();
+    
+    // Store the password in our development password store
+    // In a real app, this would be hashed before storage
+    userPasswords[data.email.toLowerCase()] = data.password;
 
     const base: z.infer<typeof UserProfileSchema> & { id: string } = {
       id: uid,
@@ -329,8 +334,12 @@ export async function signIn(
       return { success: false, error: 'Invalid email or password' };
     }
 
-    /* 3  validate password (hard-coded for now) */
-    if (password !== 'password123' && password !== 'password' && password !== 'Targo2000!') {
+    /* 3  validate password */
+    const storedPassword = userPasswords[email.toLowerCase()];
+    const defaultPasswords = ['password123', 'password', 'Targo2000!', 'Password123'];
+    
+    // Check if the password matches either the stored password or any of the default passwords
+    if (storedPassword !== password && !defaultPasswords.includes(password)) {
       logWarn('Login attempt: incorrect password', { email });
       return { success: false, error: 'Invalid email or password' };
     }

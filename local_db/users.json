@@ -166,5 +166,19 @@
     "createdAt": "2025-05-02T08:15:42.479Z",
     "updatedAt": "2025-05-02T08:15:42.479Z",
     "profilePictureUrl": null
+  },
+  {
+    "id": "htggr2d1eeevik1kcux1ed",
+    "email": "morabahdr@gmail.com",
+    "firstName": "Mohamed",
+    "lastName": "Rabah",
+    "userType": "doctor",
+    "isActive": false,
+    "emailVerified": false,
+    "phoneVerified": false,
+    "phone": null,
+    "createdAt": "2025-05-02T08:47:06.700Z",
+    "updatedAt": "2025-05-02T08:47:06.700Z",
+    "profilePictureUrl": null
   }
 ]

@@ -488,5 +488,15 @@
     "isRead": false,
     "createdAt": "2025-05-02T03:05:42.776Z",
     "relatedId": "k537r03g7ihe6w2gpbczi"
+  },
+  {
+    "id": "notif-n2bz65gef2010caboi9u",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Availability Updated",
+    "message": "Your availability settings have been updated successfully.",
+    "type": "system",
+    "isRead": false,
+    "createdAt": "2025-05-02T08:54:17.757Z",
+    "relatedId": null
   }
 ]

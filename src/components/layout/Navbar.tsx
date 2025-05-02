@@ -478,7 +478,7 @@ export default function Navbar() {
                   <Button 
                     size="sm" 
                     disabled={loading}
-                    onClick={() => navigateTo('/register')}
+                    onClick={() => navigateTo(APP_ROUTES.REGISTER)}
                   >
                     Register
                   </Button>
@@ -647,7 +647,7 @@ export default function Navbar() {
                     disabled={loading}
                     onClick={() => {
                       close();
-                      navigateTo('/register');
+                      navigateTo(APP_ROUTES.REGISTER);
                     }}
                   >
                     Register
