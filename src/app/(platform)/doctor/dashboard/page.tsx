@@ -33,9 +33,25 @@ import {
   CalendarDays,
   AlarmClock,
 } from 'lucide-react';
-import { useDoctorProfile, useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
+import {
+  useDoctorProfile,
+  useDoctorAppointments,
+  useCompleteAppointment,
+  useDoctorCancelAppointment,
+} from '@/data/doctorLoaders';
 import { useNotifications } from '@/data/sharedLoaders';
-import { format, isToday, startOfWeek, endOfWeek, isWithinInterval, isValid, parseISO, isFuture, isAfter, addDays } from 'date-fns';
+import {
+  format,
+  isToday,
+  startOfWeek,
+  endOfWeek,
+  isWithinInterval,
+  isValid,
+  parseISO,
+  isFuture,
+  isAfter,
+  addDays,
+} from 'date-fns';
 import { AppointmentStatus, VerificationStatus } from '@/types/enums';
 import { logValidation } from '@/lib/logger';
 import type { Notification } from '@/types/schemas';
@@ -56,7 +72,10 @@ const safeDate = (dateStr: string | undefined): Date | null => {
 };
 
 // Helper function for safe date comparisons
-const safeDateCompare = (dateStr: string | undefined, comparisonFn: (date: Date) => boolean): boolean => {
+const safeDateCompare = (
+  dateStr: string | undefined,
+  comparisonFn: (date: Date) => boolean
+): boolean => {
   const date = safeDate(dateStr);
   return date ? comparisonFn(date) : false;
 };
@@ -91,77 +110,94 @@ const createSafeDate = (dateStr: string, timeStr: string): Date | null => {
 // Helper for badge variant
 const getStatusVariant = (status: string) => {
   switch (status) {
-    case 'CONFIRMED': return 'info';
-    case 'COMPLETED': return 'success';
-    case 'CANCELED': return 'danger';
-    default: return 'default';
+    case 'CONFIRMED':
+      return 'info';
+    case 'COMPLETED':
+      return 'success';
+    case 'CANCELED':
+      return 'danger';
+    default:
+      return 'default';
   }
 };
 
 export default function DoctorDashboardPage() {
   const { data: profileData, isLoading: profileLoading, error: profileError } = useDoctorProfile();
-  const { data: appointmentsData, isLoading: appointmentsLoading, error: appointmentsError, refetch: refetchAppointments } = useDoctorAppointments();
-  const { data: notificationsData, isLoading: notificationsLoading, error: notificationsError, refetch: refetchNotifications } = useNotifications();
+  const {
+    data: appointmentsData,
+    isLoading: appointmentsLoading,
+    error: appointmentsError,
+    refetch: refetchAppointments,
+  } = useDoctorAppointments();
+  const {
+    data: notificationsData,
+    isLoading: notificationsLoading,
+    error: notificationsError,
+    refetch: refetchNotifications,
+  } = useNotifications();
   const completeAppointmentMutation = useCompleteAppointment();
   const cancelAppointmentMutation = useDoctorCancelAppointment();
-  
+
   const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
-  const unreadNotifications = notificationsData?.success 
-    ? notificationsData.notifications.filter((n: Notification) => !n.isRead).length 
+  const unreadNotifications = notificationsData?.success
+    ? notificationsData.notifications.filter((n: Notification) => !n.isRead).length
     : 0;
-  
+
   // Calculate stats with defensive checks
   const todayAppointments = appointments.filter((a: Appointment) => {
     const date = safeDate(a.appointmentDate);
     return date && isToday(date) && a.status !== AppointmentStatus.CANCELED;
   });
-  
+
   const thisWeekStart = startOfWeek(new Date());
   const thisWeekEnd = endOfWeek(new Date());
-  
+
   const completedThisWeek = appointments.filter((a: Appointment) => {
     const date = safeDate(a.appointmentDate);
-    return a.status === AppointmentStatus.COMPLETED &&
-      date && isWithinInterval(date, {
+    return (
+      a.status === AppointmentStatus.COMPLETED &&
+      date &&
+      isWithinInterval(date, {
         start: thisWeekStart,
-        end: thisWeekEnd
-      });
+        end: thisWeekEnd,
+      })
+    );
   });
-  
+
   // Get unique patient count
   const uniquePatientIds = new Set(appointments.map((a: Appointment) => a.patientId));
   const totalPatients = uniquePatientIds.size;
-  
+
   // Get upcoming appointments (exclude today) with defensive checks
-  const upcomingAppointments = appointments.filter((a: Appointment) => {
-    const date = safeDate(a.appointmentDate);
-    const now = new Date();
-    return date && 
-      !isToday(date) && 
-      date > now &&
-      a.status !== AppointmentStatus.CANCELED;
-  }).sort((a, b) => {
-    const dateA = safeDate(a.appointmentDate);
-    const dateB = safeDate(b.appointmentDate);
-    if (!dateA || !dateB) return 0;
-    return dateA.getTime() - dateB.getTime();
-  });
+  const upcomingAppointments = appointments
+    .filter((a: Appointment) => {
+      const date = safeDate(a.appointmentDate);
+      const now = new Date();
+      return date && !isToday(date) && date > now && a.status !== AppointmentStatus.CANCELED;
+    })
+    .sort((a: Appointment, b: Appointment) => {
+      const dateA = safeDate(a.appointmentDate);
+      const dateB = safeDate(b.appointmentDate);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
 
   // Upcoming week appointments
-  const nextWeekAppointments = appointments.filter((a: Appointment) => {
-    const date = safeDate(a.appointmentDate);
-    const now = new Date();
-    const oneWeekFromNow = addDays(now, 7);
-    return date && 
-      date > now &&
-      date <= oneWeekFromNow &&
-      a.status !== AppointmentStatus.CANCELED;
-  }).sort((a, b) => {
-    const dateA = safeDate(a.appointmentDate);
-    const dateB = safeDate(b.appointmentDate);
-    if (!dateA || !dateB) return 0;
-    return dateA.getTime() - dateB.getTime();
-  });
+  const nextWeekAppointments = appointments
+    .filter((a: Appointment) => {
+      const date = safeDate(a.appointmentDate);
+      const now = new Date();
+      const oneWeekFromNow = addDays(now, 7);
+      return (
+        date && date > now && date <= oneWeekFromNow && a.status !== AppointmentStatus.CANCELED
+      );
+    })
+    .sort((a: Appointment, b: Appointment) => {
+      const dateA = safeDate(a.appointmentDate);
+      const dateB = safeDate(b.appointmentDate);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
 
   useEffect(() => {
     try {
@@ -175,20 +211,24 @@ export default function DoctorDashboardPage() {
   if (profileError || appointmentsError || notificationsError) {
     return (
       <Alert variant="error">
-        Error loading dashboard data: {(profileError || appointmentsError || notificationsError)?.toString()}
+        Error loading dashboard data:{' '}
+        {(profileError || appointmentsError || notificationsError)?.toString()}
       </Alert>
     );
   }
 
   // After fetching profileData
   const userProfile = profileData?.success ? profileData : {};
-  const displayName = userProfile.firstName && userProfile.lastName
-    ? `Dr. ${userProfile.firstName} ${userProfile.lastName}`
-    : 'Doctor';
+  const displayName =
+    userProfile.firstName && userProfile.lastName
+      ? `Dr. ${userProfile.firstName} ${userProfile.lastName}`
+      : 'Doctor';
 
   const initials = (userProfile.firstName?.[0] || '') + (userProfile.lastName?.[0] || '');
   const specialty = userProfile.specialty || profileData?.specialty || '';
-  const isVerified = userProfile.verificationStatus === VerificationStatus.VERIFIED || profileData?.verificationStatus === VerificationStatus.VERIFIED;
+  const isVerified =
+    userProfile.verificationStatus === VerificationStatus.VERIFIED ||
+    profileData?.verificationStatus === VerificationStatus.VERIFIED;
   const profileCompletion = userProfile.profileCompleted ? 100 : 80; // Example: 100% if completed, else 80%
 
   // Add a refresh handler
@@ -207,12 +247,12 @@ export default function DoctorDashboardPage() {
     setSelectedAppointment(appt);
     setCompleteModalOpen(true);
   };
-  
+
   const handleOpenCancel = (appt: Appointment) => {
     setSelectedAppointment(appt);
     setCancelModalOpen(true);
   };
-  
+
   const handleCloseModals = () => {
     setCompleteModalOpen(false);
     setCancelModalOpen(false);
@@ -225,19 +265,19 @@ export default function DoctorDashboardPage() {
       await completeAppointmentMutation.mutateAsync({ appointmentId, notes });
       handleCloseModals();
     } catch (error) {
-      console.error("Error completing appointment:", error);
+      console.error('Error completing appointment:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   const handleConfirmCancel = async (appointmentId: string, reason: string) => {
     setIsSubmitting(true);
     try {
       await cancelAppointmentMutation.mutateAsync({ appointmentId, reason });
       handleCloseModals();
     } catch (error) {
-      console.error("Error canceling appointment:", error);
+      console.error('Error canceling appointment:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -247,11 +287,11 @@ export default function DoctorDashboardPage() {
   const formatAppointmentDate = (dateStr: string) => {
     const date = safeDate(dateStr);
     if (!date) return 'Invalid date';
-    
+
     if (isToday(date)) {
       return 'Today';
     }
-    
+
     return format(date, 'EEE, MMM d');
   };
 
@@ -289,7 +329,7 @@ export default function DoctorDashboardPage() {
             <div>
               <h3 className="text-sm font-medium text-slate-500">Total Patients</h3>
               {appointmentsLoading ? (
-                <Spinner size="sm" />
+                <Spinner className="w-4 h-4" />
               ) : (
                 <p className="text-2xl font-bold mt-1">{totalPatients}</p>
               )}
@@ -299,13 +339,13 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
         </Card>
-        
+
         <Card className="p-5 border-l-4 border-green-500 shadow-sm hover:shadow transition-shadow">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-sm font-medium text-slate-500">Today's Appointments</h3>
+              <h3 className="text-sm font-medium text-slate-500">Today&apos;s Appointments</h3>
               {appointmentsLoading ? (
-                <Spinner size="sm" />
+                <Spinner className="w-4 h-4" />
               ) : (
                 <p className="text-2xl font-bold mt-1">{todayAppointments.length}</p>
               )}
@@ -315,13 +355,13 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
         </Card>
-        
+
         <Card className="p-5 border-l-4 border-purple-500 shadow-sm hover:shadow transition-shadow">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="text-sm font-medium text-slate-500">This Week</h3>
               {appointmentsLoading ? (
-                <Spinner size="sm" />
+                <Spinner className="w-4 h-4" />
               ) : (
                 <p className="text-2xl font-bold mt-1">{completedThisWeek.length}</p>
               )}
@@ -331,13 +371,13 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
         </Card>
-        
+
         <Card className="p-5 border-l-4 border-red-500 shadow-sm hover:shadow transition-shadow">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="text-sm font-medium text-slate-500">Notifications</h3>
               {notificationsLoading ? (
-                <Spinner size="sm" />
+                <Spinner className="w-4 h-4" />
               ) : (
                 <p className="text-2xl font-bold mt-1">{unreadNotifications}</p>
               )}
@@ -357,13 +397,19 @@ export default function DoctorDashboardPage() {
             <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlarmClock className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Today's Schedule</h2>
+                <h2 className="text-lg font-semibold">Today&apos;s Schedule</h2>
               </div>
-              <Button as={Link} href="/doctor/appointments" size="sm" variant="outline" className="flex items-center gap-1">
+              <Button
+                as={Link}
+                href="/doctor/appointments"
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-1"
+              >
                 View All <ArrowRight className="h-3 w-3" />
               </Button>
             </div>
-            
+
             <div className="p-5">
               {appointmentsLoading ? (
                 <div className="flex justify-center py-10">
@@ -373,34 +419,56 @@ export default function DoctorDashboardPage() {
                 <div className="text-center py-10 text-slate-500">
                   <Calendar className="h-10 w-10 mx-auto mb-3 text-slate-400" />
                   <p>No appointments scheduled for today.</p>
-                  <Button as={Link} href="/doctor/availability" variant="link" size="sm" className="mt-2">
+                  <Button
+                    as={Link}
+                    href="/doctor/availability"
+                    variant="link"
+                    size="sm"
+                    className="mt-2"
+                  >
                     Update your availability
                   </Button>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-200 dark:divide-slate-700">
                   {todayAppointments.map((appt: Appointment) => {
-                    const initials = (appt.patientName?.split(' ').map(n => n[0]).join('') || 'P').toUpperCase();
+                    const initials = (
+                      appt.patientName
+                        ?.split(' ')
+                        .map(n => n[0])
+                        .join('') || 'P'
+                    ).toUpperCase();
                     return (
-                      <div key={appt.id} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div
+                        key={appt.id}
+                        className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                      >
                         <div className="flex items-center gap-3">
                           <Avatar initials={initials} size={44} />
                           <div>
                             <div className="font-medium">{appt.patientName || 'Patient'}</div>
                             <div className="text-slate-500 text-sm flex flex-wrap items-center gap-2">
-                              <span className="whitespace-nowrap">{appt.startTime} - {appt.endTime}</span>
-                              <Badge variant={getStatusVariant(appt.status)}>
-                                {appt.status}
-                              </Badge>
+                              <span className="whitespace-nowrap">
+                                {appt.startTime} - {appt.endTime}
+                              </span>
+                              <Badge variant={getStatusVariant(appt.status)}>{appt.status}</Badge>
                             </div>
                           </div>
                         </div>
                         {appt.status === AppointmentStatus.CONFIRMED && (
                           <div className="flex flex-wrap gap-2 ml-12 sm:ml-0">
-                            <Button size="sm" variant="primary" onClick={() => handleOpenComplete(appt)}>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => handleOpenComplete(appt)}
+                            >
                               <CheckCircle className="h-3 w-3 mr-1" /> Complete
                             </Button>
-                            <Button size="sm" variant="danger" onClick={() => handleOpenCancel(appt)}>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleOpenCancel(appt)}
+                            >
                               Cancel
                             </Button>
                           </div>
@@ -413,7 +481,7 @@ export default function DoctorDashboardPage() {
             </div>
           </Card>
         </div>
-        
+
         {/* Right Column: Upcoming & Notifications */}
         <div className="space-y-6">
           {/* Upcoming Appointments */}
@@ -424,7 +492,7 @@ export default function DoctorDashboardPage() {
                 <h2 className="text-lg font-semibold">Upcoming Week</h2>
               </div>
             </div>
-            
+
             <div className="p-5">
               {appointmentsLoading ? (
                 <div className="flex justify-center py-6">
@@ -437,23 +505,33 @@ export default function DoctorDashboardPage() {
               ) : (
                 <div className="space-y-4">
                   {nextWeekAppointments.slice(0, 5).map((appt: Appointment) => {
-                    const initials = (appt.patientName?.split(' ').map(n => n[0]).join('') || 'P').toUpperCase();
+                    const initials = (
+                      appt.patientName
+                        ?.split(' ')
+                        .map(n => n[0])
+                        .join('') || 'P'
+                    ).toUpperCase();
                     return (
-                      <div key={appt.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <div
+                        key={appt.id}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60"
+                      >
                         <Avatar initials={initials} size={36} />
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{appt.patientName || 'Patient'}</div>
+                          <div className="font-medium truncate">
+                            {appt.patientName || 'Patient'}
+                          </div>
                           <div className="text-slate-500 text-sm">
                             {formatAppointmentDate(appt.appointmentDate)} • {appt.startTime}
                           </div>
                         </div>
-                        <Badge variant={getStatusVariant(appt.status)} size="sm">
+                        <Badge variant={getStatusVariant(appt.status)} className="text-xs">
                           {appt.status}
                         </Badge>
                       </div>
                     );
                   })}
-                  
+
                   {nextWeekAppointments.length > 5 && (
                     <div className="text-center mt-2">
                       <Button as={Link} href="/doctor/appointments" variant="link" size="sm">
@@ -463,15 +541,21 @@ export default function DoctorDashboardPage() {
                   )}
                 </div>
               )}
-              
+
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <Button as={Link} href="/doctor/appointments" variant="outline" size="sm" className="w-full justify-center">
+                <Button
+                  as={Link}
+                  href="/doctor/appointments"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center"
+                >
                   View Full Schedule
                 </Button>
               </div>
             </div>
           </Card>
-          
+
           {/* Quick Actions Card */}
           <Card className="shadow-sm">
             <div className="p-5 border-b border-slate-200 dark:border-slate-700">
@@ -480,26 +564,35 @@ export default function DoctorDashboardPage() {
                 Quick Actions
               </h2>
             </div>
-            
+
             <div className="p-4 grid grid-cols-1 gap-3">
               <Button as={Link} href="/doctor/profile" variant="outline" className="justify-start">
-                <User className="h-4 w-4 mr-2" />Update Profile
+                <User className="h-4 w-4 mr-2" />
+                Update Profile
               </Button>
-              <Button as={Link} href="/doctor/availability" variant="outline" className="justify-start">
-                <Calendar className="h-4 w-4 mr-2" />Set Availability
+              <Button
+                as={Link}
+                href="/doctor/availability"
+                variant="outline"
+                className="justify-start"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Set Availability
               </Button>
               <Button as={Link} href="/notifications" variant="outline" className="justify-start">
                 <Bell className="h-4 w-4 mr-2" />
                 Check Notifications
                 {unreadNotifications > 0 && (
-                  <Badge variant="danger" size="sm" className="ml-auto">{unreadNotifications}</Badge>
+                  <Badge variant="danger" className="ml-auto text-xs">
+                    {unreadNotifications}
+                  </Badge>
                 )}
               </Button>
             </div>
           </Card>
         </div>
       </div>
-      
+
       {/* Notifications List */}
       <Card className="shadow-sm">
         <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -507,37 +600,51 @@ export default function DoctorDashboardPage() {
             <Bell className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Recent Notifications</h2>
           </div>
-          <Button as={Link} href="/notifications" size="sm" variant="outline" className="flex items-center gap-1">
+          <Button
+            as={Link}
+            href="/notifications"
+            size="sm"
+            variant="outline"
+            className="flex items-center gap-1"
+          >
             View All <ArrowRight className="h-3 w-3" />
           </Button>
         </div>
-        
+
         <div className="p-5">
           {notificationsLoading ? (
-            <div className="flex justify-center py-6"><Spinner /></div>
+            <div className="flex justify-center py-6">
+              <Spinner />
+            </div>
           ) : notificationsError ? (
             <div className="text-center text-red-500 py-6">Error loading notifications.</div>
           ) : notificationsData?.success && notificationsData.notifications.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {notificationsData.notifications.slice(0, 6).map((notif: Notification, idx: number) => (
-                <div 
-                  key={notif.id || idx} 
-                  className={`p-4 rounded-lg border ${notif.isRead ? 'border-slate-200 bg-white' : 'border-primary/20 bg-primary/5'} shadow-sm`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-full ${notif.isRead ? 'bg-slate-100' : 'bg-primary/10'}`}>
-                      <Bell className={`h-4 w-4 ${notif.isRead ? 'text-slate-500' : 'text-primary'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{notif.title}</h3>
-                      <p className="text-slate-500 text-sm line-clamp-2 mt-1">{notif.message}</p>
-                      <div className="text-xs text-slate-400 mt-2">
-                        {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : ''}
+              {notificationsData.notifications
+                .slice(0, 6)
+                .map((notif: Notification, idx: number) => (
+                  <div
+                    key={notif.id || idx}
+                    className={`p-4 rounded-lg border ${notif.isRead ? 'border-slate-200 bg-white' : 'border-primary/20 bg-primary/5'} shadow-sm`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`p-2 rounded-full ${notif.isRead ? 'bg-slate-100' : 'bg-primary/10'}`}
+                      >
+                        <Bell
+                          className={`h-4 w-4 ${notif.isRead ? 'text-slate-500' : 'text-primary'}`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">{notif.title}</h3>
+                        <p className="text-slate-500 text-sm line-clamp-2 mt-1">{notif.message}</p>
+                        <div className="text-xs text-slate-400 mt-2">
+                          {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : ''}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           ) : (
             <div className="text-center text-slate-500 py-8">No notifications yet.</div>

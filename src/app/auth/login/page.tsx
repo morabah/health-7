@@ -42,12 +42,12 @@ export default function LoginPage() {
     try {
       // Capture the form values to ensure they don't change during async operations
       const { email, password } = formData;
-      
+
       // Validate email and password
       if (!email || typeof email !== 'string') {
         throw new Error('Valid email is required');
       }
-      
+
       if (!password || typeof password !== 'string') {
         throw new Error('Valid password is required');
       }
@@ -62,7 +62,7 @@ export default function LoginPage() {
       try {
         // Attempt login
         const success = await login(email, password);
-        
+
         if (success) {
           setIsLoading(false);
           logInfo('Login successful', { email });
@@ -75,7 +75,9 @@ export default function LoginPage() {
       } catch (loginErr) {
         console.error('Login error details:', loginErr);
         setIsLoading(false);
-        setError(loginErr instanceof Error ? loginErr.message : 'Login process error. Please try again.');
+        setError(
+          loginErr instanceof Error ? loginErr.message : 'Login process error. Please try again.'
+        );
         logError('Login error in try-catch', loginErr);
       }
     } catch (err) {
@@ -163,19 +165,34 @@ export default function LoginPage() {
 
         <div className="text-center mt-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800">
           <h3 className="font-medium text-primary mb-2">Existing Database Accounts</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Use database accounts with password <span className="font-semibold">password123</span></p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+            Use database accounts with password <span className="font-semibold">password123</span>
+          </p>
           <ul className="mt-2 space-y-1 text-sm">
-            <li><span className="font-medium">Doctor:</span> user0@demo.health (Gerald Reynolds-Miller)</li>
-            <li><span className="font-medium">Doctor:</span> user5@demo.health (Mohamed Rabah)</li>
-            <li><span className="font-medium">Patient:</span> user7@demo.health (Anita D'Amoree)</li>
-            <li><span className="font-medium">Patient:</span> user8@demo.health (Traci Schowalter-Haag)</li>
+            <li>
+              <span className="font-medium">Doctor:</span> user0@demo.health (Gerald
+              Reynolds-Miller)
+            </li>
+            <li>
+              <span className="font-medium">Doctor:</span> user5@demo.health (Mohamed Rabah)
+            </li>
+            <li>
+              <span className="font-medium">Patient:</span> user7@demo.health (Anita D&apos;Amoree)
+            </li>
+            <li>
+              <span className="font-medium">Patient:</span> user8@demo.health (Traci
+              Schowalter-Haag)
+            </li>
           </ul>
           <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
             <p className="text-xs text-slate-500 dark:text-slate-400">Special account:</p>
-            <p className="text-sm"><span className="font-medium">Admin:</span> admin@example.com with password <span className="font-semibold">Targo2000!</span></p>
+            <p className="text-sm">
+              <span className="font-medium">Admin:</span> admin@example.com with password{' '}
+              <span className="font-semibold">Targo2000!</span>
+            </p>
           </div>
         </div>
       </Card>
     </div>
   );
-} 
+}

@@ -28,17 +28,17 @@ const useCurrentUser = () => {
  */
 export const useMyDashboard = () => {
   const user = useCurrentUser();
-  
+
   return useQuery({
     queryKey: ['dashboard', user?.uid],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getMyDashboardStats', { 
-        uid: user.uid, 
-        role: getUserRole(user.role)
+      return callApi('getMyDashboardStats', {
+        uid: user.uid,
+        role: getUserRole(user.role),
       });
     },
-    enabled: !!user?.uid
+    enabled: !!user?.uid,
   });
 };
 
@@ -47,17 +47,17 @@ export const useMyDashboard = () => {
  */
 export const useNotifications = () => {
   const user = useCurrentUser();
-  
+
   return useQuery({
     queryKey: ['notifications', user?.uid],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getMyNotifications', { 
-        uid: user.uid, 
-        role: getUserRole(user.role)
+      return callApi('getMyNotifications', {
+        uid: user.uid,
+        role: getUserRole(user.role),
       });
     },
-    enabled: !!user?.uid
+    enabled: !!user?.uid,
   });
 };
 
@@ -66,20 +66,20 @@ export const useNotifications = () => {
  */
 export function useMarkNotificationRead() {
   const user = useCurrentUser();
-  
+
   return useMutation({
     mutationFn: async (notificationId: string) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      
-      return callApi('markNotificationRead', { 
-        uid: user.uid, 
+
+      return callApi('markNotificationRead', {
+        uid: user.uid,
         role: getUserRole(user.role),
-        ...{ notificationId, isRead: true }
+        ...{ notificationId, isRead: true },
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    }
+    },
   });
 }
 
@@ -89,26 +89,26 @@ export function useMarkNotificationRead() {
 export const useMarkAllNotificationsRead = () => {
   const user = useCurrentUser();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (notificationIds: string[]) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      
+
       // Process each notification sequentially
       for (const id of notificationIds) {
-        await callApi('markNotificationRead', { 
-          uid: user.uid, 
+        await callApi('markNotificationRead', {
+          uid: user.uid,
           role: getUserRole(user.role),
-          ...{ notificationId: id, isRead: true }
+          ...{ notificationId: id, isRead: true },
         });
       }
-      
+
       return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    }
+    },
   });
 };
 
@@ -117,15 +117,19 @@ export const useMarkAllNotificationsRead = () => {
  */
 export const useFindDoctors = () => {
   const user = useCurrentUser();
-  
+
   return useMutation({
     mutationFn: async (searchParams?: { specialty?: string; location?: string; name?: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('findDoctors', { 
-        uid: user.uid, 
-        role: getUserRole(user.role)
-      }, searchParams);
-    }
+      return callApi(
+        'findDoctors',
+        {
+          uid: user.uid,
+          role: getUserRole(user.role),
+        },
+        searchParams
+      );
+    },
   });
 };
 
@@ -134,18 +138,18 @@ export const useFindDoctors = () => {
  */
 export const useDoctorProfile = (doctorId: string) => {
   const user = useCurrentUser();
-  
+
   return useQuery({
     queryKey: ['doctorProfile', doctorId],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getDoctorPublicProfile', { 
-        uid: user.uid, 
+      return callApi('getDoctorPublicProfile', {
+        uid: user.uid,
         role: getUserRole(user.role),
-        doctorId
+        doctorId,
       });
     },
-    enabled: !!user?.uid && !!doctorId
+    enabled: !!user?.uid && !!doctorId,
   });
 };
 
@@ -154,18 +158,18 @@ export const useDoctorProfile = (doctorId: string) => {
  */
 export const useDoctorAvailability = (doctorId: string) => {
   const user = useCurrentUser();
-  
+
   return useQuery({
     queryKey: ['doctorAvailability', doctorId],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getDoctorAvailability', { 
-        uid: user.uid, 
+      return callApi('getDoctorAvailability', {
+        uid: user.uid,
         role: getUserRole(user.role),
-        doctorId
+        doctorId,
       });
     },
-    enabled: !!user?.uid && !!doctorId
+    enabled: !!user?.uid && !!doctorId,
   });
 };
 
@@ -174,15 +178,16 @@ export const useDoctorAvailability = (doctorId: string) => {
  */
 export const useAvailableSlots = () => {
   const user = useCurrentUser();
-  
+
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      // Debounce rapid calls to avoid freezing the console
-      return callApi('getAvailableSlots', { 
-        uid: user.uid, 
-        role: getUserRole(user.role)
-      }, data);
+
+      // Ensure the user context is correctly passed as a separate first parameter
+      const ctx = { uid: user.uid, role: getUserRole(user.role) };
+
+      // Call the API with context as first param and payload as second param
+      return callApi('getAvailableSlots', ctx, data);
     },
     // Prevent retries to reduce API load
     retry: false,
@@ -196,7 +201,7 @@ export const useAvailableSlots = () => {
  */
 export const useBookAppointment = () => {
   const user = useCurrentUser();
-  
+
   return useMutation({
     mutationFn: async (data: {
       doctorId: string;
@@ -214,7 +219,7 @@ export const useBookAppointment = () => {
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    }
+    },
   });
 };
 
@@ -223,19 +228,19 @@ export const useBookAppointment = () => {
  */
 export const useDirectMessage = () => {
   const user = useCurrentUser();
-  
+
   return useMutation({
     mutationFn: async (data: { recipientId: string; message: string; subject?: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('sendDirectMessage', { 
-        uid: user.uid, 
+      return callApi('sendDirectMessage', {
+        uid: user.uid,
         role: getUserRole(user.role),
-        ...data
+        ...data,
       });
     },
     onSuccess: () => {
       // No need to invalidate any queries on the sender's side
-    }
+    },
   });
 };
 
@@ -256,4 +261,4 @@ export const useMyAppointments = (role: UserType) => {
     },
     enabled: !!user?.uid && !!role,
   });
-}; 
+};

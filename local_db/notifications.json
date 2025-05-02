@@ -418,5 +418,55 @@
     "isRead": false,
     "createdAt": "2025-05-01T02:06:14.483Z",
     "relatedId": null
+  },
+  {
+    "id": "i7djkicqzdfa9tkuucutm",
+    "userId": "u-000",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-01T02:40:53.728Z",
+    "relatedId": null
+  },
+  {
+    "id": "mo17a1zq1j8mlbsfrczqu",
+    "userId": "u-000",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-01T02:40:58.342Z",
+    "relatedId": null
+  },
+  {
+    "id": "hx1v2fvnlgivzjsz9h83ep",
+    "userId": "u-000",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-01T02:40:59.554Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-f0oc3nlmqu9n88nsvoe8g",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-10T02:20:07.895Z at 10:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-02T02:20:14.123Z",
+    "relatedId": "0vb5nafbxh7j08lk6ssrytt8"
+  },
+  {
+    "id": "notif-tfyk223pxra9qwc0brumlb",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-10T02:20:07.895Z at 10:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-02T02:20:14.123Z",
+    "relatedId": "0vb5nafbxh7j08lk6ssrytt8"
   }
 ]
