@@ -6,11 +6,26 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { 
-  Users, UserRound, Stethoscope, ShieldAlert, ArrowRight, 
-  Calendar, Activity, Clock, AlertCircle, BarChart3, Bell, CheckCircle
+import {
+  Users,
+  UserRound,
+  Stethoscope,
+  ShieldAlert,
+  ArrowRight,
+  Calendar,
+  Activity,
+  Clock,
+  AlertCircle,
+  BarChart3,
+  Bell,
+  CheckCircle,
 } from 'lucide-react';
-import { useAdminDashboardData, useAllUsers, useAllDoctors, useAllAppointments } from '@/data/adminLoaders';
+import {
+  useAdminDashboardData,
+  useAllUsers,
+  useAllDoctors,
+  useAllAppointments,
+} from '@/data/adminLoaders';
 import { VerificationStatus, UserType, AppointmentStatus } from '@/types/enums';
 import { logInfo, logValidation } from '@/lib/logger';
 import ProgressBar from '@/components/ui/ProgressBar';
@@ -18,17 +33,17 @@ import { formatDistanceToNow } from 'date-fns';
 import Badge from '@/components/ui/Badge';
 
 // Stat component for dashboard statistics with trend indicator
-function Stat({ 
-  title, 
-  value, 
-  Icon, 
+function Stat({
+  title,
+  value,
+  Icon,
   isLoading = false,
   trend = null, // Can be positive, negative, or null
   subtitle = '',
-  onClick = null
-}: { 
-  title: string; 
-  value: number | string; 
+  onClick = null,
+}: {
+  title: string;
+  value: number | string;
   Icon: React.ElementType;
   isLoading?: boolean;
   trend?: 'positive' | 'negative' | null;
@@ -36,7 +51,10 @@ function Stat({
   onClick?: (() => void) | null;
 }) {
   return (
-    <Card className={`p-6 ${onClick ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`} onClick={onClick || undefined}>
+    <Card
+      className={`p-6 ${onClick ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`}
+      onClick={onClick || undefined}
+    >
       <div className="flex items-center space-x-3 mb-3">
         <div className="p-2 bg-primary-50 dark:bg-primary-900/30 rounded-full">
           <Icon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -52,7 +70,9 @@ function Stat({
           <div className="flex items-end justify-between">
             <p className="text-2xl font-bold">{value}</p>
             {trend && (
-              <span className={`text-sm ${trend === 'positive' ? 'text-success' : 'text-danger'} font-medium`}>
+              <span
+                className={`text-sm ${trend === 'positive' ? 'text-success' : 'text-danger'} font-medium`}
+              >
                 {trend === 'positive' ? '↑' : '↓'} {subtitle}
               </span>
             )}
@@ -65,7 +85,15 @@ function Stat({
 }
 
 // Card header with link component
-function HeaderWithLink({ title, href, linkText = "View all" }: { title: string; href: string; linkText?: string }) {
+function HeaderWithLink({
+  title,
+  href,
+  linkText = 'View all',
+}: {
+  title: string;
+  href: string;
+  linkText?: string;
+}) {
   return (
     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
       <h2 className="text-lg font-medium">{title}</h2>
@@ -80,13 +108,13 @@ function HeaderWithLink({ title, href, linkText = "View all" }: { title: string;
 }
 
 // Activity item component
-function ActivityItem({ 
-  title, 
-  time, 
-  status, 
+function ActivityItem({
+  title,
+  time,
+  status,
   icon: Icon,
-  statusColor
-}: { 
+  statusColor,
+}: {
   title: string;
   time: string;
   status: string;
@@ -134,73 +162,91 @@ type Appointment = {
 
 export default function AdminDashboard() {
   // Use unified dashboard data loader
-  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useAdminDashboardData();
-  
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useAdminDashboardData();
+
   // Still need these for the user and doctor lists
   const { data: usersData, isLoading: usersLoading, error: usersError } = useAllUsers();
   const { data: doctorsData, isLoading: doctorsLoading, error: doctorsError } = useAllDoctors();
-  const { data: appointmentsData, isLoading: appointmentsLoading, error: appointmentsError } = useAllAppointments();
-  
+  const {
+    data: appointmentsData,
+    isLoading: appointmentsLoading,
+    error: appointmentsError,
+  } = useAllAppointments();
+
   // Get stats from dashboard data
   const totalUsers = usersData?.success ? usersData.users.length : 0;
   const totalPatients = dashboardData?.success ? dashboardData.adminStats?.totalPatients || 0 : 0;
   const totalDoctors = dashboardData?.success ? dashboardData.adminStats?.totalDoctors || 0 : 0;
-  const pendingVerifications = dashboardData?.success ? dashboardData.adminStats?.pendingVerifications || 0 : 0;
+  const pendingVerifications = dashboardData?.success
+    ? dashboardData.adminStats?.pendingVerifications || 0
+    : 0;
   const totalAppointments = appointmentsData?.success ? appointmentsData.appointments.length : 0;
-  
+
   // Get derived statistics
-  const verifiedDoctorsCount = doctorsData?.success 
-    ? doctorsData.doctors.filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.VERIFIED).length 
+  const verifiedDoctorsCount = doctorsData?.success
+    ? doctorsData.doctors.filter(
+        (doctor: Doctor) => doctor.verificationStatus === VerificationStatus.VERIFIED
+      ).length
     : 0;
-  
-  const doctorVerificationRate = totalDoctors > 0 
-    ? Math.round((verifiedDoctorsCount / totalDoctors) * 100) 
-    : 0;
-  
+
+  const doctorVerificationRate =
+    totalDoctors > 0 ? Math.round((verifiedDoctorsCount / totalDoctors) * 100) : 0;
+
   // Get recent users and pending doctors
-  const recentUsers = usersData?.success 
-    ? usersData.users.sort((a: User, b: User) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ).slice(0, 5)
-    : [];
-  
-  const pendingDoctors = doctorsData?.success 
-    ? doctorsData.doctors.filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING).slice(0, 5)
-    : [];
-  
-  // Get upcoming appointments
-  const upcomingAppointments = appointmentsData?.success 
-    ? appointmentsData.appointments
-        .filter((appt: any) => appt.status === AppointmentStatus.CONFIRMED)
-        .sort((a: any, b: any) => 
-          new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
+  const recentUsers = usersData?.success
+    ? usersData.users
+        .sort(
+          (a: User, b: User) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
         .slice(0, 5)
     : [];
-  
+
+  const pendingDoctors = doctorsData?.success
+    ? doctorsData.doctors
+        .filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING)
+        .slice(0, 5)
+    : [];
+
+  // Get upcoming appointments
+  const upcomingAppointments = appointmentsData?.success
+    ? appointmentsData.appointments
+        .filter((appt: any) => appt.status === AppointmentStatus.CONFIRMED)
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
+        )
+        .slice(0, 5)
+    : [];
+
   // Combined error state
   const hasError = dashboardError || usersError || doctorsError || appointmentsError;
-  const errorMessage = dashboardError 
-    ? String(dashboardError) 
-    : usersError 
-      ? String(usersError) 
-      : doctorsError 
+  const errorMessage = dashboardError
+    ? String(dashboardError)
+    : usersError
+      ? String(usersError)
+      : doctorsError
         ? String(doctorsError)
         : appointmentsError
           ? String(appointmentsError)
           : '';
-  
+
   // Activity feed data (combined from various sources)
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
-  
+
   useEffect(() => {
     // Combine data from different sources into a unified activity feed
     if (usersData?.success && doctorsData?.success && appointmentsData?.success) {
       const activities = [];
-      
+
       // Add recent user registrations
       const recentRegistrations = usersData.users
-        .sort((a: User, b: User) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort(
+          (a: User, b: User) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
         .slice(0, 3)
         .map((user: User) => ({
           type: 'registration',
@@ -209,9 +255,9 @@ export default function AdminDashboard() {
           status: 'Registered',
           icon: Users,
           statusColor: 'bg-primary-500',
-          date: new Date(user.createdAt)
+          date: new Date(user.createdAt),
         }));
-      
+
       // Add recent verification status changes
       const recentVerifications = doctorsData.doctors
         .filter((doctor: Doctor) => doctor.verificationStatus !== VerificationStatus.PENDING)
@@ -220,12 +266,14 @@ export default function AdminDashboard() {
           type: 'verification',
           title: `Dr. ${doctor.firstName} ${doctor.lastName}`,
           time: 'Recently',
-          status: doctor.verificationStatus === VerificationStatus.VERIFIED ? 'Verified' : 'Rejected',
+          status:
+            doctor.verificationStatus === VerificationStatus.VERIFIED ? 'Verified' : 'Rejected',
           icon: ShieldAlert,
-          statusColor: doctor.verificationStatus === VerificationStatus.VERIFIED ? 'bg-success' : 'bg-danger',
-          date: new Date() // We don't have the actual date, so using now
+          statusColor:
+            doctor.verificationStatus === VerificationStatus.VERIFIED ? 'bg-success' : 'bg-danger',
+          date: new Date(), // We don't have the actual date, so using now
         }));
-      
+
       // Add recent appointments
       const recentAppointments = appointmentsData.appointments
         .slice(0, 3)
@@ -236,27 +284,54 @@ export default function AdminDashboard() {
           status: appointment.status,
           icon: Calendar,
           statusColor: 'bg-info-500',
-          date: new Date(appointment.appointmentDate)
+          date: new Date(appointment.appointmentDate),
         }));
-      
+
       // Combine and sort by date
       activities.push(...recentRegistrations, ...recentVerifications, ...recentAppointments);
       activities.sort((a, b) => b.date.getTime() - a.date.getTime());
-      
+
       setActivityFeed(activities.slice(0, 6));
     }
   }, [usersData, doctorsData, appointmentsData]);
-  
+
   useEffect(() => {
     logInfo('Admin dashboard rendered (with real data)');
-    
+
+    // Debug log for user data validation
+    if (usersData?.success && usersData.users.length > 0) {
+      const firstUser = usersData.users[0];
+      logInfo('First user data', {
+        id: firstUser.id,
+        name: `${firstUser.firstName} ${firstUser.lastName}`,
+        email: firstUser.email || 'No email',
+      });
+    }
+
+    if (doctorsData?.success && doctorsData.doctors.length > 0) {
+      const firstDoctor = doctorsData.doctors[0];
+      logInfo('First doctor data', {
+        id: firstDoctor.id,
+        name:
+          firstDoctor.firstName && firstDoctor.lastName
+            ? `${firstDoctor.firstName} ${firstDoctor.lastName}`
+            : 'Missing name',
+        email: firstDoctor.email || 'No email',
+        specialty: firstDoctor.specialty || 'No specialty',
+      });
+    }
+
     // Log validation
     if (dashboardData?.success) {
       logValidation('4.10', 'success', 'Admin dashboard connected to real data via local API.');
-      logValidation('4.FINAL-POLISH', 'success', 'Full local-DB prototype: all pages fetch from & write to local_db, workflows verified');
+      logValidation(
+        '4.FINAL-POLISH',
+        'success',
+        'Full local-DB prototype: all pages fetch from & write to local_db, workflows verified'
+      );
     }
-  }, [dashboardData]);
-  
+  }, [dashboardData, usersData, doctorsData]);
+
   if (hasError) {
     return (
       <Alert variant="error" className="my-4">
@@ -264,7 +339,7 @@ export default function AdminDashboard() {
       </Alert>
     );
   }
-  
+
   return (
     <div className="space-y-10">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -283,40 +358,40 @@ export default function AdminDashboard() {
 
       {/* Stats grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Stat 
-          title="Total Users" 
-          value={totalUsers} 
-          Icon={Users} 
-          isLoading={usersLoading} 
-          onClick={() => window.location.href = '/admin/users'}
+        <Stat
+          title="Total Users"
+          value={totalUsers}
+          Icon={Users}
+          isLoading={usersLoading}
+          onClick={() => (window.location.href = '/admin/users')}
         />
-        
-        <Stat 
-          title="Patients" 
-          value={totalPatients} 
-          Icon={UserRound} 
+
+        <Stat
+          title="Patients"
+          value={totalPatients}
+          Icon={UserRound}
           isLoading={dashboardLoading}
-          subtitle={`${Math.round((totalPatients/totalUsers) * 100)}% of users`}
-          onClick={() => window.location.href = '/admin/users?type=patient'}
+          subtitle={`${Math.round((totalPatients / totalUsers) * 100)}% of users`}
+          onClick={() => (window.location.href = '/admin/users?type=patient')}
         />
-        
-        <Stat 
-          title="Doctors" 
-          value={totalDoctors} 
-          Icon={Stethoscope} 
+
+        <Stat
+          title="Doctors"
+          value={totalDoctors}
+          Icon={Stethoscope}
           isLoading={dashboardLoading}
           subtitle={`${verifiedDoctorsCount} verified`}
-          onClick={() => window.location.href = '/admin/doctors'}
+          onClick={() => (window.location.href = '/admin/doctors')}
         />
-        
-        <Stat 
-          title="Pending Verifications" 
-          value={pendingVerifications} 
-          Icon={ShieldAlert} 
+
+        <Stat
+          title="Pending Verifications"
+          value={pendingVerifications}
+          Icon={ShieldAlert}
           isLoading={dashboardLoading}
           trend={pendingVerifications > 0 ? 'negative' : null}
           subtitle={pendingVerifications > 0 ? 'Needs attention' : 'All clear'}
-          onClick={() => window.location.href = '/admin/doctors?status=PENDING'}
+          onClick={() => (window.location.href = '/admin/doctors?status=PENDING')}
         />
       </section>
 
@@ -330,31 +405,37 @@ export default function AdminDashboard() {
             {/* Doctor Verification Rate */}
             <div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Doctor Verification Rate</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Doctor Verification Rate
+                </span>
                 <span className="text-sm font-semibold">{doctorVerificationRate}%</span>
               </div>
               <ProgressBar value={doctorVerificationRate} max={100} />
             </div>
-            
+
             {/* User Type Distribution */}
             <div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-slate-600 dark:text-slate-400">User Type Distribution</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  User Type Distribution
+                </span>
               </div>
               <div className="flex space-x-1 h-2.5 mb-3">
-                <div 
-                  className="bg-primary-500 rounded-l-full" 
-                  style={{ width: `${totalPatients/totalUsers * 100}%` }}
+                <div
+                  className="bg-primary-500 rounded-l-full"
+                  style={{ width: `${(totalPatients / totalUsers) * 100}%` }}
                   title={`Patients: ${totalPatients}`}
                 />
-                <div 
-                  className="bg-success-500" 
-                  style={{ width: `${totalDoctors/totalUsers * 100}%` }}
+                <div
+                  className="bg-success-500"
+                  style={{ width: `${(totalDoctors / totalUsers) * 100}%` }}
                   title={`Doctors: ${totalDoctors}`}
                 />
-                <div 
-                  className="bg-warning-500 rounded-r-full" 
-                  style={{ width: `${(totalUsers - totalPatients - totalDoctors)/totalUsers * 100}%` }}
+                <div
+                  className="bg-warning-500 rounded-r-full"
+                  style={{
+                    width: `${((totalUsers - totalPatients - totalDoctors) / totalUsers) * 100}%`,
+                  }}
                   title={`Admins: ${totalUsers - totalPatients - totalDoctors}`}
                 />
               </div>
@@ -364,7 +445,7 @@ export default function AdminDashboard() {
                 <span>Admins</span>
               </div>
             </div>
-            
+
             {/* Appointments by Status */}
             <div>
               <div className="flex justify-between mb-2">
@@ -375,45 +456,53 @@ export default function AdminDashboard() {
                 <Button size="sm" variant="outline" className="text-xs justify-between">
                   <span>Confirmed</span>
                   <Badge variant="info" className="ml-2">
-                    {appointmentsData?.success 
-                      ? appointmentsData.appointments.filter((a: any) => a.status === AppointmentStatus.CONFIRMED).length 
+                    {appointmentsData?.success
+                      ? appointmentsData.appointments.filter(
+                          (a: any) => a.status === AppointmentStatus.CONFIRMED
+                        ).length
                       : 0}
                   </Badge>
                 </Button>
                 <Button size="sm" variant="outline" className="text-xs justify-between">
                   <span>Completed</span>
                   <Badge variant="success" className="ml-2">
-                    {appointmentsData?.success 
-                      ? appointmentsData.appointments.filter((a: any) => a.status === AppointmentStatus.COMPLETED).length 
+                    {appointmentsData?.success
+                      ? appointmentsData.appointments.filter(
+                          (a: any) => a.status === AppointmentStatus.COMPLETED
+                        ).length
                       : 0}
                   </Badge>
                 </Button>
                 <Button size="sm" variant="outline" className="text-xs justify-between">
                   <span>Canceled</span>
                   <Badge variant="danger" className="ml-2">
-                    {appointmentsData?.success 
-                      ? appointmentsData.appointments.filter((a: any) => a.status === AppointmentStatus.CANCELED).length 
+                    {appointmentsData?.success
+                      ? appointmentsData.appointments.filter(
+                          (a: any) => a.status === AppointmentStatus.CANCELED
+                        ).length
                       : 0}
                   </Badge>
                 </Button>
                 <Button size="sm" variant="outline" className="text-xs justify-between">
                   <span>Other</span>
                   <Badge variant="default" className="ml-2">
-                    {appointmentsData?.success 
-                      ? appointmentsData.appointments.filter((a: any) => 
-                        a.status !== AppointmentStatus.CONFIRMED && 
-                        a.status !== AppointmentStatus.COMPLETED && 
-                        a.status !== AppointmentStatus.CANCELED).length 
+                    {appointmentsData?.success
+                      ? appointmentsData.appointments.filter(
+                          (a: any) =>
+                            a.status !== AppointmentStatus.CONFIRMED &&
+                            a.status !== AppointmentStatus.COMPLETED &&
+                            a.status !== AppointmentStatus.CANCELED
+                        ).length
                       : 0}
                   </Badge>
                 </Button>
               </div>
             </div>
-            
+
             <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="w-full justify-center"
                 as={Link}
                 href="/admin/reports"
@@ -432,12 +521,14 @@ export default function AdminDashboard() {
             <div className="flex items-center">
               <Bell className="h-4 w-4 text-slate-400 mr-2" />
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                {activityFeed.length > 0 ? `Last updated ${formatDistanceToNow(new Date(), { addSuffix: true })}` : 'No activity'}
+                {activityFeed.length > 0
+                  ? `Last updated ${formatDistanceToNow(new Date(), { addSuffix: true })}`
+                  : 'No activity'}
               </span>
             </div>
           </div>
-          
-          {(usersLoading || doctorsLoading || appointmentsLoading) ? (
+
+          {usersLoading || doctorsLoading || appointmentsLoading ? (
             <div className="p-6 flex justify-center">
               <Spinner />
             </div>
@@ -457,7 +548,7 @@ export default function AdminDashboard() {
                   statusColor={activity.statusColor}
                 />
               ))}
-              
+
               <div className="p-4 text-center">
                 <Button variant="ghost" size="sm" as={Link} href="/admin/activity">
                   View all activity
@@ -480,22 +571,29 @@ export default function AdminDashboard() {
           ) : recentUsers.length > 0 ? (
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {recentUsers.map((user: User, idx: number) => (
-                <div key={user.id || user.email || idx} className="p-4 flex justify-between items-center">
+                <div
+                  key={user.id || user.email || idx}
+                  className="p-4 flex justify-between items-center"
+                >
                   <div>
-                    <p className="font-medium">{user.firstName} {user.lastName}</p>
+                    <p className="font-medium">
+                      {user.firstName} {user.lastName}
+                    </p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
                     <p className="text-xs text-slate-400 mt-1">
                       Joined {formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
                     </p>
                   </div>
                   <div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      user.userType === UserType.PATIENT 
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300' 
-                        : user.userType === UserType.DOCTOR
-                          ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-300'
-                          : 'bg-warning-100 text-warning-800 dark:bg-warning-900/30 dark:text-warning-300'
-                    }`}>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full ${
+                        user.userType === UserType.PATIENT
+                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
+                          : user.userType === UserType.DOCTOR
+                            ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-300'
+                            : 'bg-warning-100 text-warning-800 dark:bg-warning-900/30 dark:text-warning-300'
+                      }`}
+                    >
                       {user.userType}
                     </span>
                   </div>
@@ -503,18 +601,16 @@ export default function AdminDashboard() {
               ))}
             </div>
           ) : (
-            <div className="p-6 text-center text-slate-500 dark:text-slate-400">
-              No users found
-            </div>
+            <div className="p-6 text-center text-slate-500 dark:text-slate-400">No users found</div>
           )}
         </Card>
 
         {/* Pending verifications */}
         <Card>
-          <HeaderWithLink 
-            title="Pending Doctor Verifications" 
-            href="/admin/doctors?status=PENDING" 
-            linkText={pendingVerifications > 0 ? "Verify all" : "View all"}
+          <HeaderWithLink
+            title="Pending Doctor Verifications"
+            href="/admin/doctors?status=PENDING"
+            linkText={pendingVerifications > 0 ? 'Verify all' : 'View all'}
           />
           {doctorsLoading ? (
             <div className="p-6 flex justify-center">
@@ -523,9 +619,14 @@ export default function AdminDashboard() {
           ) : pendingDoctors.length > 0 ? (
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {pendingDoctors.map((doctor: Doctor, idx: number) => (
-                <div key={doctor.id || doctor.email || idx} className="p-4 flex justify-between items-center">
+                <div
+                  key={doctor.id || doctor.email || idx}
+                  className="p-4 flex justify-between items-center"
+                >
                   <div>
-                    <p className="font-medium">Dr. {doctor.firstName} {doctor.lastName}</p>
+                    <p className="font-medium">
+                      Dr. {doctor.firstName} {doctor.lastName}
+                    </p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{doctor.specialty}</p>
                     <div className="flex items-center mt-1">
                       <Activity className="h-3 w-3 text-warning-500 mr-1" />
@@ -533,7 +634,9 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <Link href={`/admin/doctor-verification/${doctor.id}`}>
-                    <Button size="sm" variant="primary">Verify</Button>
+                    <Button size="sm" variant="primary">
+                      Verify
+                    </Button>
                   </Link>
                 </div>
               ))}
@@ -549,4 +652,4 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
-} 
+}

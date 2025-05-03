@@ -5,8 +5,8 @@
     "licenseNumber": "UgFjwxbYMW",
     "yearsOfExperience": 23,
     "bio": "Alienus autus adipisci comparo creta cernuus tribuo consuasor cicuta illo. Thorax aestas vos ter.",
-    "verificationStatus": "pending",
-    "verificationNotes": null,
+    "verificationStatus": "verified",
+    "verificationNotes": "Status changed to verified by admin",
     "adminNotes": "Pending review",
     "location": "Cairo, Egypt",
     "education": "MBBS – Cairo University",
@@ -53,7 +53,7 @@
       "2025-06-28T20:35:44.186Z"
     ],
     "createdAt": "2025-03-30T20:35:44.186Z",
-    "updatedAt": "2025-04-29T20:35:44.186Z",
+    "updatedAt": "2025-05-02T11:17:00.456Z",
     "id": "u-000"
   },
   {
@@ -62,8 +62,8 @@
     "licenseNumber": "0OHJL4m7RC",
     "yearsOfExperience": 9,
     "bio": "Communis suspendo repellendus valens demens. Summisse temptatio laudantium.",
-    "verificationStatus": "rejected",
-    "verificationNotes": "License information could not be verified",
+    "verificationStatus": "verified",
+    "verificationNotes": "Status changed to verified by admin",
     "adminNotes": "Pending review",
     "location": "Cairo, Egypt",
     "education": "MBBS – Cairo University",
@@ -139,7 +139,7 @@
     "timezone": "Africa/Cairo",
     "blockedDates": [],
     "createdAt": "2025-03-30T20:35:44.186Z",
-    "updatedAt": "2025-05-01T02:06:14.457Z",
+    "updatedAt": "2025-05-02T11:17:08.879Z",
     "id": "u-001"
   },
   {
@@ -464,7 +464,7 @@
     "specialty": "",
     "licenseNumber": "",
     "yearsOfExperience": 0,
-    "verificationStatus": "pending",
+    "verificationStatus": "verified",
     "blockedDates": [],
     "weeklySchedule": {
       "monday": [],
@@ -490,7 +490,7 @@
     "educationHistory": [],
     "experience": [],
     "bio": null,
-    "verificationNotes": null,
+    "verificationNotes": "Status changed to verified by admin",
     "profilePictureUrl": null,
     "profilePicturePath": null,
     "licenseDocumentUrl": null,
@@ -504,7 +504,7 @@
     "consultationFee": null,
     "timezone": "UTC",
     "createdAt": "2025-05-02T08:47:06.700Z",
-    "updatedAt": "2025-05-02T08:54:17.733Z",
+    "updatedAt": "2025-05-02T11:17:03.513Z",
     "id": "htggr2d1eeevik1kcux1ed"
   }
 ]

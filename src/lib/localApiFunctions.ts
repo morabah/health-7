@@ -88,7 +88,7 @@ export async function registerUser(
     /* 3  assemble objects */
     const uid = generateId();
     const timestamp = nowIso();
-    
+
     // Store the password in our development password store
     // In a real app, this would be hashed before storage
     userPasswords[data.email.toLowerCase()] = data.password;
@@ -200,63 +200,42 @@ export async function getMockPatientProfile(
 export async function getMockDoctorProfile(
   userId: string
 ): Promise<z.infer<typeof DoctorProfileSchema> & { id: string }> {
-  const timestamp = new Date().toISOString();
-  const uniqueId = `doctor-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
-
+  const timestamp = nowIso();
   return {
-    id: uniqueId,
+    id: `dr-${userId}`,
     userId,
-    specialty: 'General Practice',
-    licenseNumber: `MD-${Math.floor(Math.random() * 100000)}`,
-    yearsOfExperience: 5,
-    bio: 'Experienced doctor with a passion for patient care',
-    verificationStatus: VerificationStatus.VERIFIED,
+    specialty: 'Cardiology',
+    licenseNumber: 'MED123456',
+    yearsOfExperience: 8,
+    bio: 'Experienced cardiologist with focus on preventative care.',
+    verificationStatus: VerificationStatus.PENDING,
     verificationNotes: null,
     adminNotes: '',
-    education: [
+    education: JSON.stringify([
       {
         institution: 'Medical University',
         degree: 'Doctor of Medicine',
         field: 'Medicine',
-        startYear: 2010,
-        endYear: 2014,
+        startYear: 2008,
+        endYear: 2013,
         isOngoing: false,
-        description: 'Studied general medicine with a focus on primary care',
+        description: 'Specialized in Cardiology',
       },
-    ],
-    certifications: [
-      {
-        name: 'Board Certification',
-        issuer: 'American Board of Medicine',
-        issueDate: '2015-01-15',
-        expiryDate: '2025-01-15',
-        isExpired: false,
-        credentialId: 'BOARD-12345',
-      },
-    ],
-    languages: ['English'],
-    insuranceAccepted: ['Medicare', 'Blue Cross'],
-    appointmentTypes: ['Consultation', 'Follow-up', 'Annual Physical'],
-    officeAddress: {
-      line1: '123 Medical Drive',
-      line2: 'Suite 100',
-      city: 'Healthville',
-      state: 'CA',
-      postalCode: '90210',
-      country: 'USA',
-    },
-    officePhone: '555-123-4567',
-    officeHours: {
-      monday: { start: '09:00', end: '17:00' },
-      tuesday: { start: '09:00', end: '17:00' },
-      wednesday: { start: '09:00', end: '17:00' },
-      thursday: { start: '09:00', end: '17:00' },
-      friday: { start: '09:00', end: '17:00' },
-      saturday: null,
-      sunday: null,
-    },
+    ]), // Store as a string
+    servicesOffered: 'Cardiac consultation, ECG analysis, Heart health assessment',
+    languages: ['English', 'Spanish'],
+    consultationFee: 120,
+    location: 'New York Medical Center',
     profilePictureUrl: null,
-    weeklySchedule: null,
+    weeklySchedule: {
+      monday: [],
+      tuesday: [],
+      wednesday: [],
+      thursday: [],
+      friday: [],
+      saturday: [],
+      sunday: [],
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -337,7 +316,7 @@ export async function signIn(
     /* 3  validate password */
     const storedPassword = userPasswords[email.toLowerCase()];
     const defaultPasswords = ['password123', 'password', 'Targo2000!', 'Password123'];
-    
+
     // Check if the password matches either the stored password or any of the default passwords
     if (storedPassword !== password && !defaultPasswords.includes(password)) {
       logWarn('Login attempt: incorrect password', { email });
@@ -1574,9 +1553,21 @@ export async function markNotificationRead(
 /**
  * Get a doctor's public profile
  */
-export async function getDoctorPublicProfile(
-  ctx: { uid: string; role: UserType; doctorId: string }
-): Promise<ResultOk<{ doctor: z.infer<typeof DoctorProfileSchema> }> | ResultErr> {
+export async function getDoctorPublicProfile(ctx: {
+  uid: string;
+  role: UserType;
+  doctorId: string;
+}): Promise<
+  | ResultOk<{
+      doctor: z.infer<typeof DoctorProfileSchema> & {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('getDoctorPublicProfile');
 
   try {
@@ -1649,9 +1640,26 @@ export async function getDoctorPublicProfile(
       blockedDates: Array.isArray(doc.blockedDates) ? doc.blockedDates : [],
       createdAt: typeof doc.createdAt === 'string' ? doc.createdAt : new Date().toISOString(),
       updatedAt: typeof doc.updatedAt === 'string' ? doc.updatedAt : new Date().toISOString(),
+      // Add required fields not in doc
+      licenseDocumentUrl: null,
+      certificatePath: null,
+      certificateUrl: null,
+      licenseDocumentPath: null,
+      profilePictureUrl: null,
+      profilePicturePath: null,
+      educationHistory: [],
     };
 
-    return { success: true, doctor: profile };
+    // Include the enhanced profile with user data
+    const enhancedProfile = {
+      ...profile,
+      id: doctorId,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+    };
+
+    return { success: true, doctor: enhancedProfile };
   } catch (e) {
     logError('getDoctorPublicProfile failed', e);
     return { success: false, error: 'Error fetching doctor profile' };
@@ -1769,7 +1777,7 @@ export async function adminVerifyDoctor(ctx: {
   uid: string;
   role: UserType;
   doctorId: string;
-  status: string;
+  status: string | VerificationStatus;
   notes?: string;
 }): Promise<ResultOk<{ message: string }> | ResultErr> {
   logInfo('adminVerifyDoctor called', {
@@ -1786,35 +1794,78 @@ export async function adminVerifyDoctor(ctx: {
   }
 
   try {
-    // In a real implementation, this would update the doctor in the database
-    // For now, just return success
+    // Validate status value
+    let verificationStatus: VerificationStatus;
+    if (Object.values(VerificationStatus).includes(ctx.status as VerificationStatus)) {
+      verificationStatus = ctx.status as VerificationStatus;
+    } else {
+      return { success: false, error: `Invalid verification status: ${ctx.status}` };
+    }
+
     const timestamp = nowIso();
 
-    // Create a notification for the doctor
-    const notifications = await getNotifications();
-    const doctorNotification: Notification = {
-      id: generateId(),
-      userId: ctx.doctorId,
-      title: `Verification Status Update`,
-      message:
-        ctx.status === 'VERIFIED'
-          ? 'Congratulations! Your doctor account has been verified. You can now start accepting appointments.'
-          : `Your verification request was not approved. ${ctx.notes || 'Please contact support for more information.'}`,
-      type: NotificationType.VERIFICATION_STATUS_CHANGE,
-      isRead: false,
-      createdAt: timestamp,
-      relatedId: null,
-    };
-    notifications.push(doctorNotification as Notification);
-    await saveNotifications(notifications);
+    // Get all doctors
+    const doctors = await getDoctors();
 
-    return {
-      success: true,
-      message: `Doctor verification status updated to ${ctx.status}`,
-    };
-  } catch (e) {
-    logError('adminVerifyDoctor failed', e);
-    return { success: false, error: 'Error updating doctor verification status' };
+    // Find the doctor by ID
+    const doctorIndex = doctors.findIndex(d => d.userId === ctx.doctorId || d.id === ctx.doctorId);
+
+    if (doctorIndex === -1) {
+      return { success: false, error: 'Doctor not found' };
+    }
+
+    // Update verification status
+    const doctor = { ...doctors[doctorIndex] };
+
+    // Only update if status is different
+    if (doctor.verificationStatus !== verificationStatus) {
+      doctor.verificationStatus = verificationStatus;
+
+      // Add notes if provided
+      if (ctx.notes) {
+        doctor.verificationNotes = ctx.notes;
+      }
+
+      doctor.updatedAt = timestamp;
+
+      // Update in array
+      doctors[doctorIndex] = doctor;
+
+      // Save to database
+      await saveDoctors(doctors);
+
+      // Create notification for the doctor
+      const notifications = await getNotifications();
+
+      const newNotification: Notification = {
+        id: generateId(),
+        userId: doctor.userId,
+        title: 'Verification Status Updated',
+        message: `Your verification status has been updated to ${verificationStatus.toLowerCase()}. ${ctx.notes ? `Notes: ${ctx.notes}` : ''}`,
+        isRead: false,
+        createdAt: timestamp,
+        type: NotificationType.VERIFICATION,
+        relatedId: doctor.id || doctor.userId,
+      };
+
+      notifications.push(newNotification);
+      await saveNotifications(notifications);
+
+      logInfo(`Doctor ${ctx.doctorId} verification status updated to ${verificationStatus}`);
+
+      return {
+        success: true,
+        message: `Doctor verification status updated to ${verificationStatus}`,
+      };
+    } else {
+      return {
+        success: true,
+        message: `Doctor verification status was already ${verificationStatus}`,
+      };
+    }
+  } catch (error) {
+    logError('Error updating doctor verification status', error);
+    return { success: false, error: 'Failed to update doctor verification status' };
   }
 }
 
@@ -1846,10 +1897,17 @@ export async function adminGetAllUsers(ctx: {
 /**
  * Admin get all doctors
  */
-export async function adminGetAllDoctors(ctx: {
-  uid: string;
-  role: UserType;
-}): Promise<ResultOk<{ doctors: z.infer<typeof DoctorProfileSchema>[] }> | ResultErr> {
+export async function adminGetAllDoctors(ctx: { uid: string; role: UserType }): Promise<
+  | ResultOk<{
+      doctors: (z.infer<typeof DoctorProfileSchema> & {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      })[];
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('adminGetAllDoctors');
 
   try {
@@ -1857,12 +1915,37 @@ export async function adminGetAllDoctors(ctx: {
 
     logInfo('adminGetAllDoctors called', { uid, role });
 
-    const doctors = await getDoctors();
+    // Only admins can access this endpoint
+    if (role !== UserType.ADMIN) {
+      return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
+    }
 
-    return { success: true, doctors };
+    const doctors = await getDoctors();
+    const users = await getUsers();
+
+    // Join doctor profiles with user info
+    const enrichedDoctors = doctors.map(doctor => {
+      const user = users.find(u => u.id === doctor.userId);
+      return {
+        ...doctor,
+        id: doctor.id || doctor.userId, // Ensure ID exists
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
+        email: user?.email || '',
+        // Convert education and servicesOffered to strings if they're arrays
+        education: Array.isArray(doctor.education)
+          ? JSON.stringify(doctor.education)
+          : doctor.education || '',
+        servicesOffered: Array.isArray(doctor.servicesOffered)
+          ? doctor.servicesOffered.join(', ')
+          : doctor.servicesOffered || '',
+      };
+    });
+
+    return { success: true, doctors: enrichedDoctors };
   } catch (e) {
     logError('adminGetAllDoctors failed', e);
-    return { success: false, error: 'Error fetching all doctors' };
+    return { success: false, error: 'Error fetching doctors' };
   } finally {
     perf.stop();
   }
@@ -2326,18 +2409,21 @@ export async function getMyDashboardStats(ctx: { uid: string; role: UserType }):
 export async function getAvailableSlots(
   ctx: { uid: string; role: UserType },
   payload: { doctorId: string; date: string }
-): Promise<ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }> | ResultErr> {
+): Promise<
+  | ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }>
+  | ResultErr
+> {
   const perf = trackPerformance('getAvailableSlots');
-  
+
   try {
     // Validate context first - this is essential for authorization
     if (!ctx || typeof ctx !== 'object') {
       logError('getAvailableSlots - Invalid context', { ctx });
       return { success: false, error: 'Invalid authentication context' };
     }
-    
+
     const { uid, role } = ctx;
-    
+
     if (!uid || typeof uid !== 'string') {
       logError('getAvailableSlots - Missing uid in context', { ctx });
       return { success: false, error: 'User ID is required' };
@@ -2347,85 +2433,95 @@ export async function getAvailableSlots(
       logError('getAvailableSlots - Missing role in context', { uid, ctx });
       return { success: false, error: 'User role is required' };
     }
-    
+
     // Minimize logging to prevent console freeze
     // Only log core info, not full payload
-    logInfo('getAvailableSlots called', { 
-      uid: uid.substring(0, 6) + '...', 
-      role, 
-      doctorId: payload?.doctorId 
+    logInfo('getAvailableSlots called', {
+      uid: uid.substring(0, 6) + '...',
+      role,
+      doctorId: payload?.doctorId,
     });
-    
+
     // Validate required parameters
     if (!payload || typeof payload !== 'object') {
       logError('getAvailableSlots - Missing payload', { uid, role });
       return { success: false, error: 'Missing payload data' };
     }
-    
+
     if (!payload.doctorId) {
       logError('getAvailableSlots - Missing doctorId', { uid, role, payload });
       return { success: false, error: 'Doctor ID is required' };
     }
-    
+
     if (!payload.date) {
       logError('getAvailableSlots - Missing date', { uid, role, doctorId: payload.doctorId });
       return { success: false, error: 'Date is required' };
     }
-    
+
     // Validate date format
     try {
       const dateObj = new Date(payload.date);
       if (isNaN(dateObj.getTime())) {
-        logError('getAvailableSlots - Invalid date format', { 
-          uid, role, doctorId: payload.doctorId, date: payload.date 
+        logError('getAvailableSlots - Invalid date format', {
+          uid,
+          role,
+          doctorId: payload.doctorId,
+          date: payload.date,
         });
         return { success: false, error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.' };
       }
     } catch (dateError) {
-      logError('getAvailableSlots - Date parsing error', { 
-        uid, role, doctorId: payload.doctorId, date: payload.date, error: dateError 
+      logError('getAvailableSlots - Date parsing error', {
+        uid,
+        role,
+        doctorId: payload.doctorId,
+        date: payload.date,
+        error: dateError,
       });
       return { success: false, error: 'Invalid date format' };
     }
-    
+
     // Extract validated data
     const { doctorId, date } = payload;
-    
+
     // Get doctor profile
     try {
       const doctors = await getDoctors();
-      
+
       // Try to find doctor by userId first
       let doctor = doctors.find(d => d.userId === doctorId);
-      
+
       // If not found by userId, try by id (document id)
       if (!doctor) {
         doctor = doctors.find(d => d.id === doctorId);
       }
-      
+
       if (!doctor) {
         logError('getAvailableSlots - Doctor not found', { uid, role, doctorId });
         return { success: false, error: 'Doctor not found' };
       }
-      
+
       // Check if doctor is verified
       if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
-        logError('getAvailableSlots - Doctor not verified', { 
-          uid, role, doctorId, 
-          status: doctor.verificationStatus 
+        logError('getAvailableSlots - Doctor not verified', {
+          uid,
+          role,
+          doctorId,
+          status: doctor.verificationStatus,
         });
         return { success: false, error: 'Doctor is not verified' };
       }
-      
+
       // Get existing appointments
       const appointments = await getAppointments();
-      
+
       // Find appointments for this doctor
-      const doctorAppointments = appointments.filter(a => 
-        (a.doctorId === doctorId || a.doctorId === doctor?.userId) && 
-        a.status !== AppointmentStatus.CANCELED
+      const doctorAppointments = appointments.filter(
+        a =>
+          (a.doctorId === doctorId || a.doctorId === doctor?.userId) &&
+          a.status !== AppointmentStatus.CANCELED
       );
-      
+
       // Safely calculate available slots
       try {
         // Make sure doctor has the required properties to generate slots
@@ -2433,42 +2529,47 @@ export async function getAvailableSlots(
           logInfo('getAvailableSlots - Initializing empty schedule', { doctorId });
           // Initialize with empty default schedule if needed
           doctor.weeklySchedule = {
-            monday: [], tuesday: [], wednesday: [], 
-            thursday: [], friday: [], saturday: [], sunday: []
+            monday: [],
+            tuesday: [],
+            wednesday: [],
+            thursday: [],
+            friday: [],
+            saturday: [],
+            sunday: [],
           };
         }
-        
+
         if (!doctor.blockedDates) {
           doctor.blockedDates = [];
         }
-        
+
         // Make sure getAvailableSlotsForDate is imported at the file level, not dynamically
         if (typeof getAvailableSlotsForDate !== 'function') {
-          logError('getAvailableSlots - getAvailableSlotsForDate is not a function', { 
-            doctorId, 
-            getAvailableSlotsForDateType: typeof getAvailableSlotsForDate
+          logError('getAvailableSlots - getAvailableSlotsForDate is not a function', {
+            doctorId,
+            getAvailableSlotsForDateType: typeof getAvailableSlotsForDate,
           });
           return { success: false, error: 'Internal error: Slot calculation function unavailable' };
         }
-        
+
         // Generate available slots
         const availableSlots = getAvailableSlotsForDate(doctor, date, doctorAppointments);
-        
+
         if (!Array.isArray(availableSlots)) {
           logError('getAvailableSlots - getAvailableSlotsForDate did not return an array', {
             doctorId,
             date,
-            resultType: typeof availableSlots
+            resultType: typeof availableSlots,
           });
           return { success: false, error: 'Internal error: Invalid slot calculation result' };
         }
-        
-        logInfo('getAvailableSlots - Slots generated successfully', { 
-          doctorId, 
-          date, 
-          slotCount: availableSlots.length 
+
+        logInfo('getAvailableSlots - Slots generated successfully', {
+          doctorId,
+          date,
+          slotCount: availableSlots.length,
         });
-        
+
         return { success: true, slots: availableSlots };
       } catch (slotError) {
         logError('Error calculating slots', {
@@ -2476,21 +2577,59 @@ export async function getAvailableSlots(
           doctorId,
           date,
           hasWeeklySchedule: !!doctor.weeklySchedule,
-          hasBlockedDates: !!doctor.blockedDates
+          hasBlockedDates: !!doctor.blockedDates,
         });
         return { success: false, error: 'Error calculating available slots' };
       }
     } catch (dbError) {
-      logError('getAvailableSlots - Database error', { 
-        error: dbError, 
-        doctorId, 
-        date 
+      logError('getAvailableSlots - Database error', {
+        error: dbError,
+        doctorId,
+        date,
       });
       return { success: false, error: 'Error accessing doctor data' };
     }
   } catch (e) {
     logError('getAvailableSlots failed', e);
     return { success: false, error: 'Error fetching available slots' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Get all appointments for admin dashboard
+ */
+export async function adminGetAllAppointments(ctx: {
+  uid: string;
+  role: UserType;
+}): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
+  const perf = trackPerformance('adminGetAllAppointments');
+
+  try {
+    const { uid, role } = ctx;
+
+    logInfo('adminGetAllAppointments called', { uid, role });
+
+    // Only admins can access this endpoint
+    if (role !== UserType.ADMIN) {
+      return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
+    }
+
+    const appointments = await getAppointments();
+
+    // Sort appointments by date and time (most recent first)
+    appointments.sort((a, b) => {
+      const dateA = `${a.appointmentDate}T${a.startTime}`;
+      const dateB = `${b.appointmentDate}T${b.startTime}`;
+
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+
+    return { success: true, appointments };
+  } catch (e) {
+    logError('adminGetAllAppointments failed', e);
+    return { success: false, error: 'Error fetching appointments' };
   } finally {
     perf.stop();
   }
@@ -2518,6 +2657,7 @@ export type LocalApi = {
   adminVerifyDoctor: typeof adminVerifyDoctor;
   adminGetAllUsers: typeof adminGetAllUsers;
   adminGetAllDoctors: typeof adminGetAllDoctors;
+  adminGetAllAppointments: typeof adminGetAllAppointments;
   adminGetUserDetail: typeof adminGetUserDetail;
   adminUpdateUserStatus: typeof adminUpdateUserStatus;
   adminCreateUser: typeof adminCreateUser;
@@ -2547,6 +2687,7 @@ export const localApi: LocalApi = {
   adminVerifyDoctor,
   adminGetAllUsers,
   adminGetAllDoctors,
+  adminGetAllAppointments,
   adminGetUserDetail,
   adminUpdateUserStatus,
   adminCreateUser,
@@ -2570,6 +2711,7 @@ export default {
   cancelAppointment,
   completeAppointment,
   getAppointmentDetails,
+  adminGetAllAppointments,
 };
 
 /**

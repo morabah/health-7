@@ -498,5 +498,122 @@
     "isRead": false,
     "createdAt": "2025-05-02T08:54:17.757Z",
     "relatedId": null
+  },
+  {
+    "id": "2olbnf9myyggg1vqi72gfq",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T09:18:38.854Z",
+    "relatedId": null
+  },
+  {
+    "id": "im8sw5kbmo7glv6mflxn29",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T09:18:41.081Z",
+    "relatedId": null
+  },
+  {
+    "id": "au8vdtgglx7ks2jeoicr8",
+    "userId": "u-000",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T09:18:47.896Z",
+    "relatedId": null
+  },
+  {
+    "id": "mjonk7vhwzo5oze92312co",
+    "userId": "u-001",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T09:19:00.252Z",
+    "relatedId": null
+  },
+  {
+    "id": "60l3ouyfn4s95e4asw8gv",
+    "userId": "u-000",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T09:43:47.354Z",
+    "relatedId": null
+  },
+  {
+    "id": "rwg2v5a1ss7wyt6v6siyo9",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T10:01:35.344Z",
+    "relatedId": null
+  },
+  {
+    "id": "k69oxp57sei11v1tkri2npl",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T10:01:38.670Z",
+    "relatedId": null
+  },
+  {
+    "id": "t512uowgj5pqhqkvxj8a",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T10:01:39.871Z",
+    "relatedId": null
+  },
+  {
+    "id": "uhzshth7rmqk04hsx7e4c",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Update",
+    "message": "Your verification request was not approved. Status changed to verified by admin",
+    "type": "verification_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-02T10:01:45.142Z",
+    "relatedId": null
+  },
+  {
+    "id": "nbqz9aw1zefphvwl669cx",
+    "userId": "u-000",
+    "title": "Verification Status Updated",
+    "message": "Your verification status has been updated to verified. Notes: Status changed to verified by admin",
+    "isRead": false,
+    "createdAt": "2025-05-02T11:17:00.456Z",
+    "relatedId": "u-000"
+  },
+  {
+    "id": "j6ka4vjrn1khcpmtb8lg8c",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Verification Status Updated",
+    "message": "Your verification status has been updated to verified. Notes: Status changed to verified by admin",
+    "isRead": false,
+    "createdAt": "2025-05-02T11:17:03.513Z",
+    "relatedId": "htggr2d1eeevik1kcux1ed"
+  },
+  {
+    "id": "jakts3qqi3nuoriaoh44pb",
+    "userId": "u-001",
+    "title": "Verification Status Updated",
+    "message": "Your verification status has been updated to verified. Notes: Status changed to verified by admin",
+    "isRead": false,
+    "createdAt": "2025-05-02T11:17:08.879Z",
+    "relatedId": "u-001"
   }
 ]
