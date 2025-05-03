@@ -149,9 +149,13 @@ export const loadSessionById = (sessionId: string): SessionData | null => {
 /**
  * Save session data to localStorage
  * @param payload The session data to save, or null to clear the session
+ * @param sessionKey Optional key override for storing multiple session types
  * @returns The session ID if saved, or null if cleared
  */
-export const saveSession = (payload: { uid: string; email?: string; role: UserType } | null): string | null => {
+export const saveSession = (
+  payload: { uid: string; email?: string; role: UserType } | null,
+  sessionKey: string = SESSION_KEY
+): string | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -169,7 +173,7 @@ export const saveSession = (payload: { uid: string; email?: string; role: UserTy
       }
       
       // Clear the current session
-      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(sessionKey);
       return null;
     } else {
       // Create a session with a unique ID
@@ -181,7 +185,7 @@ export const saveSession = (payload: { uid: string; email?: string; role: UserTy
       };
       
       // Save as current session
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
       
       // Also save with session-specific key
       localStorage.setItem(`${SESSION_KEY}-${sessionId}`, JSON.stringify(sessionData));

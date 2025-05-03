@@ -16,6 +16,7 @@ import { UserType } from '@/types/enums';
 import { callApi } from '@/lib/apiClient';
 import { roleToDashboard, roleToProfile, APP_ROUTES } from '@/lib/router';
 import type { Notification } from '@/types/schemas';
+import UserSwitcher from '@/components/ui/UserSwitcher';
 
 // Format the last active timestamp
 const formatLastActive = (timestamp: number): string => {
@@ -264,6 +265,9 @@ export default function Navbar() {
                   >
                     <MessageSquare size={18} />
                   </Link>
+
+                  {/* User Switcher */}
+                  <UserSwitcher />
 
                   {/* User dropdown */}
                   <HeadlessMenu as="div" className="relative">

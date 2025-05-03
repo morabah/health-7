@@ -24,6 +24,9 @@ import { generateId } from '@/lib/localApiCore';
 // Constants
 const isBrowser = typeof window !== 'undefined';
 
+// Enable multi-login feature - this controls if multiple logins are shown in the UI
+const MULTI_LOGIN_ENABLED = true;
+
 // Add TypeScript augmentation for window global state
 declare global {
   interface Window {
@@ -34,148 +37,160 @@ declare global {
   }
 }
 
-// Initialize global state if in browser
-if (isBrowser) {
-  window.__authFetchInFlight = false;
-  window.__lastProfileFetch = 0;
-  
-  // Dev helper for mock login
-  window.__mockLogin = async (credsOrRole) => {
-    // Handle both string role shortcuts and credential objects
-    if (typeof credsOrRole === 'string') {
-      // For role-based testing, use preset test accounts
-      let email, password;
-      const role = credsOrRole;
-      
-      switch (role) {
-        case 'PATIENT':
-        case UserType.PATIENT:
-          email = 'test-patient@example.com';
-          password = 'password123';
-          break;
-        case 'DOCTOR':
-        case UserType.DOCTOR:
-          email = 'test-doctor@example.com';
-          password = 'password123';
-          break;
-        case 'ADMIN':
-        case UserType.ADMIN:
-          email = 'test-admin@example.com';
-          password = 'password123';
-          break;
-        default:
-          console.error('Invalid role for mock login');
-          return;
-      }
-      
-      // Get the auth context through the global accessor
-      const auth = useAuthStore();
-      if (auth) {
-        auth.login(email, password);
-      }
-    } else if (credsOrRole && typeof credsOrRole === 'object') {
-      // Handle credential object with email/password
-      const creds = credsOrRole;
-      const auth = useAuthStore();
-      if (auth && creds.email && creds.password) {
-        auth.login(creds.email, creds.password);
-      }
-    }
-  };
-}
-
-// Type definitions for registration payloads
-export interface PatientRegistrationPayload {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  gender: string;
-  bloodType?: string;
-  medicalHistory?: string;
-  userType: UserType;
-}
-
-export interface DoctorRegistrationPayload {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  specialty: string;
-  licenseNumber: string;
-  yearsOfExperience: number;
-  userType: UserType;
-}
-
-// Type for the User object
-interface User {
+// User data (minimal, with appropriate UID from firebase)
+type User = {
   uid: string;
-  email?: string;
+  email: string | null;
   role: UserType;
-  sessionId?: string;
+  sessionId: string;
   emailVerified?: boolean;
-}
+};
 
-// Type for a stored session
-export interface StoredSession {
+// Stored session with timestamp
+export type StoredSession = {
   sessionId: string;
   uid: string;
-  email?: string;
+  email?: string; // Keep as optional but handle it safely
   role: UserType;
-  userProfile?: UserProfile;
   lastActive: number;
-}
+  displayName?: string; // Optional display name to show in the UI
+};
 
-// Define the Auth Context type
-interface AuthContextType {
+/**
+ * Types for registration payloads
+ */
+export type PatientRegistrationPayload = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  gender?: string;
+  userType: UserType.PATIENT;
+};
+
+export type DoctorRegistrationPayload = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  specialty?: string;
+  licenseNumber?: string;
+  yearsOfExperience?: number;
+  userType: UserType.DOCTOR;
+};
+
+// Auth context definition
+export type AuthContextType = {
   user: User | null;
-  profile: (UserProfile & { id: string }) | null;
-  patientProfile: (PatientProfile & { id: string }) | null;
-  doctorProfile: (DoctorProfile & { id: string }) | null;
+  profile: UserProfile & { id: string } | null;
+  patientProfile: PatientProfile & { id: string } | null;
+  doctorProfile: DoctorProfile & { id: string } | null;
   loading: boolean;
   error: string | null;
   activeSessions: StoredSession[];
+  multiLoginEnabled: boolean; // Flag to indicate if multi-login feature is enabled
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   clearError: () => void;
-  registerPatient: (payload: PatientRegistrationPayload) => Promise<unknown>;
-  registerDoctor: (payload: DoctorRegistrationPayload) => Promise<unknown>;
+  registerPatient: (payload: PatientRegistrationPayload) => Promise<boolean>;
+  registerDoctor: (payload: DoctorRegistrationPayload) => Promise<boolean>;
   switchToSession: (sessionId: string) => Promise<boolean>;
-  logoutAllSessions: () => void;
-  updateUserVerificationStatus?: (verified: boolean) => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Global auth store for mock login helper
-let useAuthStore: () => AuthContextType | undefined = () => undefined;
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  logoutAllSessions: () => Promise<void>;
+  updateUserVerificationStatus: (verified: boolean) => Promise<void>;
 };
 
-// Safe check for race condition guard
-const isAuthFetchInFlight = () => isBrowser && window.__authFetchInFlight;
-const setAuthFetchInFlight = (value: boolean) => {
-  if (isBrowser) window.__authFetchInFlight = value;
-};
-const getLastProfileFetch = () => isBrowser ? window.__lastProfileFetch : 0;
-const setLastProfileFetch = (value: number) => {
-  if (isBrowser) window.__lastProfileFetch = value;
+// Create context with default values
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  profile: null,
+  patientProfile: null,
+  doctorProfile: null,
+  loading: false,
+  error: null,
+  activeSessions: [],
+  multiLoginEnabled: MULTI_LOGIN_ENABLED,
+  login: async () => false,
+  logout: () => {},
+  refreshProfile: async () => {},
+  clearError: () => {},
+  registerPatient: async () => false,
+  registerDoctor: async () => false,
+  switchToSession: async () => false,
+  logoutAllSessions: async () => {},
+  updateUserVerificationStatus: async () => {},
+});
+
+// Store the auth context hook result for direct access (used for mock login helper)
+let useAuthStore = () => useContext(AuthContext);
+
+// Utility to check if an auth API request is in progress
+const isAuthFetchInFlight = (): boolean => {
+  if (!isBrowser) return false;
+  return Boolean(window.__authFetchInFlight);
 };
 
-// Checks if enough time has passed since last profile fetch
-const canFetchProfile = () => {
+// Set global auth fetch in flight flag
+const setAuthFetchInFlight = (value: boolean): void => {
+  if (!isBrowser) return;
+  window.__authFetchInFlight = value;
+};
+
+// Check if profile can be fetched within rate limit
+const canFetchProfile = (): boolean => {
+  if (!isBrowser) return true;
+  
   const now = Date.now();
-  const last = getLastProfileFetch();
-  return (now - last) > 10000; // 10 seconds minimum between fetches
+  const lastFetch = window.__lastProfileFetch || 0;
+  
+  // Rate limit to one fetch per 2 seconds
+  const canFetch = now - lastFetch > 2000;
+  
+  if (canFetch) {
+    window.__lastProfileFetch = now;
+  }
+  
+  return canFetch;
 };
+
+// Clear the last fetch timestamp to force a refresh next time
+const clearProfileFetchTimestamp = (): void => {
+  if (!isBrowser) return;
+  window.__lastProfileFetch = 0;
+};
+
+// Add a global helper for mock login
+if (isBrowser) {
+  window.__mockLogin = async (creds): Promise<void> => {
+    try {
+      const authContext = useAuthStore();
+      let email;
+      let password;
+      
+      if (typeof creds === 'string') {
+        // Handle email-only format (default password)
+        email = creds;
+        password = 'password123';
+      } else {
+        // Handle object with email/password
+        email = creds.email;
+        password = creds.password;
+      }
+      
+      console.log(`[Mock Login] Attempting to log in with: ${email}`);
+      const result = await authContext.login(email, password);
+      
+      if (result) {
+        console.log('[Mock Login] Login successful');
+      } else {
+        console.error('[Mock Login] Login failed, see error in Auth context');
+      }
+    } catch (error) {
+      console.error('[Mock Login] Error:', error);
+    }
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -202,14 +217,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // and cleans up orphaned session IDs
       const sessions = getDetailedActiveSessions();
       
+      // Add display names for better UI representation
+      const enhancedSessions = sessions.map(session => {
+        let displayName = session.email || 'Unknown User';
+        
+        // Try to add the role for better identification
+        switch (session.role) {
+          case UserType.ADMIN:
+            displayName = `Admin: ${session.email || 'Unknown'}`;
+            break;
+          case UserType.DOCTOR:
+            displayName = `Doctor: ${session.email || 'Unknown'}`;
+            break;
+          case UserType.PATIENT:
+            displayName = `Patient: ${session.email || 'Unknown'}`;
+            break;
+        }
+        
+        return {
+          ...session,
+          displayName,
+          email: session.email || 'Unknown' // Ensure email is not undefined
+        };
+      });
+      
       // Update the state with the detailed sessions
-      setActiveSessions(sessions.map(session => ({
-        sessionId: session.sessionId,
-        uid: session.uid,
-        email: session.email,
-        role: session.role,
-        lastActive: session.lastActive
-      })));
+      setActiveSessions(enhancedSessions);
       
       logInfo('Active sessions loaded', { count: sessions.length });
     } catch (error) {
@@ -227,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set user from session
         setUser({
           uid: session.uid,
-          email: session.email,
+          email: session.email ? session.email : null, // Explicitly convert undefined to null
           role: session.role,
           sessionId: session.sessionId
         });
@@ -245,7 +278,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, [loadActiveSessions]);
 
-  // Define refreshProfile with race condition guard
+  // Logout function - define this BEFORE it's used in refreshProfile
+  const logout = useCallback(() => {
+    // Clear React state
+    setUser(null);
+    setProfile(null);
+    setPatientProfile(null);
+    setDoctorProfile(null);
+    
+    // Clear localStorage session
+    saveSession(null);
+    
+    // Clear auth context for API calls
+    clearCurrentAuthCtx();
+    
+    // Update active sessions
+    loadActiveSessions();
+    
+    // Redirect to login page
+    if (isBrowser) {
+      try {
+        router.replace(APP_ROUTES.LOGIN);
+      } catch (e) {
+        // Fallback to direct navigation if router fails
+        window.location.href = APP_ROUTES.LOGIN;
+      }
+    }
+  }, [router, loadActiveSessions]);
+
+  // Define refreshProfile with race condition guard - now we can use logout safely
   const refreshProfile = useCallback(async () => {
     // Check global flag to prevent duplicate requests
     if (isAuthFetchInFlight()) {
@@ -265,56 +326,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Set global flag
       setAuthFetchInFlight(true);
-      setLastProfileFetch(Date.now());
-      setLoading(true);
       
-      const response = await callApi('getMyUserProfile', { uid: user.uid, role: user.role });
+      const result = await callApi('getMyUserProfile', {
+        uid: user.uid,
+        role: user.role
+      });
       
-      if (response.success && response.userProfile) {
-        // Set the user profile
-        setProfile(response.userProfile);
+      if (!result.success) {
+        logError('Failed to load user profile', result.error);
         
-        // Set role-specific profile if available
-        if (response.roleProfile) {
-          if (user.role === UserType.PATIENT) {
-            setPatientProfile(response.roleProfile as PatientProfile & {id: string});
-          } else if (user.role === UserType.DOCTOR) {
-            setDoctorProfile(response.roleProfile as DoctorProfile & {id: string});
-          }
-        }
-        
-        // Only redirect to dashboard if the user is on the login page or root
-        if (profile && pathname) {
-          const isLoginPage = pathname === '/login' || pathname === '/' || pathname === '/auth/login';
+        // Check if the error is due to auth issues
+        if (result.error?.toLowerCase().includes('auth') || 
+            result.error?.toLowerCase().includes('unauthorized') ||
+            result.error?.toLowerCase().includes('not found')) {
           
-          if (isLoginPage) {
-            const dashPath = roleToDashboard(profile.userType);
-            router.replace(dashPath);
-          }
+          logWarn('Auth error detected during profile refresh, initiating logout');
+          logout();
         }
         
-        // Update the active sessions list after successful profile refresh
-        await loadActiveSessions();
-      } else {
-        const errorMsg = response.error || 'Failed to load profile';
-        setError(errorMsg);
+        return;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error loading profile');
-    } finally {
+      
+      // Update profile and role-specific data
+      setProfile(result.userProfile);
+      
+      if (user.role === UserType.PATIENT && result.roleProfile) {
+        setPatientProfile(result.roleProfile as PatientProfile & { id: string });
+      } else if (user.role === UserType.DOCTOR && result.roleProfile) {
+        setDoctorProfile(result.roleProfile as DoctorProfile & { id: string });
+      }
+      
+      // Set loading to false once we have profile data
       setLoading(false);
+    } catch (error) {
+      logError('Error in refreshProfile', error);
+      setLoading(false);
+    } finally {
       setAuthFetchInFlight(false);
     }
-  }, [user, profile, pathname, router, loadActiveSessions]);
+  }, [user, logout]); // Now logout is defined when used as a dependency
 
-  // Fetch user profile when user changes
+  // Refresh profile effect - runs after auth state changes
   useEffect(() => {
     if (user) {
       refreshProfile();
     }
   }, [user, refreshProfile]);
+
+  // Logout all sessions function
+  const logoutAllSessions = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Clear all sessions in localStorage
+      clearAllSessions();
+      
+      // Clear React state
+      setUser(null);
+      setProfile(null);
+      setPatientProfile(null);
+      setDoctorProfile(null);
+      setActiveSessions([]);
+      
+      // Clear auth context for API calls
+      clearCurrentAuthCtx();
+      
+      // Redirect to login page
+      router.replace(APP_ROUTES.LOGIN);
+    } catch (error) {
+      setError('Failed to logout all sessions');
+      logError('Error in logoutAllSessions', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   // Switch to a different user session
   const switchToSession = useCallback(async (sessionId: string): Promise<boolean> => {
@@ -357,7 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update the user state
       setUser({
         uid: session.uid,
-        email: session.email,
+        email: session.email ? session.email : null, // Explicitly convert undefined to null
         role: session.role,
         sessionId: session.sessionId
       });
@@ -393,6 +479,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login handler
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    // Don't allow multiple login calls simultaneously
+    if (loginInProgress.current) {
+      logWarn('Login already in progress, skipping duplicate request');
+      return false;
+    }
+    
+    loginInProgress.current = true;
     setLoading(true);
     setError('');
 
@@ -400,7 +493,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logInfo('auth-event', { action: 'login-attempt', email, timestamp: new Date().toISOString() });
       
       // We'll use the 'login' method which our apiClient will map to signIn
-      const result = await callApi('login', email, password);
+      const result = await callApi('login', { email, password });
       
       if (!result.success) {
         setError(result.error || 'Login failed');
@@ -417,7 +510,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uid: user.id,
         email: userProfile.email || '',
         role: userProfile.userType,
-        lastActive: Date.now()
+        lastActive: Date.now(),
+        displayName: `${userProfile.firstName} ${userProfile.lastName} (${userProfile.userType})`
       };
 
       // Store session in localStorage
@@ -464,110 +558,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     } finally {
       setLoading(false);
+      loginInProgress.current = false;
     }
   }, [router, loadActiveSessions]);
 
-  // Logout function
-  const logout = useCallback(() => {
-    // Clear React state
-    setUser(null);
-    setProfile(null);
-    setPatientProfile(null);
-    setDoctorProfile(null);
-    
-    // Clear localStorage session
-    saveSession(null);
-    
-    // Clear auth context for API calls
-    clearCurrentAuthCtx();
-    
-    // Update active sessions
-    loadActiveSessions();
-    
-    // Redirect to login page
-    if (isBrowser) {
-      try {
-        router.replace(APP_ROUTES.LOGIN);
-      } catch (e) {
-        // Fallback to direct navigation if router fails
-        window.location.href = APP_ROUTES.LOGIN;
-      }
-    }
-  }, [router, loadActiveSessions]);
-
-  // Logout from all sessions
-  const logoutAllSessions = useCallback(() => {
-    // Clear all sessions in localStorage
-    clearAllSessions();
-    
-    // Clear React state
-    setUser(null);
-    setProfile(null);
-    setPatientProfile(null);
-    setDoctorProfile(null);
-    setActiveSessions([]);
-    
-    // Clear auth context for API calls
-    clearCurrentAuthCtx();
-    
-    // Redirect to login page
-    if (isBrowser) {
-      try {
-        router.replace(APP_ROUTES.LOGIN);
-      } catch (e) {
-        // Fallback to direct navigation if router fails
-        window.location.href = APP_ROUTES.LOGIN;
-      }
-    }
-  }, [router]);
-
-  // Register patient function
+  // Patient registration handler
   const registerPatient = useCallback(async (payload: PatientRegistrationPayload) => {
+    setLoading(true);
+    setError('');
+    
     try {
-      setLoading(true);
-      clearError();
+      const result = await callApi('registerPatient', {
+        ...payload,
+      });
       
-      const res = await callApi('registerPatient', payload);
-      
-      if (res.success) {
-        // Auto-login after successful registration
-        return login(payload.email, payload.password);
-      } else {
-        setError(res.error || 'Registration failed');
-        return res;
+      if (!result.success) {
+        setError(result.error || 'Registration failed');
+        return false;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error during registration');
-      return { success: false, error: error };
+      
+      // Auto-login the new user
+      await login(payload.email, payload.password);
+      
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error during registration';
+      setError(message);
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [login, clearError, error]);
-      
-  // Register doctor function
+  }, [login]);
+
+  // Doctor registration handler
   const registerDoctor = useCallback(async (payload: DoctorRegistrationPayload) => {
+    setLoading(true);
+    setError('');
+    
     try {
-      setLoading(true);
-      clearError();
+      const result = await callApi('registerDoctor', {
+        ...payload,
+      });
       
-      const res = await callApi('registerDoctor', payload);
-      
-      if (res.success) {
-        // Auto-login after successful registration
-        return login(payload.email, payload.password);
-      } else {
-        setError(res.error || 'Registration failed');
-        return res;
+      if (!result.success) {
+        setError(result.error || 'Registration failed');
+        return false;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error during registration');
-      return { success: false, error: error };
+      
+      // Auto-login the new user
+      await login(payload.email, payload.password);
+      
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error during registration';
+      setError(message);
+      return false;
     } finally {
       setLoading(false);
-      }
-  }, [login, clearError, error]);
+    }
+  }, [login]);
 
-  // Update user's email verification status (for local development simulation)
   const updateUserVerificationStatus = useCallback(async (verified: boolean) => {
     if (!user) return;
     
@@ -619,6 +669,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     activeSessions,
+    multiLoginEnabled: MULTI_LOGIN_ENABLED,
     login,
     logout,
     refreshProfile,
@@ -644,3 +695,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+export const useAuth = () => useContext(AuthContext);
