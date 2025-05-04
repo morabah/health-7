@@ -507,7 +507,7 @@ export function throwHttpError(status: number, message?: string, context?: Recor
 
 export default {
   AppError,
-  AppCacheError,
+  CacheError,
   DataError,
   AuthError,
   ApiError,

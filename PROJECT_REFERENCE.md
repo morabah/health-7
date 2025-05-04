@@ -474,6 +474,7 @@ These changes further improve the application's type safety, enhance the user ex
   - Replaced custom error classes with the standard application error classes
   - Fixed references to undefined functions by using callApi instead
   - Fixed imports to avoid naming conflicts
+  - Updated the default export in errors.ts to use CacheError instead of undefined AppCacheError
 
 ### Fixed Memory Leaks
 
