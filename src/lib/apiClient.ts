@@ -1,16 +1,22 @@
 /**
  * API Client
  *
- * Unified caller for local API functions.
- * All components must use this wrapper rather than importing localApiFunctions directly.
- * This allows us to swap the backend implementation later by changing only this file.
+ * Unified caller for local API functions or Firebase Cloud Functions.
+ * All components must use this wrapper rather than importing functions directly.
+ * This allows us to swap the backend implementation by changing only this file.
  */
 
 import * as localAPI from './localApiFunctions';
+import { isFirebaseEnabled, functions } from './firebaseConfig';
+import { firebaseApi } from './firebaseFunctions';
 import { getCurrentAuthCtx } from './apiAuthCtx';
 import { logInfo, logError } from './logger';
 import { callApiWithErrorHandling } from './apiErrorHandling';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+import { createFirebaseError } from './firebaseErrorMapping';
+
+// Get the appropriate API based on configuration
+const api = isFirebaseEnabled ? firebaseApi : localAPI.localApi;
 
 // Low-noise API methods that should minimize logging
 const LOW_NOISE_METHODS = ['getAvailableSlots', 'getMyNotifications', 'getMyDashboardStats'];
@@ -54,19 +60,26 @@ interface CallApiOptions {
   /**
    * Extra context data for error reporting
    */
-  errorContext?: Record<string, any>;
+  errorContext?: Record<string, unknown>;
+  
+  /**
+   * Force use of local API implementation regardless of configuration
+   */
+  forceLocal?: boolean;
 }
 
 /**
- * Call a local API function with the provided arguments
+ * Call an API function with the provided arguments
+ * This function will route to either local implementation or Firebase Functions
+ * based on the isFirebaseEnabled flag and options
  *
  * @param method - The API method name to call
  * @param args - Arguments to pass to the API method
  * @returns Promise with the result of the API call
  */
-export async function callApi<T = any>(
+export async function callApi<T = unknown>(
   method: string, 
-  ...args: any[]
+  ...args: unknown[]
 ): Promise<T> {
   // Only log non-low-noise methods to prevent console flooding
   const shouldLog = !LOW_NOISE_METHODS.includes(method);
@@ -87,6 +100,11 @@ export async function callApi<T = any>(
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
+      // If Firebase is enabled, use Firebase Functions instead of local implementation
+      if (isFirebaseEnabled) {
+        return await callFirebaseFunction<T>(mappedMethod, ...args);
+      }
+
       // Special handling for login/signIn
       if (method === 'login') {
         // Extract email and password from arguments for login
@@ -96,18 +114,20 @@ export async function callApi<T = any>(
         } else if (
           args.length === 1 &&
           typeof args[0] === 'object' &&
-          args[0].email &&
-          args[0].password
+          args[0] !== null &&
+          'email' in args[0] &&
+          'password' in args[0]
         ) {
           // Args are in object format {email, password}
-          return (await localAPI.signIn(args[0].email, args[0].password)) as T;
+          const { email, password } = args[0] as { email: string; password: string };
+          return (await localAPI.signIn(email, password)) as T;
         }
       }
 
       // Check if we have the method in our local API
-      if (mappedMethod in localAPI.localApi) {
+      if (mappedMethod in api) {
         // @ts-ignore: dynamic method call
-        const localApiMethod = localAPI.localApi[mappedMethod];
+        const localApiMethod = api[mappedMethod];
 
         // Special case for methods that need auth context
         if (
@@ -130,6 +150,7 @@ export async function callApi<T = any>(
             args.length > 0 &&
             args[0] &&
             typeof args[0] === 'object' &&
+            args[0] !== null &&
             'uid' in args[0] &&
             'role' in args[0]
           ) {
@@ -197,6 +218,82 @@ export async function callApi<T = any>(
 }
 
 /**
+ * Call a Firebase Cloud Function
+ * Used when isFirebaseEnabled is true
+ * 
+ * @param method Function name to call
+ * @param args Arguments to pass to the function
+ * @returns The result of the function call
+ */
+async function callFirebaseFunction<T>(method: string, ...args: unknown[]): Promise<T> {
+  try {
+    // Create a callable reference to the Firebase Function
+    const callable = functions.httpsCallable(method);
+    
+    // Prepare payload - combine all arguments into a single object for Cloud Functions
+    let payload: Record<string, unknown> = {};
+    
+    // Special handling for methods with context as first argument
+    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null && 'uid' in args[0] && 'role' in args[0]) {
+      // Take context from first argument
+      const [ctx, ...restArgs] = args;
+      
+      // If there's exactly one more argument and it's an object, use it as payload
+      if (restArgs.length === 1 && typeof restArgs[0] === 'object' && restArgs[0] !== null) {
+        payload = { 
+          context: ctx,
+          ...restArgs[0] as Record<string, unknown>
+        };
+      } else if (restArgs.length > 0) {
+        // Multiple arguments, create a data property with the rest
+        payload = {
+          context: ctx,
+          data: restArgs.length === 1 ? restArgs[0] : restArgs
+        };
+      } else {
+        // Just context, no additional data
+        payload = { context: ctx };
+      }
+    } else {
+      // No context object, use first argument as payload or combine all
+      if (args.length === 1) {
+        if (typeof args[0] === 'object' && args[0] !== null) {
+          payload = args[0] as Record<string, unknown>;
+        } else {
+          payload = { data: args[0] };
+        }
+      } else if (args.length > 1) {
+        payload = { data: args };
+      }
+    }
+    
+    // Call the Firebase Function
+    const result = await callable(payload);
+    
+    // Firebase Functions return { data: ... }
+    return result.data as T;
+  } catch (error) {
+    // Transform Firebase errors to a standard format
+    if (error && typeof error === 'object' && 'code' in error) {
+      // This is a Firebase error, use our mapping to create a better error object
+      const firebaseError = error as { code: string; message: string };
+      logError(`Firebase function ${method} error: ${firebaseError.code}`, { 
+        method, 
+        code: firebaseError.code,
+        message: firebaseError.message,
+        args 
+      });
+      
+      throw createFirebaseError(firebaseError);
+    }
+    
+    // For non-Firebase errors, log and rethrow
+    logError(`Error calling Firebase function ${method}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Call an API with options for customizing error handling
  * 
  * @param method API method name
@@ -204,10 +301,10 @@ export async function callApi<T = any>(
  * @param args Arguments to pass to the API method
  * @returns Promise with the API result
  */
-export async function callApiWithOptions<T = any>(
+export async function callApiWithOptions<T = unknown>(
   method: string,
   options: CallApiOptions = {},
-  ...args: any[]
+  ...args: unknown[]
 ): Promise<T> {
   // Determine API category based on method name if not specified
   let category = options.errorCategory || 'api';
@@ -222,6 +319,8 @@ export async function callApiWithOptions<T = any>(
     }
   }
   
+  // Implement options handling here if needed
+  // For now, just forward to callApi
   return callApi<T>(method, ...args);
 }
 

@@ -2,7 +2,13 @@
 
 import { reportError } from './errorMonitoring';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
-import { logError, logInfo } from './logger';
+import { logError, logInfo, logWarn } from './logger';
+import { 
+  getFirebaseErrorMessage, 
+  getFirebaseErrorCategory,
+  getFirebaseErrorSeverity,
+  createFirebaseError
+} from './firebaseErrorMapping';
 
 /**
  * Configuration options for API calls
@@ -414,31 +420,176 @@ export async function enhancedFetch(
 }
 
 /**
- * Call an API with automatic error handling, retries, and proper error reporting
+ * API Error Handling
  * 
- * @param apiFunction API function to call
- * @param args Arguments for the API function
- * @param options API options
- * @returns API call result
+ * Utility functions for standardized API error handling with retry logic,
+ * error categorization, and error mapping between local API and Firebase.
  */
-export async function callApiWithErrorHandling<T extends unknown[], R>(
-  apiFunction: (...args: T) => Promise<R>,
-  args: T,
-  options: ApiOptions = {}
-): Promise<R> {
-  const functionName = apiFunction.name || 'unknown';
+
+// Retry configuration
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY_MS = 1000;
+const EXPONENTIAL_BACKOFF_FACTOR = 1.5;
+
+/**
+ * Error handling options
+ */
+export interface ErrorHandlingOptions {
+  /**
+   * API endpoint name for logging
+   */
+  endpoint?: string;
   
-  // Merge options with defaults and add function name
-  const opts: ApiOptions = {
-    ...options,
-    endpoint: options.endpoint || functionName,
-  };
+  /**
+   * Custom error message
+   */
+  errorMessage?: string;
   
-  // Create enhanced API function with error handling
-  const enhancedApiFunction = withApiErrorHandling(apiFunction, opts);
+  /**
+   * Whether this operation is retryable
+   */
+  retryable?: boolean;
   
-  // Call the enhanced function
-  return enhancedApiFunction(...args);
+  /**
+   * Maximum number of retries
+   */
+  maxRetries?: number;
+  
+  /**
+   * Base delay before retry in ms (will increase with backoff)
+   */
+  retryDelayMs?: number;
+  
+  /**
+   * Error category for classification
+   */
+  errorCategory?: ErrorCategory;
+  
+  /**
+   * Error severity
+   */
+  errorSeverity?: ErrorSeverity;
+  
+  /**
+   * Extra context data for error reporting
+   */
+  errorContext?: Record<string, unknown>;
+}
+
+/**
+ * Call an API function with standardized error handling and retry logic
+ * 
+ * @param fn The function to call
+ * @param args Arguments to pass to the function
+ * @param options Error handling options
+ * @returns Promise with the result of the function
+ */
+export async function callApiWithErrorHandling<T>(
+  fn: (...args: unknown[]) => Promise<T>,
+  args: unknown[] = [],
+  options: ErrorHandlingOptions = {}
+): Promise<T> {
+  // Set default options
+  const {
+    endpoint = 'unknown-endpoint',
+    errorMessage = 'API call failed',
+    retryable = true,
+    maxRetries = DEFAULT_MAX_RETRIES,
+    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+    errorCategory = 'api',
+    errorSeverity = 'error',
+    errorContext = {}
+  } = options;
+  
+  // Initialize retry counter
+  let retryCount = 0;
+  
+  // Keep trying until we succeed or exceed max retries
+  while (true) {
+    try {
+      // Call the function with provided arguments
+      return await fn(...args);
+    } catch (error) {
+      // Check if we should retry
+      if (retryable && retryCount < maxRetries) {
+        // Increment retry counter
+        retryCount++;
+        
+        // Calculate delay with exponential backoff
+        const delay = retryDelayMs * Math.pow(EXPONENTIAL_BACKOFF_FACTOR, retryCount - 1);
+        
+        // Log retry attempt
+        logWarn(`API call to ${endpoint} failed. Retrying (${retryCount}/${maxRetries}) in ${delay}ms`, { 
+          error,
+          retryCount,
+          maxRetries,
+          delay,
+          ...errorContext
+        });
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Retry the operation (continue to next loop iteration)
+        continue;
+      }
+      
+      // Add error handling - map Firebase errors to standard format
+      if (error && typeof error === 'object' && 'code' in error) {
+        // This is likely a Firebase error
+        const firebaseError = error as { code: string; message: string };
+        
+        // Get user-friendly error details from our mapping
+        const userMessage = getFirebaseErrorMessage(firebaseError.code, errorMessage);
+        const category = getFirebaseErrorCategory(firebaseError.code) || errorCategory;
+        const severity = getFirebaseErrorSeverity(firebaseError.code) || errorSeverity;
+        
+        // Map Firebase error codes to our standard error format
+        logError(`Firebase API Error in ${endpoint}: ${firebaseError.code}`, {
+          code: firebaseError.code,
+          message: firebaseError.message,
+          userMessage,
+          endpoint,
+          category,
+          severity,
+          ...errorContext
+        });
+        
+        // Format as a standard error object with Firebase error properties
+        const standardError = createFirebaseError(firebaseError);
+        (standardError as any).endpoint = endpoint;
+        (standardError as any).errorContext = errorContext;
+        
+        throw standardError;
+      }
+      
+      // Standard error logging
+      logError(`API Error in ${endpoint}: ${errorMessage}`, {
+        error,
+        endpoint,
+        category: errorCategory,
+        severity: errorSeverity,
+        ...errorContext
+      });
+      
+      // Rethrow with enhanced context
+      if (error instanceof Error) {
+        // Add metadata to existing error
+        (error as any).category = errorCategory;
+        (error as any).severity = errorSeverity;
+        (error as any).context = errorContext;
+        throw error;
+      } else {
+        // Wrap non-Error objects
+        const standardError = new Error(errorMessage);
+        (standardError as any).category = errorCategory;
+        (standardError as any).severity = errorSeverity;
+        (standardError as any).originalError = error;
+        (standardError as any).context = errorContext;
+        throw standardError;
+      }
+    }
+  }
 }
 
 export default {

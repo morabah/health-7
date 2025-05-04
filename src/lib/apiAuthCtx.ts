@@ -1,84 +1,91 @@
 /**
- * API Authentication Context
+ * API Authentication Context Management
  * 
- * Provides utilities for getting the current authentication context synchronously.
- * Used by apiClient.ts to attach auth context to local API calls.
+ * Manages the current user authentication context for API calls.
+ * This will be used to automatically provide context to API calls.
+ * The implementation is designed to work with both local dev and Firebase Auth.
  */
 
 import { UserType } from '@/types/enums';
-import { loadSession, saveSession, clearSession } from './localSession';
-import { logInfo } from './logger';
+import { isFirebaseEnabled, auth } from './firebaseConfig';
 
-// Auth context type definition
+// Auth context interface - used across the application
 export interface AuthContext {
   uid: string;
   role: UserType;
+  isAuthenticated?: boolean;
 }
 
-// Store the current auth context in memory
-let currentAuthCtx: AuthContext | null = null;
-
-// Initialize auth context from session storage if available
-if (typeof window !== 'undefined') {
-  try {
-    const session = loadSession<AuthContext>('api_auth_ctx');
-    if (session && session.uid && session.role) {
-      currentAuthCtx = session;
-      logInfo('API Auth context initialized from session', { uid: session.uid, role: session.role });
-    }
-  } catch (error) {
-    console.error('Error loading auth context from session:', error);
-  }
+// Firebase User interface (simplified)
+interface FirebaseUser {
+  uid: string;
+  email: string | null;
 }
+
+// Global state to store the current auth context
+let currentAuthContext: AuthContext | null = null;
 
 /**
- * Set the current authentication context
- * This should be called when a user logs in or their state changes
- * 
- * @param ctx Authentication context with user ID and role, or null to clear
+ * Set the current auth context for subsequent API calls
  */
-export function setCurrentAuthCtx(ctx: AuthContext | null): void {
-  currentAuthCtx = ctx;
-  
-  // Persist to localStorage for page reloads
-  if (typeof window !== 'undefined') {
-    if (ctx) {
-      saveSession(ctx, 'api_auth_ctx');
-    } else {
-      clearSession('api_auth_ctx');
-    }
+export function setCurrentAuthCtx(context: AuthContext): void {
+  if (!context.uid || !context.role) {
+    console.error('Invalid auth context provided', context);
+    return;
   }
-  
-  logInfo('API Auth context updated', ctx || { status: 'cleared' });
+  currentAuthContext = context;
 }
 
 /**
- * Get the current authentication context
- * Returns the stored context or null if not set
- * 
- * @returns The current auth context or null
- */
-export function getCurrentAuthCtx(): AuthContext | null {
-  return currentAuthCtx;
-}
-
-/**
- * Clear the current authentication context
- * This should be called when a user logs out
+ * Clear the current auth context (logout)
  */
 export function clearCurrentAuthCtx(): void {
-  currentAuthCtx = null;
-  
-  // Clear from localStorage
-  if (typeof window !== 'undefined') {
-    clearSession('api_auth_ctx');
+  currentAuthContext = null;
+}
+
+/**
+ * Get the current auth context, automatically resolving from Firebase Auth if enabled
+ */
+export function getCurrentAuthCtx(): AuthContext {
+  // If Firebase is enabled, try to get the current user from Firebase Auth
+  if (isFirebaseEnabled && auth.currentUser) {
+    // Cast to the expected type
+    const firebaseUser = auth.currentUser as FirebaseUser;
+    
+    // This is a simplification - in a real implementation, you would 
+    // retrieve the user's role from Firestore or claims
+    return {
+      uid: firebaseUser.uid,
+      role: UserType.PATIENT, // Default role - in real app, get from Firebase user claims
+      isAuthenticated: true
+    };
   }
   
-  logInfo('API Auth context cleared');
+  // Otherwise, use the stored context
+  if (!currentAuthContext) {
+    throw new Error('No authentication context available. User must be logged in.');
+  }
+  
+  return {
+    ...currentAuthContext,
+    isAuthenticated: true
+  };
+}
+
+/**
+ * Check if the user is authenticated
+ */
+export function isAuthenticated(): boolean {
+  if (isFirebaseEnabled) {
+    return !!auth.currentUser;
+  }
+  
+  return !!currentAuthContext;
 }
 
 export default {
   setCurrentAuthCtx,
-  getCurrentAuthCtx,
   clearCurrentAuthCtx,
+  getCurrentAuthCtx,
+  isAuthenticated
 }; 
