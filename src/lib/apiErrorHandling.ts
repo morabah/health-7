@@ -62,7 +62,7 @@ interface ApiOptions {
   /**
    * Context data to include in error reports
    */
-  errorContext?: Record<string, any>;
+  errorContext?: Record<string, unknown>;
   
   /**
    * Whether the operation can be retried by the user
@@ -185,12 +185,17 @@ function extractErrorDetails(error: unknown): {
   
   // Handle Error objects
   if (error instanceof Error) {
-    // Check for status and code properties
-    const anyError = error as any;
+    // Extract any additional properties from error object
+    const errorWithProps = error as Error & { 
+      status?: number; 
+      statusCode?: number; 
+      code?: string;
+    };
+    
     return {
       message: error.message,
-      status: anyError.status || anyError.statusCode,
-      code: anyError.code,
+      status: errorWithProps.status || errorWithProps.statusCode,
+      code: errorWithProps.code,
     };
   }
   
@@ -232,9 +237,9 @@ function extractErrorDetails(error: unknown): {
 export async function parseApiError(error: Response): Promise<{
   message: string;
   status: number;
-  data?: any;
+  data?: unknown;
 }> {
-  let data: any = null;
+  let data: unknown = null;
   let message = error.statusText || 'API request failed';
   
   try {
@@ -243,9 +248,9 @@ export async function parseApiError(error: Response): Promise<{
     
     // Use error message from response if available
     if (data && typeof data === 'object') {
-      if (data.message) {
+      if ('message' in data && typeof data.message === 'string') {
         message = data.message;
-      } else if (data.error) {
+      } else if ('error' in data) {
         message = typeof data.error === 'string' ? data.error : 'API request failed';
       }
     }
@@ -318,8 +323,8 @@ export function categorizeError(error: unknown): ErrorCategory {
   if (
     error instanceof Error && 
     ('code' in error) && 
-    typeof (error as any).code === 'string' && 
-    (error as any).code.startsWith('auth/')
+    typeof (error as Error & { code?: string }).code === 'string' && 
+    (error as Error & { code: string }).code.startsWith('auth/')
   ) {
     return 'auth';
   }
@@ -342,20 +347,21 @@ export function categorizeError(error: unknown): ErrorCategory {
   if (
     error && 
     typeof error === 'object' && 
-    'status' in error && 
-    typeof (error as any).status === 'number'
+    'status' in error
   ) {
-    const status = (error as any).status;
-    if (status === 401 || status === 403) {
-      return 'auth';
+    const errorWithStatus = error as { status: unknown };
+    if (typeof errorWithStatus.status === 'number') {
+      if (errorWithStatus.status === 401 || errorWithStatus.status === 403) {
+        return 'auth';
+      }
+      if (errorWithStatus.status === 404) {
+        return 'data';
+      }
+      if (errorWithStatus.status >= 500) {
+        return 'server';
+      }
+      return 'api';
     }
-    if (status === 404) {
-      return 'data';
-    }
-    if (status >= 500) {
-      return 'server';
-    }
-    return 'api';
   }
   
   // Default to 'api' for unrecognized errors
@@ -404,10 +410,15 @@ export function isNetworkError(error: unknown): boolean {
   if (
     error && 
     typeof error === 'object' && 
-    'status' in error && 
-    ((error as any).status === 0 || (error as any).status === 'network_error')
+    'status' in error
   ) {
-    return true;
+    // Define the error type with status property
+    const errorWithStatus = error as { status: unknown };
+    
+    // Check for network error status codes
+    if (errorWithStatus.status === 0 || errorWithStatus.status === 'network_error') {
+      return true;
+    }
   }
   
   return false;
@@ -481,8 +492,14 @@ export function withApiErrorHandling<T extends unknown[], R>(
           // For the last attempt, enhance the error with additional information
           if (error instanceof Error) {
             error.message = `${opts.errorMessage}: ${error.message}`;
-            (error as any).retryable = opts.retryable;
-            (error as any).context = errorContext;
+            
+            // Add extra properties to the error object with type safety
+            const enhancedError = error as Error & { 
+              retryable?: boolean; 
+              context?: Record<string, unknown>;
+            };
+            enhancedError.retryable = opts.retryable;
+            enhancedError.context = errorContext;
           }
           
           // Rethrow the error
@@ -556,10 +573,14 @@ export async function enhancedFetch(
         
         // Create a custom error with the response data
         const customError = new Error(error.message);
-        (customError as any).status = error.status;
-        (customError as any).data = error.data;
+        const enhancedError = customError as Error & { 
+          status: number; 
+          data: unknown;
+        };
+        enhancedError.status = error.status;
+        enhancedError.data = error.data;
         
-        throw customError;
+        throw enhancedError;
       }
       
       return response;
@@ -659,10 +680,21 @@ export async function callApiWithErrorHandling<T>(
   // Check for offline status before making the API call
   if (isOffline()) {
     const offlineError = new Error('You appear to be offline. Please check your internet connection and try again.');
-    (offlineError as any).isOffline = true;
-    (offlineError as any).category = 'network';
-    (offlineError as any).severity = 'warning';
-    (offlineError as any).recoverable = true;
+    
+    // Define the extended error type
+    interface OfflineError extends Error {
+      isOffline: boolean;
+      category: ErrorCategory;
+      severity: ErrorSeverity;
+      recoverable: boolean;
+    }
+    
+    // Cast to the extended type and set properties
+    (offlineError as OfflineError).isOffline = true;
+    (offlineError as OfflineError).category = 'network';
+    (offlineError as OfflineError).severity = 'warning';
+    (offlineError as OfflineError).recoverable = true;
+    
     reportError(offlineError, {
       category: 'network',
       severity: 'warning',
@@ -724,8 +756,16 @@ export async function callApiWithErrorHandling<T>(
         
         // Format as a standard error object with Firebase error properties
         const standardError = createFirebaseError(firebaseError);
-        (standardError as any).endpoint = endpoint;
-        (standardError as any).errorContext = errorContext;
+        
+        // Define extended error type with additional properties
+        interface EnhancedFirebaseError extends Error {
+          endpoint: string;
+          errorContext: Record<string, unknown>;
+        }
+        
+        // Cast and set properties
+        (standardError as EnhancedFirebaseError).endpoint = endpoint;
+        (standardError as EnhancedFirebaseError).errorContext = errorContext;
         
         throw standardError;
       }
@@ -741,18 +781,37 @@ export async function callApiWithErrorHandling<T>(
   
       // Rethrow with enhanced context
       if (error instanceof Error) {
+        // Define enhanced error type
+        interface EnhancedApiError extends Error {
+          category: ErrorCategory;
+          severity: ErrorSeverity;
+          context: Record<string, unknown>;
+        }
+        
         // Add metadata to existing error
-        (error as any).category = errorCategory;
-        (error as any).severity = errorSeverity;
-        (error as any).context = errorContext;
+        (error as EnhancedApiError).category = errorCategory;
+        (error as EnhancedApiError).severity = errorSeverity;
+        (error as EnhancedApiError).context = errorContext;
+        
         throw error;
       } else {
         // Wrap non-Error objects
         const standardError = new Error(errorMessage);
-        (standardError as any).category = errorCategory;
-        (standardError as any).severity = errorSeverity;
-        (standardError as any).originalError = error;
-        (standardError as any).context = errorContext;
+        
+        // Define enhanced error type
+        interface EnhancedStandardError extends Error {
+          category: ErrorCategory;
+          severity: ErrorSeverity;
+          originalError: unknown;
+          context: Record<string, unknown>;
+        }
+        
+        // Add metadata
+        (standardError as EnhancedStandardError).category = errorCategory;
+        (standardError as EnhancedStandardError).severity = errorSeverity;
+        (standardError as EnhancedStandardError).originalError = error;
+        (standardError as EnhancedStandardError).context = errorContext;
+        
         throw standardError;
       }
     }

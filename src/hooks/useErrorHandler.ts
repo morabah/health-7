@@ -5,6 +5,7 @@ import { reportError, errorMonitor } from '@/lib/errorMonitoring';
 import ErrorDisplay, { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import { logError } from '@/lib/logger';
+import React from 'react';
 
 /**
  * Enhanced error state with metadata
@@ -15,7 +16,7 @@ interface ErrorState {
   category?: ErrorCategory;
   severity?: ErrorSeverity;
   errorId?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   timestamp?: number;
   userMessage?: string;
   retryable?: boolean;
@@ -81,7 +82,7 @@ interface EnhancedErrorHandler {
     message?: string;
     category?: ErrorCategory;
     severity?: ErrorSeverity;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     retryable?: boolean;
     action?: string;
   }) => ErrorState | undefined;
@@ -91,7 +92,7 @@ interface EnhancedErrorHandler {
     message?: string;
     category?: ErrorCategory;
     severity?: ErrorSeverity;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     retryable?: boolean;
   }) => Promise<T | null>;
   withErrorHandling: <T extends unknown[], R>(
@@ -101,14 +102,14 @@ interface EnhancedErrorHandler {
       message?: string;
       category?: ErrorCategory;
       severity?: ErrorSeverity;
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       retryable?: boolean;
     }
   ) => (...args: T) => Promise<R | null>;
   ErrorComponent: () => ReactElement | null;
-  startSpan: (name: string, metadata?: Record<string, any>) => {
+  startSpan: (name: string, metadata?: Record<string, unknown>) => {
     finish: () => void;
-    addMetadata: (key: string, value: any) => void;
+    addMetadata: (key: string, value: unknown) => void;
   };
 }
 
@@ -162,7 +163,7 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
       message?: string;
       category?: ErrorCategory;
       severity?: ErrorSeverity;
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       retryable?: boolean;
       action?: string;
     } = {}
@@ -248,7 +249,7 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
   }, [component, defaultCategory, defaultSeverity, onError, redirectOnFatal, errorPagePath, router, simpleMode]);
   
   /**
-   * Clear the current error
+   * Clear the error state
    */
   const clearError = useCallback(() => {
     setError(null);
@@ -256,126 +257,121 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
   }, []);
   
   /**
-   * Start a performance span/transaction for measuring operations
+   * Auto-dismiss the error after a timeout
    */
-  const startSpan = useCallback((name: string, metadata: Record<string, any> = {}) => {
-    // Include component name in metadata
-    const enhancedMetadata = {
-      ...metadata,
-      ...(component ? { component } : {}),
-    };
-    
-    return errorMonitor.startSpan(name, enhancedMetadata);
-  }, [component]);
-  
-  /**
-   * Try to execute a function, capturing any errors
-   */
-  const tryCatch = useCallback(async <T extends unknown>(
-    fn: () => Promise<T> | T,
-    opts: {
-      action?: string;
-      message?: string;
-      category?: ErrorCategory;
-      severity?: ErrorSeverity;
-      context?: Record<string, any>;
-      retryable?: boolean;
-    } = {}
-  ): Promise<T | null> => {
-    // Start a span for this operation if action is provided
-    const span = opts.action ? startSpan(opts.action, opts.context) : null;
-    
-    try {
-      // Call the function and return the result
-      const result = await fn();
-      
-      // Finish the span
-      if (span) span.finish();
-      
-      return result;
-    } catch (err) {
-      // Handle the error
-      handleError(err, {
-        action: opts.action,
-        message: opts.message,
-        category: opts.category,
-        severity: opts.severity,
-        context: opts.context,
-        retryable: opts.retryable,
-      });
-      
-      // Finish the span with error
-      if (span) {
-        span.addMetadata('error', true);
-        span.finish();
-      }
-      
-      return null;
-    }
-  }, [handleError, startSpan]);
-  
-  /**
-   * Wrap a function with error handling
-   */
-  const withErrorHandling = useCallback(<T extends unknown[], R extends unknown>(
-    fn: (...args: T) => Promise<R> | R,
-    opts: {
-      action?: string;
-      message?: string;
-      category?: ErrorCategory;
-      severity?: ErrorSeverity;
-      context?: Record<string, any>;
-      retryable?: boolean;
-    } = {}
-  ) => {
-    return async (...args: T): Promise<R | null> => {
-      return tryCatch(() => fn(...args), opts);
-    };
-  }, [tryCatch]);
-  
-  // Auto-dismiss error after timeout if autoDismiss is true
   useEffect(() => {
-    if (autoDismiss && isErrorVisible && error) {
+    if (autoDismiss && error && isErrorVisible) {
       const timer = setTimeout(() => {
         setIsErrorVisible(false);
       }, autoDismissTimeout);
       
       return () => clearTimeout(timer);
     }
-  }, [autoDismiss, isErrorVisible, error, autoDismissTimeout]);
+  }, [autoDismiss, autoDismissTimeout, error, isErrorVisible]);
   
   /**
-   * Function to render an error display component
-   * Note: We're not actually returning JSX here, just a function
-   * that will return JSX when called
+   * Execute a function and handle any errors
    */
-  const ErrorComponent = useCallback(() => {
+  const tryCatch = useCallback(async <T>(
+    fn: () => Promise<T> | T, 
+    opts?: {
+      action?: string;
+      message?: string;
+      category?: ErrorCategory;
+      severity?: ErrorSeverity;
+      context?: Record<string, unknown>;
+      retryable?: boolean;
+    }
+  ): Promise<T | null> => {
+    try {
+      return await fn();
+    } catch (err) {
+      handleError(err, opts);
+      return null;
+    }
+  }, [handleError]);
+  
+  /**
+   * Create a wrapped version of a function that handles errors
+   */
+  const withErrorHandling = useCallback(<T extends unknown[], R>(
+    fn: (...args: T) => Promise<R> | R,
+    opts?: {
+      action?: string;
+      message?: string;
+      category?: ErrorCategory;
+      severity?: ErrorSeverity;
+      context?: Record<string, unknown>;
+      retryable?: boolean;
+    }
+  ) => {
+    return async (...args: T): Promise<R | null> => {
+      try {
+        return await fn(...args);
+      } catch (err) {
+        handleError(err, opts);
+        return null;
+      }
+    };
+  }, [handleError]);
+  
+  /**
+   * Component to display the current error
+   */
+  const ErrorComponent = useCallback((): ReactElement | null => {
     if (!error || !isErrorVisible) return null;
     
-    // The actual JSX will be created when this function is called in the component
-    return ErrorDisplay({
-      error: error.error,
-      message: error.userMessage || error.message,
-      severity: error.severity,
-      category: error.category, 
-      onDismiss: clearError,
-      onRetry: error.retryable ? () => setIsErrorVisible(false) : undefined,
-      context: error.context,
-      errorId: error.errorId
-    });
-  }, [error, isErrorVisible, clearError]);
-  
-  // Return tuple for simple mode (original API)
-  if (simpleMode || (options === undefined)) {
-    // If we have an error and in simple mode, throw it for the boundary
-    if (error?.error instanceof Error) {
-      throw error.error;
-    }
+    // Create an Error object if the error isn't already one
+    const errorObj = error.error instanceof Error 
+      ? error.error 
+      : new Error(String(error.error));
     
-    return [null, handleError] as SimpleErrorHandler;
+    // Return the ErrorDisplay component
+    return React.createElement(ErrorDisplay, {
+      error: errorObj,
+      message: error.message,
+      category: error.category || defaultCategory,
+      severity: error.severity || defaultSeverity,
+      errorId: error.errorId,
+      context: error.context as Record<string, unknown>,
+      onDismiss: clearError,
+      onRetry: error.retryable ? () => setIsErrorVisible(false) : undefined
+    });
+  }, [error, isErrorVisible, defaultCategory, defaultSeverity, clearError]);
+  
+  /**
+   * Start a performance/error span for tracking
+   */
+  const startSpan = useCallback((name: string, metadata?: Record<string, unknown>) => {
+    const span = errorMonitor.startSpan(name, metadata || {});
+    
+    return {
+      finish: () => {
+        if (span && typeof span.finish === 'function') {
+          span.finish();
+        }
+      },
+      addMetadata: (key: string, value: unknown) => {
+        if (span && typeof span.addMetadata === 'function') {
+          span.addMetadata(key, value);
+        }
+      }
+    };
+  }, []);
+  
+  // Return type depends on simpleMode option
+  if (simpleMode) {
+    const simpleErrorSetter = (err: unknown) => {
+      handleError(err);
+    };
+    
+    return [
+      error?.error instanceof Error ? error.error : null,
+      simpleErrorSetter
+    ] as SimpleErrorHandler;
   }
   
-  // Return enhanced API with all utilities
+  // Return the enhanced error handler
   return {
     error,
     isErrorVisible,
@@ -384,8 +380,8 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
     tryCatch,
     withErrorHandling,
     ErrorComponent,
-    startSpan,
-  } as EnhancedErrorHandler;
+    startSpan
+  };
 }
 
 export default useErrorHandler; 
