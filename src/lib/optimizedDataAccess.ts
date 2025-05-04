@@ -1,21 +1,27 @@
 'use client';
 
-import {
-  getUsers,
-  getDoctors,
-  getAppointments,
-  getNotifications
-} from './localDb';
-import { localApi } from './localApiFunctions';
-import { cacheKeys, cacheManager } from './queryClient';
+/**
+ * Optimized Data Access
+ * 
+ * Provides a unified interface for data access with memory caching.
+ * This implementation focuses on performance and efficient memory usage.
+ */
+
+import { UserType as UserRole } from '@/types/enums';
 import { logInfo, logError, logWarn } from './logger';
-import { UserType } from '@/types/enums';
-import { 
-  CacheError as AppCacheError,
-  DataError
-} from './errors';
-import { deduplicatedApiCall } from './apiDeduplication';
+import { cacheKeys, cacheManager } from './queryClient';
 import { enhancedCache, CacheCategory } from './cacheManager';
+import { callApi } from './apiClient';
+import { queryOptions } from '@tanstack/react-query';
+import { DataError } from './errors';
+
+// Import types from schemas
+import type { 
+  Appointment as AppointmentType,
+  DoctorProfile as DoctorType, 
+  Notification as NotificationType, 
+  UserProfile as UserProfileType 
+} from '@/types/schemas';
 
 // Type for filtered data request options
 export interface FilterOptions {
@@ -178,17 +184,7 @@ interface DataAccessError extends Error {
   retryable: boolean;
 }
 
-// Use standardized error classes from errors.ts
-class CacheError extends AppCacheError {
-  constructor(message: string, context?: Record<string, unknown>) {
-    super(message, {
-      code: 'CACHE_ERROR',
-      context,
-      retryable: true
-    });
-  }
-}
-
+// Use the imported error classes from errors.ts
 class DataFetchError extends DataError {
   constructor(message: string, code = 'DATA_FETCH_ERROR', context?: Record<string, unknown>, retryable = true) {
     super(message, {
@@ -405,16 +401,18 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     
     // Fetch fresh data
     logInfo('Fetching fresh users data');
-    const users = await getUsers();
+    const response = await callApi<{ success: boolean; users: User[] }>('getAllUsers');
     
-    if (!users || !Array.isArray(users)) {
+    if (!response.success || !response.users || !Array.isArray(response.users)) {
       throw new DataFetchError(
         'Invalid response from users data source',
         'INVALID_USER_DATA',
-        { dataType: typeof users, cacheKey },
+        { dataType: typeof response.users, cacheKey },
         false
       );
     }
+    
+    const users = response.users;
     
     // Set in React Query cache
     cacheManager.setQueryData(cacheKeys.users(options.filters), { success: true, users });
@@ -542,8 +540,8 @@ export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<
     
     // Try using admin function first
     try {
-      const adminCtx = { uid: 'admin', role: UserType.ADMIN };
-      const result = await localApi.adminGetAllDoctors(adminCtx);
+      const adminCtx = { uid: 'admin', role: UserRole.ADMIN };
+      const result = await callApi<{ success: boolean; doctors: Doctor[] }>('adminGetAllDoctors', adminCtx);
       
       if (result.success && result.doctors) {
         // Set in both caches
@@ -558,13 +556,21 @@ export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<
       logError('Admin doctors fetch failed, falling back to standard method', adminError);
     }
     
-    // Fallback to direct database access
-    const doctors = await getDoctors();
+    // Fallback to direct API access
+    const doctorsResponse = await callApi<{ success: boolean; doctors: Doctor[] }>('getAllDoctors');
+    
+    if (!doctorsResponse.success || !doctorsResponse.doctors) {
+      throw new DataFetchError('Failed to fetch doctors', 'DOCTOR_FETCH_ERROR');
+    }
+    
+    const doctors = doctorsResponse.doctors;
     
     // Enhanced data with user information
-    const users = await getUsers();
-    const enhancedDoctors = doctors.map(doctor => {
-      const user = users.find(u => u.id === doctor.userId);
+    const usersResponse = await callApi<{ success: boolean; users: User[] }>('getAllUsers');
+    const users = usersResponse.success && usersResponse.users ? usersResponse.users : [];
+    
+    const enhancedDoctors = doctors.map((doctor: Doctor) => {
+      const user = users.find((u: User) => u.id === doctor.userId);
       return {
         ...doctor,
         firstName: user?.firstName || '',
@@ -658,7 +664,13 @@ export async function getOptimizedAppointments(options: FilterOptions = {}): Pro
     
     // Fetch appointments - no advanced caching as they change frequently
     logInfo('Fetching fresh appointments data');
-    const appointments = await getAppointments();
+    const response = await callApi<{ success: boolean; appointments: Appointment[] }>('getAllAppointments');
+    
+    if (!response.success || !response.appointments) {
+      throw new DataFetchError('Failed to fetch appointments', 'APPOINTMENT_FETCH_ERROR');
+    }
+    
+    const appointments = response.appointments;
     
     // Process and return data
     const processedData = processAppointmentsData(appointments, options);
@@ -804,26 +816,25 @@ export async function getOptimizedNotifications(
     logInfo('Fetching fresh notifications data');
     
     // Get user role from users collection if we need it for API call
-    let userRole: UserType = UserType.PATIENT;
+    let userRole: UserRole = UserRole.PATIENT;
     try {
-      const users = await getUsers();
+      const users = await getOptimizedUsers();
       const user = users.find(u => u.id === userId);
       if (user && 'userType' in user) {
-        userRole = user.userType as UserType;
+        userRole = user.userType as UserRole;
       }
     } catch (error) {
       logError('Error getting user role for notifications, using default', error);
     }
     
     // Call API to get notifications with proper UserType
-    const result = await localApi.getMyNotifications({
-      uid: userId,
-      role: userRole
-    });
-    
-    // TODO: Type mismatch in deduplicatedApiCall needs to be fixed
-    // The current implementation works but there's a TypeScript error that should be addressed
-    // by properly aligning the types between localApi.getMyNotifications and ApiResponse interface
+    const result = await callApi<ApiResponse<Notification[]>>(
+      'getMyNotifications',
+      {
+        uid: userId,
+        role: userRole
+      }
+    );
     
     if (result.success && 'notifications' in result && Array.isArray(result.notifications)) {
       // Set in both caches
@@ -864,16 +875,18 @@ export async function getOptimizedNotifications(
     });
     
     recoveryAttempted = true;
-    const notifications = await getNotifications();
+    const notificationsResponse = await callApi<{ success: boolean; notifications: Notification[] }>('getAllNotifications');
     
-    if (!notifications || !Array.isArray(notifications)) {
+    if (!notificationsResponse.success || !notificationsResponse.notifications || !Array.isArray(notificationsResponse.notifications)) {
       throw new DataFetchError(
         'Invalid response from notifications data source',
         'INVALID_NOTIFICATION_DATA',
-        { dataType: typeof notifications, userId, cacheKey },
+        { dataType: typeof notificationsResponse.notifications, userId, cacheKey },
         false
       );
     }
+    
+    const notifications = notificationsResponse.notifications;
     
     // Filter notifications for this user
     const userNotifications = notifications.filter(notif => 
@@ -1010,4 +1023,19 @@ export {
   getMemoryCacheData, 
   clearMemoryCache,
   evictCacheEntries
-}; 
+};
+
+/**
+ * Base error class for optimized data access
+ */
+export class OptimizedDataError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'OptimizedDataError';
+  }
+}
+
+function fallbackToLocalDb() {
+  logWarn('Falling back to local database for data access');
+  // Implementation...
+} 

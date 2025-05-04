@@ -465,11 +465,17 @@ These changes further improve the application's type safety, enhance the user ex
 - Fixed linter errors in `bookingApi.ts`:
   - Added proper TypeScript types to parameters that were implicitly typed as `any`
   - Replaced unsupported properties (`cacheTime`, `onSuccess`, `onError`) with proper React hooks
-  - Implemented a state-based approach for tracking performance measurements instead of context
-  - Added custom type definitions to ensure type safety throughout the application
-  - Fixed the missing `myDashboard` cache key by creating a custom `dashboardCacheKey` function
+  - Implemented a state-based approach to handle form submission and error reporting
 
-### Memory Leak Prevention and Component Unmount Handling
+### Fixed Runtime Errors
+
+- Fixed "ReferenceError: AppCacheError is not defined" in optimizedDataAccess.ts
+  - Fixed error class inheritance by using proper imports from errors.ts
+  - Replaced custom error classes with the standard application error classes
+  - Fixed references to undefined functions by using callApi instead
+  - Fixed imports to avoid naming conflicts
+
+### Fixed Memory Leaks
 
 - Fixed memory leaks in Book Appointment flow (2023-12-05)
   - Added `isMountedRef` to prevent state updates after component unmount

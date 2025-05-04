@@ -6,6 +6,8 @@
  * provide detailed context, and improve error handling throughout the application.
  */
 
+'use client';
+
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 
 /**
@@ -501,4 +503,14 @@ export function throwHttpError(status: number, message?: string, context?: Recor
     default:
       throw new ApiError(message || `HTTP error ${status}`, { context, status });
   }
-} 
+}
+
+export default {
+  AppError,
+  AppCacheError,
+  DataError,
+  AuthError,
+  ApiError,
+  ValidationError,
+  AppointmentError
+}; 
