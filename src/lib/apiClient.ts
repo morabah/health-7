@@ -27,6 +27,7 @@ import {
 } from './optimizedDataAccess';
 import { cacheKeys, cacheManager } from './queryClient';
 import { UserType } from '@/types/enums';
+import { deduplicatedApiCall } from './apiDeduplication';
 
 // Get the appropriate API based on configuration
 const api = isFirebaseEnabled ? firebaseApi : localAPI.localApi;
@@ -59,6 +60,16 @@ const METHOD_MAPPING: Record<string, string> = {
   registerPatient: 'registerUser',
   registerDoctor: 'registerUser',
 };
+
+// Methods that should use deduplication
+const DEDUPLICATION_ELIGIBLE_METHODS = [
+  'getMyNotifications',
+  'getMyDashboardStats',
+  'getAvailableSlots',
+  'findDoctors',
+  'getMyUserProfile',
+  'getMyAppointments'
+];
 
 /**
  * Options for callApi
@@ -103,6 +114,11 @@ interface CallApiOptions {
    * Skip optimized data access and use the standard implementation
    */
   skipOptimized?: boolean;
+  
+  /**
+   * Skip deduplication for this call
+   */
+  skipDeduplication?: boolean;
 }
 
 // Interface for auth context in API calls
@@ -164,6 +180,78 @@ export async function callApiWithOptions<T = unknown>(
   // Check if method needs mapping (e.g., login -> signIn)
   const mappedMethod = METHOD_MAPPING[method] || method;
   
+  // Create a function to execute the actual API call using standard implementation
+  const executeApiCall = async (): Promise<T> => {
+    try {
+      // For Firebase, create a callable function
+      if (isFirebaseEnabled && !options.forceLocal) {
+        return await callFirebaseFunction<T>(mappedMethod, ...args);
+      }
+
+      // For local development, call local API directly
+      // Check if method exists
+      if (!(mappedMethod in (api as ApiMethods))) {
+        // If mapped method doesn't exist, check if original method exists
+        if (method !== mappedMethod && method in (api as ApiMethods)) {
+          // Use original method if mapped method doesn't exist
+          return await (api as ApiMethods)[method](...args) as T;
+        }
+        throw new ApiError(`API method ${mappedMethod} not found`, {
+          code: 'API_METHOD_NOT_FOUND',
+          status: 404,
+          retryable: false,
+          severity: 'error',
+          context: { method: mappedMethod, originalMethod: method }
+        });
+      }
+
+      // Special handling for login method to ensure correct parameter passing
+      if (method === 'login' && args.length === 1 && args[0] && typeof args[0] === 'object') {
+        const loginParams = args[0] as Record<string, unknown>;
+        if ('email' in loginParams && 'password' in loginParams) {
+          const email = loginParams.email;
+          const password = loginParams.password;
+          return await (api as ApiMethods)[mappedMethod](email, password) as T;
+        }
+      }
+
+      // If no auth context provided but needed, get from session
+      let callArgs = [...args];
+      if (callArgs.length === 0 || !callArgs[0] || typeof callArgs[0] !== 'object' || !('uid' in callArgs[0])) {
+        // Only inject auth context for methods that typically need it
+        // Skip for public methods like register, login, etc.
+        if (!['registerUser', 'signIn', 'login', 'requestPasswordReset'].includes(mappedMethod)) {
+          const authCtx = getCurrentAuthCtx();
+          if (authCtx && authCtx.uid) {
+            callArgs.unshift(authCtx);
+          }
+        }
+      }
+
+      // Call the API method
+      const result = await (api as ApiMethods)[mappedMethod](...callArgs);
+      
+      if (shouldLog && result && typeof result === 'object') {
+        // Use optional chaining for safety
+        logInfo(`[callApi] Result from ${method}:`, {
+          success: 'success' in result ? result.success : undefined,
+          hasData: !!(
+            ('data' in result && result.data) || 
+            ('user' in result && result.user) || 
+            ('users' in result && result.users) || 
+            ('doctor' in result && result.doctor)
+          ),
+          error: 'error' in result ? result.error : undefined
+        });
+      }
+
+      return result as T;
+    } catch (error) {
+      logError(`Error calling API method: ${method}`, { error, args });
+      throw error;
+    }
+  };
+
   // Try to use optimized data access for performance if not explicitly skipped
   if (!options.skipOptimized && !isFirebaseEnabled && OPTIMIZED_METHODS[method]) {
     try {
@@ -236,77 +324,34 @@ export async function callApiWithOptions<T = unknown>(
     }
   }
 
-  // Create a function to execute the actual API call using standard implementation
-  const executeApiCall = async (): Promise<T> => {
-    try {
-      // For Firebase, create a callable function
-      if (isFirebaseEnabled && !options.forceLocal) {
-        return await callFirebaseFunction<T>(mappedMethod, ...args);
-      }
-
-      // For local development, call local API directly
-      // Check if method exists
-      if (!(mappedMethod in (api as ApiMethods))) {
-        // If mapped method doesn't exist, check if original method exists
-        if (method !== mappedMethod && method in (api as ApiMethods)) {
-          // Use original method if mapped method doesn't exist
-          return await (api as ApiMethods)[method](...args) as T;
-        }
-        throw new ApiError(`API method ${mappedMethod} not found`, {
-          code: 'API_METHOD_NOT_FOUND',
-          status: 404,
-          retryable: false,
-          severity: 'error',
-          context: { method: mappedMethod, originalMethod: method }
-        });
-      }
-
-      // Special handling for login method to ensure correct parameter passing
-      if (method === 'login' && args.length === 1 && args[0] && typeof args[0] === 'object') {
-        const loginParams = args[0] as Record<string, unknown>;
-        if ('email' in loginParams && 'password' in loginParams) {
-          const email = loginParams.email;
-          const password = loginParams.password;
-          return await (api as ApiMethods)[mappedMethod](email, password) as T;
-        }
-      }
-
-      // If no auth context provided but needed, get from session
-      let callArgs = [...args];
-      if (callArgs.length === 0 || !callArgs[0] || typeof callArgs[0] !== 'object' || !('uid' in callArgs[0])) {
-        // Only inject auth context for methods that typically need it
-        // Skip for public methods like register, login, etc.
-        if (!['registerUser', 'signIn', 'login', 'requestPasswordReset'].includes(mappedMethod)) {
-          const authCtx = getCurrentAuthCtx();
-          if (authCtx && authCtx.uid) {
-            callArgs.unshift(authCtx);
+  // Use deduplication for eligible methods if not explicitly skipped
+  if (!options.skipDeduplication && DEDUPLICATION_ELIGIBLE_METHODS.includes(method)) {
+    return deduplicatedApiCall<T>(
+      method,
+      () => callApiWithErrorHandling<T>(
+        executeApiCall,
+        [], // Empty args array since we've already processed args in executeApiCall
+        {
+          endpoint: method,
+          errorMessage: options.errorMessage || `Error calling API method: ${method}`,
+          retryable: options.retry ?? false,
+          maxRetries: options.maxRetries || 3,
+          errorCategory: options.errorCategory || 'api',
+          errorSeverity: options.errorSeverity || 'error',
+          errorContext: {
+            ...options.errorContext,
+            method,
+            args
           }
         }
+      ),
+      args,
+      { 
+        label: `API:${method}`,
+        verbose: shouldLog
       }
-
-      // Call the API method
-      const result = await (api as ApiMethods)[mappedMethod](...callArgs);
-      
-      if (shouldLog && result && typeof result === 'object') {
-        // Use optional chaining for safety
-        logInfo(`[callApi] Result from ${method}:`, {
-          success: 'success' in result ? result.success : undefined,
-          hasData: !!(
-            ('data' in result && result.data) || 
-            ('user' in result && result.user) || 
-            ('users' in result && result.users) || 
-            ('doctor' in result && result.doctor)
-          ),
-          error: 'error' in result ? result.error : undefined
-        });
-      }
-
-      return result as T;
-    } catch (error) {
-      logError(`Error calling API method: ${method}`, { error, args });
-      throw error;
-    }
-  };
+    );
+  }
 
   // Fall back to standard implementation with proper error handling
   return callApiWithErrorHandling<T>(

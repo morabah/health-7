@@ -22,6 +22,7 @@ This reference document compiles all key learnings, implementation details, and 
 16. [Firebase Migration Guide](#firebase-migration-guide)
 17. [Error Handling Checklist](#error-handling-checklist)
 18. [Test Fixes & Testing Reference](#test-fixes--testing-reference)
+19. [Cache System Enhancements](#cache-system-enhancements)
 
 ---
 
@@ -451,3 +452,132 @@ These changes further improve the application's type safety, enhance the user ex
   - Deleted empty src/app/(dev)/unauthorized directory
   - These directories were not referenced in the sitemap or anywhere in the codebase
   - Kept the empty src/app/(dev) directory itself as it's referenced in the sitemap.txt
+
+### Fixed API Integration Bugs
+
+- Fixed the `cancelAppointment` function in `doctorLoaders.ts` that was causing error messages
+  - Properly formatted API call parameters by separating context and payload correctly
+  - Restructured API calls to follow the correct pattern: `callApi(methodName, context, payload)`
+  - Fixed the TypeError: "Cannot destructure property 'appointmentId' of 'payload' as it is undefined"
+
+### Fixed Linter Errors
+
+- Fixed linter errors in `bookingApi.ts`:
+  - Added proper TypeScript types to parameters that were implicitly typed as `any`
+  - Replaced unsupported properties (`cacheTime`, `onSuccess`, `onError`) with proper React hooks
+  - Implemented a state-based approach for tracking performance measurements instead of context
+  - Added custom type definitions to ensure type safety throughout the application
+  - Fixed the missing `myDashboard` cache key by creating a custom `dashboardCacheKey` function
+
+### Memory Leak Prevention and Component Unmount Handling
+
+- Fixed memory leaks in Book Appointment flow (2023-12-05)
+  - Added `isMountedRef` to prevent state updates after component unmount
+  - Added cleanup functions to all useEffect hooks with timers or interval IDs
+  - Memoized API calling functions with useCallback to prevent unnecessary recreation
+  - Enhanced error handling for non-patient users trying to book appointments
+  - Added proper mount status checking before all state updates
+  - Fixed redirect after successful booking with proper cleanup
+  - Improved role-based error handling with clear user messages
+
+The memory leak prevention approach includes:
+1. Creating a mount status ref (`isMountedRef`) to track when components mount/unmount
+2. Checking this ref before any state updates
+3. Using cleanup functions in useEffect hooks to clear any timers, intervals, or subscriptions
+4. Creating stable callback references with useCallback for any asynchronous operations
+5. Preventing state updates after component unmount
+
+These improvements address issues where unmounted components were still trying to update state, causing React warnings and potential memory leaks.
+
+#### Implementation Pattern:
+
+```tsx
+// 1. Create a mounted ref
+const isMountedRef = useRef<boolean>(true);
+
+// 2. Track component mount status
+useEffect(() => {
+  isMountedRef.current = true;
+  return () => {
+    isMountedRef.current = false;
+  };
+}, []);
+
+// 3. Use in async functions
+const fetchData = useCallback(async () => {
+  if (!isMountedRef.current) return;
+  
+  try {
+    const result = await someApiCall();
+    
+    // Check if still mounted before updating state
+    if (isMountedRef.current) {
+      setData(result);
+    }
+  } catch (error) {
+    if (isMountedRef.current) {
+      setError(error);
+    }
+  }
+}, [isMountedRef]);
+
+// 4. Clean up timers in effects
+useEffect(() => {
+  const timerId = setTimeout(() => {
+    if (isMountedRef.current) {
+      // Do something
+    }
+  }, 3000);
+  
+  return () => {
+    clearTimeout(timerId);
+  };
+}, []);
+```
+
+### Fixed Performance Issues
+
+- Implemented LRU Cache to improve application performance
+  - Reduced redundant API calls for notification fetching
+  - Added cache statistics tracking for monitoring
+  - Implemented automatic pruning of expired entries
+  - Added priority-based eviction for efficient memory usage
+
+- Improved API deduplication to prevent duplicate requests
+  - Enhanced the deduplication key creation for better cache hits
+  - Fixed TypeScript issues with Map iteration using Array.from()
+  - Added cache integration for high-frequency API calls
+
+## Cache System Enhancements
+
+### LRU Cache Implementation
+
+We've implemented a proper Least Recently Used (LRU) cache system to improve the application's performance and memory management. Key features include:
+
+1. **LRUCache Class** (`src/lib/lruCache.ts`)
+   - Efficient implementation of an LRU cache with size limits and priority-based eviction
+   - Memory-size aware with configurable maximum size (in bytes)
+   - Entry count limits to prevent excessive memory usage
+   - Prioritization system for cache entries (high/normal/low)
+   - Automatic cache entry expiration based on TTL
+   - Size estimation for different data types
+
+2. **Enhanced Cache Manager** (`src/lib/cacheManager.ts`)
+   - Unified interface for all application caching needs
+   - Category-based caching for better organization (users, doctors, appointments, notifications)
+   - Different TTL durations for each data category based on volatility
+   - React Query integration for smooth migration
+   - Statistics tracking for monitoring cache performance
+   - Automatic pruning of expired entries
+
+3. **Integration with Existing Systems**
+   - The LRU cache was integrated with the existing memory cache in `optimizedDataAccess.ts`
+   - Backward compatibility maintained for legacy code
+   - Performance improvements for notification fetching
+   - Reduced memory usage due to intelligent eviction policies
+
+This enhancement significantly improves the application's performance by:
+- Preventing memory leaks through proper memory management
+- Reducing unnecessary API calls through efficient caching
+- Improving user experience with faster data access
+- Providing better stability under high load

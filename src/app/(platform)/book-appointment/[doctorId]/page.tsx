@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
@@ -35,6 +35,7 @@ import useErrorHandler from '@/hooks/useErrorHandler';
 import useBookingError, { BookingError, BookingErrorCode } from '@/hooks/useBookingError';
 import { callApi } from '@/lib/apiClient';
 import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors';
+import { UserType } from '@/types/enums';
 
 // Define the merged doctor profile type based on API response
 interface DoctorPublicProfile {
@@ -121,6 +122,7 @@ function BookAppointmentPageContent() {
   const { BookingError } = useBookingError();
   
   const doctorId = params?.doctorId ? String(params.doctorId) : '';
+  const isMountedRef = useRef<boolean>(true);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
@@ -132,6 +134,24 @@ function BookAppointmentPageContent() {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<Array<{ startTime: string; endTime: string }>>([]);
   const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  // Set up mount status tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Check if user is a patient at component load
+  useEffect(() => {
+    if (user && user.role !== UserType.PATIENT) {
+      setRoleError("Only patients can book appointments. Please login with a patient account.");
+    } else {
+      setRoleError(null);
+    }
+  }, [user]);
 
   // Fetch doctor profile with proper typing
   const { 
@@ -177,29 +197,30 @@ function BookAppointmentPageContent() {
   // Handle successful booking
   useEffect(() => {
     if (bookAppointmentMutation.isSuccess) {
-      setSuccess(true);
+      if (isMountedRef.current) {
+        setSuccess(true);
+      }
       
-      // Redirect after a short delay
-      setTimeout(() => {
-        router.push('/patient/appointments?justBooked=1');
+      // Use a variable to track timeout
+      const redirectTimeout = setTimeout(() => {
+        // Check if component is still mounted before redirecting
+        if (isMountedRef.current) {
+          router.push('/patient/appointments?justBooked=1');
+        }
       }, 3000);
+      
+      // Clean up the timeout if the component unmounts
+      return () => {
+        clearTimeout(redirectTimeout);
+      };
     }
   }, [bookAppointmentMutation.isSuccess, router]);
 
-  // Generate selectable dates based on availability
-  useEffect(() => {
-    generateDates();
-  }, [availabilityDataResponse]);
-
-  // On date selection, fetch available time slots
-  useEffect(() => {
-    if (selectedDate) {
-      fetchAvailableSlots();
-    }
-  }, [selectedDate]);
-
   // Generate dates for the next 14 days, marking which ones are available
-  const generateDates = () => {
+  const generateDates = useCallback(() => {
+    // Don't proceed if component is unmounted
+    if (!isMountedRef.current) return;
+    
     const dates: Date[] = [];
     const availableDates: Date[] = [];
     const today = new Date();
@@ -227,18 +248,26 @@ function BookAppointmentPageContent() {
       }
     }
 
-    setAllDates(dates);
-    setSelectableDates(availableDates);
+    // Only update state if component is still mounted
+    if (isMountedRef.current) {
+      setAllDates(dates);
+      setSelectableDates(availableDates);
 
-    // If we have available dates, pre-select the first one
-    if (availableDates.length > 0 && !selectedDate) {
-      setSelectedDate(availableDates[0]);
+      // If we have available dates, pre-select the first one
+      if (availableDates.length > 0 && !selectedDate) {
+        setSelectedDate(availableDates[0]);
+      }
     }
-  };
+  }, [availability, selectedDate, isMountedRef]);
+
+  // Generate selectable dates based on availability
+  useEffect(() => {
+    generateDates();
+  }, [availabilityDataResponse, generateDates]);
 
   // Fetch available time slots for the selected date
-  const fetchAvailableSlots = async () => {
-    if (!selectedDate) return;
+  const fetchAvailableSlots = useCallback(async () => {
+    if (!selectedDate || !isMountedRef.current) return;
     
     try {
       // Show loading indicator
@@ -260,6 +289,9 @@ function BookAppointmentPageContent() {
         'getAvailableSlots',
         { doctorId, date: formattedDate }
       );
+      
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
       
       if (response.success && response.slots && Array.isArray(response.slots)) {
         setAvailableTimeSlots(response.slots);
@@ -287,6 +319,9 @@ function BookAppointmentPageContent() {
         throw new BookingError('Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: formattedDate });
       }
     } catch (error) {
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+      
       // Log the error
       logError('Error fetching available slots', {
         doctorId,
@@ -302,9 +337,18 @@ function BookAppointmentPageContent() {
       // Otherwise, create a standardized error
       throw new BookingError(error instanceof Error ? error.message : 'Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: format(selectedDate, 'yyyy-MM-dd') });
     } finally {
-      setSlotsLoading(false);
+      if (isMountedRef.current) {
+        setSlotsLoading(false);
+      }
     }
-  };
+  }, [doctorId, selectedDate, isMountedRef, BookingError]);
+
+  // On date selection, fetch available time slots
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedDate, fetchAvailableSlots]);
 
   // Check if a date is selectable
   const isDateSelectable = (date: Date) => {
@@ -317,14 +361,29 @@ function BookAppointmentPageContent() {
   };
 
   // Handle appointment booking
-  const handleBookAppointment = async (e: React.FormEvent) => {
+  const handleBookAppointment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isMountedRef.current) return;
     
     if (!user) {
       throw new AuthError('You must be logged in to book an appointment', {
         code: 'UNAUTHORIZED',
         context: { doctorId },
         retryable: false
+      });
+      return;
+    }
+    
+    // Add role check here to prevent booking attempts
+    if (user.role !== UserType.PATIENT) {
+      setRoleError('Only patients can book appointments. Please login with a patient account.');
+      
+      throw new AppointmentError('Only patients can book appointments. Please login with a patient account.', {
+        code: 'PATIENT_ONLY',
+        context: { doctorId, userRole: user.role },
+        retryable: false,
+        severity: 'warning'
       });
       return;
     }
@@ -375,6 +434,9 @@ function BookAppointmentPageContent() {
         { doctorId, date: formattedDate }
       );
       
+      // Check if component is still mounted
+      if (!isMountedRef.current) return;
+      
       if (!verifyResponse.success || !verifyResponse.slots) {
         throw new ApiError('Could not verify appointment slot availability', {
           code: 'SLOT_VERIFICATION_FAILED',
@@ -403,6 +465,9 @@ function BookAppointmentPageContent() {
       // Call the booking mutation
       const result = await bookAppointmentMutation.mutateAsync(appointmentData);
       
+      // Check if component is still mounted
+      if (!isMountedRef.current) return;
+      
       // Define the expected mutation result type
       interface BookingResult {
         success: boolean;
@@ -417,6 +482,10 @@ function BookAppointmentPageContent() {
         'success' in value;
       
       if (isBookingResult(result) && result.success) {
+        if (isMountedRef.current) {
+          setSuccess(true);
+        }
+        
         logInfo('Appointment booked successfully', {
           ...bookingContext,
           appointmentId: result.appointmentId || 'unknown'
@@ -496,7 +565,17 @@ function BookAppointmentPageContent() {
         }
       );
     }
-  };
+  }, [
+    doctorId, 
+    user, 
+    selectedDate, 
+    selectedTimeSlot, 
+    selectedEndTime, 
+    appointmentType, 
+    reason, 
+    isMountedRef, 
+    bookAppointmentMutation
+  ]);
 
   if (doctorError || availabilityError) {
     return (
@@ -520,6 +599,14 @@ function BookAppointmentPageContent() {
       </Link>
 
       <h1 className="text-2xl font-bold mb-6 dark:text-white">Book an Appointment</h1>
+
+      {/* Role error message */}
+      {roleError && (
+        <Alert variant="error" className="mb-6">
+          <AlertOctagon className="h-4 w-4 mr-2" />
+          {roleError}
+        </Alert>
+      )}
 
       {/* Error message from mutation */}
       {bookAppointmentMutation.isError && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu as MenuIcon, X, Bell, Sun, Moon, LogOut, MessageSquare, LogIn, Users } from 'lucide-react';
@@ -17,6 +17,7 @@ import { APP_ROUTES } from '@/lib/router';
 import type { Notification } from '@/types/schemas';
 import UserSwitcher from '@/components/ui/UserSwitcher';
 import { logError } from '@/lib/logger';
+import { enhancedCache, CacheCategory } from '@/lib/cacheManager';
 
 // Format the last active timestamp
 const formatLastActive = (timestamp: number): string => {
@@ -57,7 +58,9 @@ export default function Navbar() {
   const [switchingSession, setSwitchingSession] = useState(false);
   const [fetchingNotifications, setFetchingNotifications] = useState(false);
   const [notificationsFetchFailed, setNotificationsFetchFailed] = useState(false);
-  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const lastFetchTimeRef = useRef<number>(0); // Use ref instead of state to avoid re-renders
+  const intervalRef = useRef<NodeJS.Timeout | null>(null); // Store interval in a ref
+  const isMountedRef = useRef<boolean>(true); // Track if component is mounted
   const pathname = usePathname();
   const router = useRouter();
   
@@ -67,86 +70,171 @@ export default function Navbar() {
   // Check if a route is active
   const isActive = (href: string) => pathname === href;
 
-  // Fetch unread notifications count with optimization
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
+  // Memoized fetch notifications function to prevent recreating on every render
+  const fetchNotifications = useCallback(async () => {
+    // Don't fetch if we're already fetching, failed recently, or component unmounted
+    if (fetchingNotifications || notificationsFetchFailed || !isMountedRef.current) {
+      return;
+    }
     
-    // Time between fetches for notifications (in ms)
+    // Guard for user authentication
+    if (!user?.uid || !user?.role) {
+      return;
+    }
+    
+    // Debounce check
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 5000) { // 5 seconds debounce
+      return;
+    }
+    
+    // Check if notifications are in the LRU cache first
+    const cacheKey = `notifications:${user.uid}`;
+    const cachedNotifications = enhancedCache.get<{success: boolean, notifications: Notification[]}>(
+      CacheCategory.NOTIFICATIONS,
+      cacheKey
+    );
+    
+    if (cachedNotifications && isMountedRef.current) {
+      const count = cachedNotifications.notifications.filter((n: Notification) => !n.isRead).length;
+      setUnreadCount(count);
+      return;
+    }
+    
+    setFetchingNotifications(true);
+    lastFetchTimeRef.current = now;
+    
+    try {
+      // The getMyNotifications API call is already deduplicated by the apiClient
+      // We don't need to specify any special options since deduplication is enabled by default
+      const response = await callApi('getMyNotifications', { uid: user.uid, role: user.role });
+      
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+      
+      if (response && typeof response === 'object' && 'success' in response && response.success) {
+        const notifications = 'notifications' in response && Array.isArray(response.notifications) 
+          ? response.notifications as Notification[] 
+          : [];
+        const count = notifications.filter((n: Notification) => !n.isRead).length;
+        setUnreadCount(count);
+        setNotificationsFetchFailed(false);
+        
+        // Store in LRU cache for faster access
+        enhancedCache.set(
+          CacheCategory.NOTIFICATIONS,
+          cacheKey,
+          response,
+          { 
+            ttl: 15000, // 15 seconds TTL
+            priority: 'normal'
+          }
+        );
+      }
+    } catch (error) {
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+      
+      logError('Error fetching notifications', { error, userId: user?.uid });
+      setNotificationsFetchFailed(true);
+      
+      // If we fail, we'll retry after a longer delay (2 minutes)
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setNotificationsFetchFailed(false);
+        }
+      }, 120000);
+    } finally {
+      // Check if component is still mounted before updating state
+      if (isMountedRef.current) {
+        setFetchingNotifications(false);
+      }
+    }
+  }, [user, fetchingNotifications, notificationsFetchFailed]);
+  
+  // Memoized visibility change handler
+  const handleVisibilityChange = useCallback(() => {
+    // Constants
     const ACTIVE_FETCH_INTERVAL = 60000; // 1 minute
     const BACKGROUND_FETCH_INTERVAL = 300000; // 5 minutes
     const DEBOUNCE_TIME = 5000; // 5 seconds between potential fetches
     
-    const fetchNotifications = async () => {
-      // Don't fetch if we're still in debounce time
-      const now = Date.now();
-      if (
-        !user || 
-        fetchingNotifications || 
-        notificationsFetchFailed || 
-        (now - lastFetchTime < DEBOUNCE_TIME)
-      ) return;
-      
-      setFetchingNotifications(true);
-      setLastFetchTime(now);
-      
-      try {
-        const response = await callApi('getMyNotifications', { uid: user.uid, role: user.role });
-        if (response && typeof response === 'object' && 'success' in response && response.success) {
-          const notifications = 'notifications' in response && Array.isArray(response.notifications) 
-            ? response.notifications as Notification[] 
-            : [];
-          const count = notifications.filter((n: Notification) => !n.isRead).length;
-          setUnreadCount(count);
-          setNotificationsFetchFailed(false);
-        }
-      } catch (error) {
-        logError('Error fetching notifications', { error, userId: user?.uid });
-        setNotificationsFetchFailed(true);
-        
-        // If we fail, we'll retry after a longer delay (2 minutes)
-        setTimeout(() => {
-          setNotificationsFetchFailed(false);
-        }, 120000);
-      } finally {
-        setFetchingNotifications(false);
-      }
-    };
+    // Don't do anything if component is unmounted
+    if (!isMountedRef.current) return;
     
-    // Track document visibility to optimize fetching
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // If becoming visible, fetch immediately if it's been a while
-        const now = Date.now();
-        if (now - lastFetchTime > DEBOUNCE_TIME) {
+    if (document.visibilityState === 'visible') {
+      // If becoming visible, fetch immediately if it's been a while
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current > DEBOUNCE_TIME) {
+        fetchNotifications();
+      }
+      
+      // Clear existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      // Reset to more frequent interval when tab is visible
+      intervalRef.current = setInterval(() => {
+        if (isMountedRef.current) {
           fetchNotifications();
         }
-        
-        // Reset to more frequent interval when tab is visible
-        if (interval) clearInterval(interval);
-        interval = setInterval(fetchNotifications, ACTIVE_FETCH_INTERVAL);
-      } else {
-        // Lower frequency polling when tab is not visible
-        if (interval) clearInterval(interval);
-        interval = setInterval(fetchNotifications, BACKGROUND_FETCH_INTERVAL);
+      }, ACTIVE_FETCH_INTERVAL);
+    } else {
+      // Clear existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-    };
-    
-    if (user) {
-      // Initial fetch (only once)
-      fetchNotifications();
       
-      // Set up visibility change listener to optimize polling
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      
-      // Start with active interval (tab is assumed to be visible on load)
-      interval = setInterval(fetchNotifications, ACTIVE_FETCH_INTERVAL);
+      // Lower frequency polling when tab is not visible
+      intervalRef.current = setInterval(() => {
+        if (isMountedRef.current) {
+          fetchNotifications();
+        }
+      }, BACKGROUND_FETCH_INTERVAL);
+    }
+  }, [fetchNotifications]);
+
+  // Set up notification polling and visibility handling
+  useEffect(() => {
+    // Skip if no user is authenticated
+    if (!user || !user.uid || !user.role) {
+      return;
     }
     
+    // Track component mount status
+    isMountedRef.current = true;
+    
+    // Constants
+    const ACTIVE_FETCH_INTERVAL = 60000; // 1 minute
+    
+    // Initial fetch (only once)
+    fetchNotifications();
+    
+    // Set up visibility change listener to optimize polling
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Start with active interval (tab is assumed to be visible on load)
+    intervalRef.current = setInterval(() => {
+      if (isMountedRef.current) {
+        fetchNotifications();
+      }
+    }, ACTIVE_FETCH_INTERVAL);
+    
+    // Cleanup function
     return () => {
-      if (interval) clearInterval(interval);
+      isMountedRef.current = false;
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, fetchingNotifications, notificationsFetchFailed, lastFetchTime]);
+  }, [user, fetchNotifications, handleVisibilityChange]);
 
   // Close account switcher when navigation changes
   useEffect(() => {

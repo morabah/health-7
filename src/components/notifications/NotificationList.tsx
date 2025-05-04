@@ -63,6 +63,15 @@ export default function NotificationList({
   const loadingRef = useRef<boolean>(false);
   const consecutiveErrorsRef = useRef(0);
   const lastSuccessfulFetchRef = useRef<number>(Date.now());
+  const isMountedRef = useRef<boolean>(true); // Track if component is mounted
+  
+  // Set isMounted to false when component unmounts
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   // Memoize unread count to prevent unnecessary re-renders
   const unreadCount = useMemo(() => 
@@ -71,7 +80,7 @@ export default function NotificationList({
   
   // Debounced loader function with error handling and backoff
   const loadOptimizedNotifications = useCallback(async (forceRefresh = false) => {
-    if (!user?.uid || loadingRef.current) return;
+    if (!user?.uid || loadingRef.current || !isMountedRef.current) return;
     
     // Don't allow concurrent loads
     loadingRef.current = true;
@@ -101,6 +110,11 @@ export default function NotificationList({
         cacheOptions
       );
       
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       if (optimizedData && Array.isArray(optimizedData)) {
         setLocalData(optimizedData);
         
@@ -121,6 +135,11 @@ export default function NotificationList({
         setLastRefreshTime(Date.now());
       }
     } catch (err) {
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       // Increment error counter for backoff
       consecutiveErrorsRef.current++;
       logError('Error loading optimized notifications', err);
@@ -132,6 +151,9 @@ export default function NotificationList({
   // Handle document visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       if (document.visibilityState === 'visible') {
         // Refresh immediately when tab becomes visible again
         loadOptimizedNotifications(true);
@@ -167,12 +189,16 @@ export default function NotificationList({
     return () => {
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
     };
   }, [loadOptimizedNotifications]);
   
   // Handle adaptive polling
   useEffect(() => {
+    // Don't set up polling if not mounted
+    if (!isMountedRef.current) return;
+    
     // Setup polling with the dynamic interval
     const setupNextPoll = () => {
       // Clear any existing timeouts
@@ -180,19 +206,31 @@ export default function NotificationList({
         clearTimeout(pollTimeoutRef.current);
       }
       
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       // Only poll if the tab is visible or we're on a longer interval (when hidden)
       const isVisible = document.visibilityState === 'visible';
       const effectiveInterval = isVisible ? pollingInterval : Math.max(pollingInterval, 120000);
       
-      pollTimeoutRef.current = setTimeout(() => {
+      pollTimeoutRef.current = setTimeout(async () => {
+        // Check again if component is still mounted before proceeding
+        if (!isMountedRef.current) return;
+        
         const timeSinceLastRefresh = Date.now() - lastRefreshTime;
         
         // Only refresh if it's been long enough since the last refresh
         if (timeSinceLastRefresh > 15000 || isVisible) {
-          loadOptimizedNotifications().finally(() => {
-            // Setup next poll after completion
-            setupNextPoll();
-          });
+          try {
+            await loadOptimizedNotifications();
+          } catch (err) {
+            // Ignore errors in the polling mechanism
+          } finally {
+            // Only set up next poll if still mounted
+            if (isMountedRef.current) {
+              setupNextPoll();
+            }
+          }
         } else {
           // If we skipped, setup the next poll
           setupNextPoll();
@@ -207,12 +245,15 @@ export default function NotificationList({
     return () => {
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
     };
   }, [pollingInterval, lastRefreshTime, loadOptimizedNotifications]);
   
   // Update local data when the React Query cache updates
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     if (data && typeof data === 'object' && 'success' in data && data.success && 'notifications' in data && Array.isArray(data.notifications)) {
       setLocalData(data.notifications);
       setLastRefreshTime(Date.now());
@@ -223,7 +264,7 @@ export default function NotificationList({
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
-    if (!localData.length || !user?.uid) return;
+    if (!localData.length || !user?.uid || !isMountedRef.current) return;
 
     // Get all unread notifications
     const unreadNotifications = localData.filter(notif => !notif.isRead);
@@ -243,8 +284,13 @@ export default function NotificationList({
       
       // Mark each notification as read
       for (const notification of unreadNotifications) {
+        // Check if component is still mounted before continuing the loop
+        if (!isMountedRef.current) break;
         await notificationMutation.mutateAsync(notification.id);
       }
+      
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
       
       // Force cache invalidation
       await cacheManager.invalidateQueries(['notifications', user.uid]);
@@ -252,21 +298,29 @@ export default function NotificationList({
       // Get fresh data
       await loadOptimizedNotifications(true);
       
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       logInfo('notifications', { action: 'mark-all-read', userId: user.uid });
       logValidation('4.10', 'success', 'Notification system fully functional with real data');
     } catch (err) {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       // Revert optimistic update on error
       loadOptimizedNotifications(true);
       setError2('Failed to mark all notifications as read');
       logError('Error marking all notifications as read', err);
     } finally {
-      setIsMarkingAllRead(false);
+      if (isMountedRef.current) {
+        setIsMarkingAllRead(false);
+      }
     }
   };
 
   // Mark a single notification as read
   const markAsRead = async (id: string) => {
-    if (!user?.uid) return;
+    if (!user?.uid || !isMountedRef.current) return;
     
     setIsMarkingRead(true);
     setError2(null);
@@ -284,20 +338,31 @@ export default function NotificationList({
       // Update in the backend
       await notificationMutation.mutateAsync(id);
       
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       // Force cache invalidation
       await cacheManager.invalidateQueries(['notifications', user.uid]);
       
       // Get fresh data
       await loadOptimizedNotifications(true);
       
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       logInfo('notifications', { action: 'mark-read', notificationId: id, userId: user.uid });
     } catch (err) {
+      // Only proceed if component is still mounted
+      if (!isMountedRef.current) return;
+      
       // Revert optimistic update on error
       loadOptimizedNotifications(true);
       setError2('Failed to mark notification as read');
       logError('Error marking notification as read', { notificationId: id, error: err });
     } finally {
-      setIsMarkingRead(false);
+      if (isMountedRef.current) {
+        setIsMarkingRead(false);
+      }
     }
   };
 
