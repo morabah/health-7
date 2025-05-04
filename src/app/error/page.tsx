@@ -3,9 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
-import { reportError, errorMonitor } from '@/lib/errorMonitoring';
 import Button from '@/components/ui/Button';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+
+// Custom error interface to match our requirements
+interface AppError {
+  message: string;
+  userMessage: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  errorId: string;
+  timestamp: number;
+  context?: Record<string, unknown>;
+}
 
 /**
  * Global Error Page
@@ -17,21 +28,21 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 export default function ErrorPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<AppError | null>(null);
   
   // Extract error ID from URL parameters
-  const errorId = searchParams.get('id');
+  const errorId = searchParams?.get('id') || 'unknown';
   
   useEffect(() => {
     // If error ID is present, try to retrieve error details from error monitor
     // In a real implementation, this would fetch from the error monitoring service
-    if (errorId) {
+    if (errorId !== 'unknown') {
       // For demonstration, we'll create a mock error to display
-      const mockError = {
+      const mockError: AppError = {
         message: 'An error occurred while processing your request',
-        userMessage: 'We\'re sorry, but something went wrong.',
-        category: searchParams.get('category') || 'unknown',
-        severity: searchParams.get('severity') || 'error',
+        userMessage: 'We&apos;re sorry, but something went wrong.',
+        category: (searchParams?.get('category') as ErrorCategory) || 'unknown',
+        severity: (searchParams?.get('severity') as ErrorSeverity) || 'error',
         timestamp: Date.now(),
         errorId,
       };
@@ -41,7 +52,7 @@ export default function ErrorPage() {
       // If no error ID, create a generic error
       setError({
         message: 'Unknown error',
-        userMessage: 'We\'re sorry, but an unexpected error occurred.',
+        userMessage: 'We&apos;re sorry, but an unexpected error occurred.',
         category: 'unknown',
         severity: 'error',
         errorId: 'unknown',
@@ -113,9 +124,9 @@ export default function ErrorPage() {
         return (
           <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-lg">
             <h3 className="text-lg font-medium mb-2">Permission Denied</h3>
-            <p>You don't have permission to access this resource.</p>
+            <p>You don&apos;t have permission to access this resource.</p>
             <ul className="list-disc list-inside mt-4 space-y-2">
-              <li>Make sure you're logged in with the correct account</li>
+              <li>Make sure you&apos;re logged in with the correct account</li>
               <li>Contact support if you believe this is an error</li>
             </ul>
           </div>
@@ -141,7 +152,7 @@ export default function ErrorPage() {
         return (
           <div className="mt-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <h3 className="text-lg font-medium mb-2">Unexpected Error</h3>
-            <p>We're sorry, but something unexpected happened.</p>
+            <p>We&apos;re sorry, but something unexpected happened.</p>
             <ul className="list-disc list-inside mt-4 space-y-2">
               <li>Try refreshing the page</li>
               <li>Go back to the previous page and try again</li>
@@ -169,14 +180,14 @@ export default function ErrorPage() {
         <div className="border-b border-gray-200 dark:border-gray-800 p-6">
           <h1 className="text-2xl font-bold">Oops! Something went wrong</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            We've encountered an error while processing your request.
+            We&apos;ve encountered an error while processing your request.
           </p>
         </div>
         
         <div className="p-6">
           {/* Error Display */}
           <ErrorDisplay
-            error={error}
+            error={new Error(error.message)}
             message={error.userMessage}
             category={error.category}
             severity={error.severity}

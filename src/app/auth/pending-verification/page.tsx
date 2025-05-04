@@ -160,7 +160,7 @@ export default function PendingVerificationPage() {
           </div>
           <h1 className="text-2xl font-bold mb-4">Email Verified!</h1>
           <p className="text-slate-600 dark:text-slate-300 mb-6">
-            Your email has been successfully verified. You'll be redirected to your dashboard shortly.
+            Your email has been successfully verified. You&apos;ll be redirected to your dashboard shortly.
           </p>
           <div className="flex justify-center">
             <Link href={user.role === UserType.DOCTOR ? '/doctor/dashboard' : '/patient/dashboard'}>
@@ -205,7 +205,7 @@ export default function PendingVerificationPage() {
           <Mail className="w-16 h-16 mx-auto text-primary mb-4" />
           <h1 className="text-2xl font-bold mb-2">Verify Your Email</h1>
           <p className="text-slate-600 dark:text-slate-300">
-            We've sent a verification link to your email address:
+            We&apos;ve sent a verification link to your email address:
             <span className="block font-medium mt-2">{user.email}</span>
           </p>
         </div>
@@ -231,7 +231,7 @@ export default function PendingVerificationPage() {
             <ol className="list-decimal pl-5 space-y-2 text-slate-600 dark:text-slate-300">
               <li>Check your email inbox (and spam folder)</li>
               <li>Click the verification link in the email</li>
-              <li>Once verified, you'll be able to access your account</li>
+              <li>Once verified, you&apos;ll be able to access your account</li>
             </ol>
           </div>
           
@@ -262,7 +262,7 @@ export default function PendingVerificationPage() {
           
           <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
             <p className="text-center text-slate-600 dark:text-slate-300 mb-4">
-              Didn't receive the email? Check your spam folder or click below to resend.
+              Didn&apos;t receive the email? Check your spam folder or click below to resend.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Button 

@@ -29,7 +29,7 @@ interface FirebaseUser {
   photoURL?: string | null;
   customClaims?: {
     role?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -37,7 +37,7 @@ interface FirebaseUser {
 let currentAuthContext: AuthContext | null = null;
 
 // Cache for Firebase user role mapping
-let roleCache: Record<string, UserType> = {};
+const roleCache: Record<string, UserType> = {};
 
 /**
  * Set the current auth context for subsequent API calls
@@ -160,16 +160,19 @@ export function getCurrentUserRole(): UserType | null {
   try {
     const ctx = getCurrentAuthCtx();
     return ctx.role;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
 
-export default {
+// Create a named export object
+const apiAuthCtx = {
   setCurrentAuthCtx,
   clearCurrentAuthCtx,
   getCurrentAuthCtx,
   isAuthenticated,
   getCurrentUserRole,
   mapFirebaseUserToRole
-}; 
+};
+
+export default apiAuthCtx; 

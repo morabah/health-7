@@ -5,6 +5,20 @@
  * It handles both local development with emulators and production environment.
  */
 
+// Custom type definitions for simulated Firebase services
+type FirebaseUser = {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+  emailVerified?: boolean;
+};
+
+type FirebaseDocument = {
+  exists: boolean;
+  data: () => Record<string, unknown> | null;
+  id?: string;
+};
+
 // This should be replaced with your actual Firebase config when migrating
 export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "FIREBASE_API_KEY",
@@ -30,37 +44,37 @@ export const emulatorConfig = {
 // when the Firebase SDK is imported and initialized
 export const auth = {
   currentUser: null,
-  onAuthStateChanged: (callback: (user: any) => void) => {
+  onAuthStateChanged: (_callback: (user: FirebaseUser) => void) => {
     return () => {}; // Returns unsubscribe function
   },
-  signInWithEmailAndPassword: async (email: string, password: string) => {
+  signInWithEmailAndPassword: async (_email: string, _password: string) => {
     // This is just a mock - will be replaced with actual Firebase Auth
     throw new Error("Firebase Auth not initialized");
   },
-  createUserWithEmailAndPassword: async (email: string, password: string) => {
+  createUserWithEmailAndPassword: async (_email: string, _password: string) => {
     throw new Error("Firebase Auth not initialized");
   },
   signOut: async () => {
     throw new Error("Firebase Auth not initialized");
   },
-  sendPasswordResetEmail: async (email: string) => {
+  sendPasswordResetEmail: async (_email: string) => {
     throw new Error("Firebase Auth not initialized");
   },
-  sendEmailVerification: async (user: any) => {
+  sendEmailVerification: async (_user: FirebaseUser) => {
     throw new Error("Firebase Auth not initialized");
   }
 };
 
 export const firestore = {
   // Placeholder for Firestore
-  collection: (path: string) => ({
-    doc: (id: string) => ({
-      get: async () => ({ exists: false, data: () => null }),
-      set: async (data: any) => {},
-      update: async (data: any) => {},
+  collection: (_path: string) => ({
+    doc: (_id: string) => ({
+      get: async (): Promise<FirebaseDocument> => ({ exists: false, data: () => null }),
+      set: async (_data: Record<string, unknown>) => {},
+      update: async (_data: Record<string, unknown>) => {},
       delete: async () => {}
     }),
-    add: async (data: any) => ({ id: 'mock-id' }),
+    add: async (_data: Record<string, unknown>) => ({ id: 'mock-id' }),
     where: () => ({ 
       get: async () => ({ docs: [] }),
       orderBy: () => ({
@@ -79,7 +93,7 @@ export const firestore = {
 
 export const functions = {
   // Placeholder for Firebase Functions
-  httpsCallable: (name: string) => async (data: any) => {
+  httpsCallable: (name: string) => async (data: Record<string, unknown>) => {
     console.log(`Mock Firebase Function called: ${name}`, data);
     return { data: null };
   },
@@ -93,8 +107,8 @@ export const functions = {
 
 export const storage = {
   // Placeholder for Firebase Storage
-  ref: (path: string) => ({
-    put: async (file: any) => ({
+  ref: (_path: string) => ({
+    put: async (_file: File) => ({
       ref: {
         getDownloadURL: async () => "https://mock-download-url.com/file.jpg"
       }
@@ -111,7 +125,7 @@ export const isFirebaseEnabled = process.env.NEXT_PUBLIC_FIREBASE_ENABLED === "t
 export const forceEmulator = process.env.NEXT_PUBLIC_FORCE_EMULATOR === "true" || false;
 
 // Flag for Firebase connection status
-export let isFirebaseInitialized = false;
+export const isFirebaseInitialized = false;
 
 // Firebase initialization status for client components
 export const getFirebaseStatus = () => ({

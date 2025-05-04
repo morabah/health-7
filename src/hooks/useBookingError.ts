@@ -31,12 +31,12 @@ export type BookingErrorCode =
 // Base booking error class with required properties for our error boundaries
 export class BookingError extends Error {
   code: BookingErrorCode;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 
   constructor(
     message: string, 
     code: BookingErrorCode, 
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'BookingError';
@@ -71,7 +71,7 @@ export function useBookingError() {
     details?: { 
       date?: string;
       doctorId?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   ) => {
     // Log the error first
@@ -106,7 +106,7 @@ export function useBookingError() {
       appointmentId?: string;
       paymentMethod?: string;
       amount?: number;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   ) => {
     // Log the error first
@@ -128,7 +128,7 @@ export function useBookingError() {
   const throwBookingError = useCallback((
     code: BookingErrorCode,
     message: string,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ) => {
     // Log the error first
     errorMonitor.captureException(new Error(message), {
