@@ -2,7 +2,6 @@
 
 import {
   getUsers,
-  getPatients,
   getDoctors,
   getAppointments,
   getNotifications
@@ -39,7 +38,7 @@ interface BaseEntity {
 interface User extends BaseEntity {
   firstName?: string;
   lastName?: string;
-  email?: string;
+  email?: string | null;
   role?: string;
 }
 
@@ -78,6 +77,46 @@ interface MemoryCacheItem<T> {
   expiresAt: number;
   priority: string;
   size?: number;
+}
+
+// Type for safe comparison of potentially unknown values
+type Comparable = string | number | boolean | null | undefined;
+
+// Helper function to safely compare values
+function compareValues(a: unknown, b: unknown, descending = false): number {
+  // Handle nullish values
+  if (a == null && b == null) return 0;
+  if (a == null) return descending ? 1 : -1;
+  if (b == null) return descending ? -1 : 1;
+  
+  // Cast to comparable types if possible
+  const aComp = a as Comparable;
+  const bComp = b as Comparable;
+  
+  // Compare based on types
+  if (typeof aComp === 'string' && typeof bComp === 'string') {
+    return descending 
+      ? bComp.localeCompare(aComp) 
+      : aComp.localeCompare(bComp);
+  }
+  
+  if (typeof aComp === 'number' && typeof bComp === 'number') {
+    return descending 
+      ? bComp - aComp 
+      : aComp - bComp;
+  }
+  
+  if (typeof aComp === 'boolean' && typeof bComp === 'boolean') {
+    if (aComp === bComp) return 0;
+    return (descending ? !aComp : aComp) ? 1 : -1;
+  }
+  
+  // Fallback for mixed types (convert to string)
+  const aStr = String(aComp);
+  const bStr = String(bComp);
+  return descending 
+    ? bStr.localeCompare(aStr) 
+    : aStr.localeCompare(bStr);
 }
 
 // Default cache options
@@ -291,10 +330,7 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
           const aValue = a[options.sortBy!];
           const bValue = b[options.sortBy!];
           
-          if (options.sortOrder === 'desc') {
-            return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-          }
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+          return compareValues(aValue, bValue, options.sortOrder === 'desc');
         });
       }
       
@@ -330,8 +366,9 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
 /**
  * Process users data with filtering, sorting and pagination
  */
-function processUsersData(users: User[], options: FilterOptions): User[] {
-  let result = [...users];
+function processUsersData(users: unknown[], options: FilterOptions): User[] {
+  // Cast users to User[] to ensure compatibility
+  let result = [...users] as User[];
   
   // Apply filters
   if (options.filters) {
@@ -353,10 +390,7 @@ function processUsersData(users: User[], options: FilterOptions): User[] {
       const aValue = a[options.sortBy!];
       const bValue = b[options.sortBy!];
       
-      if (options.sortOrder === 'desc') {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      return compareValues(aValue, bValue, options.sortOrder === 'desc');
     });
   }
   
@@ -370,13 +404,13 @@ function processUsersData(users: User[], options: FilterOptions): User[] {
   // Apply field selection if needed
   if (options.fields && options.fields.length > 0) {
     result = result.map(item => {
-      const newItem: Record<string, any> = {};
+      const newItem: Record<string, unknown> = { id: item.id };
       options.fields!.forEach(field => {
         if (field in item) {
           newItem[field] = item[field];
         }
       });
-      return newItem;
+      return newItem as User;
     });
   }
   
@@ -398,7 +432,7 @@ export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<
     }
     
     // Try React Query cache next
-    const queryData = cacheManager.getQueryData<any>(
+    const queryData = cacheManager.getQueryData<{ success: boolean; doctors: Doctor[] }>(
       cacheKeys.doctors(options.filters)
     );
     
@@ -468,8 +502,9 @@ export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<
 /**
  * Process doctors data with filtering, sorting and pagination
  */
-function processDoctorsData(doctors: Doctor[], options: FilterOptions): Doctor[] {
-  let result = [...doctors];
+function processDoctorsData(doctors: unknown[], options: FilterOptions): Doctor[] {
+  // Cast doctors to Doctor[] to ensure compatibility
+  let result = [...doctors] as Doctor[];
   
   // Apply filters
   if (options.filters) {
@@ -503,10 +538,7 @@ function processDoctorsData(doctors: Doctor[], options: FilterOptions): Doctor[]
         bValue = `${b.firstName || ''} ${b.lastName || ''}`;
       }
       
-      if (options.sortOrder === 'desc') {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      return compareValues(aValue, bValue, options.sortOrder === 'desc');
     });
   }
   
@@ -551,8 +583,9 @@ export async function getOptimizedAppointments(options: FilterOptions = {}): Pro
 /**
  * Process appointments data with filtering, sorting and pagination
  */
-function processAppointmentsData(appointments: Appointment[], options: FilterOptions): Appointment[] {
-  let result = [...appointments];
+function processAppointmentsData(appointments: unknown[], options: FilterOptions): Appointment[] {
+  // Cast appointments to Appointment[] to ensure compatibility 
+  let result = [...appointments] as Appointment[];
   
   // Apply filters
   if (options.filters) {
@@ -574,11 +607,7 @@ function processAppointmentsData(appointments: Appointment[], options: FilterOpt
     const aValue = a[sortBy];
     const bValue = b[sortBy];
     
-    const sortOrder = options.sortOrder || 'desc';
-    if (sortOrder === 'desc') {
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-    }
-    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    return compareValues(aValue, bValue, options.sortOrder === 'desc');
   });
   
   // Apply pagination
@@ -702,9 +731,22 @@ export async function getOptimizedNotifications(
     // Try to get user role from cache first
     const usersCacheKey = `users-${JSON.stringify({ filters: { id: userId } })}`;
     const cachedUsers = getMemoryCacheData<User[]>(usersCacheKey);
-    const userRole = cachedUsers?.[0]?.role || UserType.PATIENT;
+    const cachedRole = cachedUsers?.[0]?.role;
     
-    // Call API to get notifications
+    // Convert string role to UserType enum value
+    let userRole: UserType;
+    switch (cachedRole) {
+      case 'doctor':
+        userRole = UserType.DOCTOR;
+        break;
+      case 'admin':
+        userRole = UserType.ADMIN;
+        break;
+      default:
+        userRole = UserType.PATIENT; // Default to patient
+    }
+    
+    // Call API to get notifications with proper UserType
     const result = await localApi.getMyNotifications({
       uid: userId,
       role: userRole
@@ -774,8 +816,9 @@ export async function getOptimizedNotifications(
 /**
  * Process notifications data with filtering, sorting, and pagination
  */
-function processNotificationsData(notifications: Notification[], options: FilterOptions): Notification[] {
-  let result = [...notifications];
+function processNotificationsData(notifications: unknown[], options: FilterOptions): Notification[] {
+  // Cast notifications to Notification[] to ensure compatibility
+  let result = [...notifications] as Notification[];
   
   // Apply filters
   if (options.filters) {
@@ -799,10 +842,7 @@ function processNotificationsData(notifications: Notification[], options: Filter
     const aValue = a[sortBy];
     const bValue = b[sortBy];
     
-    if (sortOrder === 'desc') {
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-    }
-    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    return compareValues(aValue, bValue, sortOrder === 'desc');
   });
   
   // Apply pagination
