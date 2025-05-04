@@ -488,14 +488,6 @@ return callApi(
 );
 ```
 
-#### Performance and TypeScript Fixes
-
-- Fixed JSX syntax error in the `performanceMetrics.ts` file by replacing JSX syntax with `React.createElement`
-- Fixed linter errors in `bookingApi.ts` by adding proper TypeScript types and removing unsupported properties
-- Fixed the missing `myDashboard` cache key in the cache invalidation system
-- Implemented a state-based approach for tracking performance measurements instead of using context
-- Added proper type imports from React Query to ensure type safety throughout the application
-
 #### Patient Profile Update Fix
 
 - Fixed the `useUpdatePatientProfile` hook in `patientLoaders.ts` to properly pass user context to the API
@@ -514,6 +506,34 @@ return callApi(
 - Added utilities in `dateUtils.ts` for properly formatting dates between HTML inputs and APIs
 - Implemented both `formatDateForInput` and `formatDateForApi` functions
 - Fixed date format warnings by ensuring ISO date strings are properly converted to the format expected by date inputs
+
+#### TypeScript and Linting Issues in optimizedDataAccess.ts
+
+- Fixed multiple TypeScript errors in the optimizedDataAccess.ts file
+- Root causes: Improper type checking for sortable values, unsafe comparison of unknown types, and use of 'any' types
+- Solutions implemented:
+  - Created a safe `compareValues` helper function for type-safe sorting comparisons
+  - Replaced `any` types with proper TypeScript interfaces and type assertions
+  - Fixed function parameter typing (e.g., using `unknown[]` with type assertions instead of assuming specific types)
+  - Improved User interface type by making email `string | null` instead of just `string`
+  - Fixed role conversion from string to UserType enum in the notification functions
+  - Removed unused imports
+
+These bug fixes improve application stability, prevent unnecessary API calls, and enhance error resilience in key components.
+
+### TypeScript and Linting Issues in enhancedApiClient.ts
+
+- Fixed multiple TypeScript errors and linting issues in the enhancedApiClient.ts file
+- Root causes: Use of `any` types, unused imports, and improper cache key definitions
+- Solutions implemented:
+  - Removed unused imports like 'useQueryClient'
+  - Created proper interfaces for batch queue items and batch results
+  - Replaced all `any` types with proper TypeScript types (unknown with type assertions)
+  - Fixed mutation cache invalidation by using proper cacheKeys.* functions
+  - Improved type safety in the Promise handling
+  - Used appropriate Array<T> generic type notation in type definitions
+
+These bug fixes improve application stability, prevent unnecessary API calls, and enhance error resilience in key components.
 
 ---
 
@@ -951,6 +971,18 @@ These additional features enhance the application's functionality, user experien
   - Implemented longer retry intervals (2 minutes) after a failure instead of constant retries
   - Added proper TypeScript type checking for API responses to prevent undefined property access
   - Implemented proper array type checking and casting for the notifications array
+
+### TypeScript and Linting Issues in optimizedDataAccess.ts
+
+- Fixed multiple TypeScript errors in the optimizedDataAccess.ts file
+- Root causes: Improper type checking for sortable values, unsafe comparison of unknown types, and use of 'any' types
+- Solutions implemented:
+  - Created a safe `compareValues` helper function for type-safe sorting comparisons
+  - Replaced `any` types with proper TypeScript interfaces and type assertions
+  - Fixed function parameter typing (e.g., using `unknown[]` with type assertions instead of assuming specific types)
+  - Improved User interface type by making email `string | null` instead of just `string`
+  - Fixed role conversion from string to UserType enum in the notification functions
+  - Removed unused imports
 
 These bug fixes improve application stability, prevent unnecessary API calls, and enhance error resilience in key components.
 
