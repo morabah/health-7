@@ -25,12 +25,11 @@ import {
 } from '@/types/schemas';
 import type { 
   UserProfile, 
-  PatientProfile, 
-  DoctorProfile
+  PatientProfile
 } from '@/types/schemas';
 
 // Import getMockDoctorProfile directly to avoid circular dependency
-let getMockDoctorProfileFn: any = null;
+let getMockDoctorProfileFn: ((userId: string) => Promise<z.infer<typeof DoctorProfileSchema> & { id: string }>) | null = null;
 
 /**
  * Register a new user (patient or doctor)
@@ -163,7 +162,6 @@ export async function registerUser(
 export async function getMockPatientProfile(
   userId: string
 ): Promise<z.infer<typeof PatientProfileSchema> & { id: string }> {
-  const timestamp = new Date().toISOString();
   const uniqueId = `patient-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
 
   return {

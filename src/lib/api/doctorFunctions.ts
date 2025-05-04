@@ -5,15 +5,13 @@
  */
 
 import { z } from 'zod';
-import { UserType, VerificationStatus, NotificationType } from '@/types/enums';
+import { UserType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
-import { logInfo, logError, logWarn } from '@/lib/logger';
+import { logInfo, logError } from '@/lib/logger';
 import { 
   getDoctors, 
   saveDoctors,
-  getUsers,
-  getPatients,
-  getAppointments
+  getUsers
 } from '@/lib/localDb';
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';

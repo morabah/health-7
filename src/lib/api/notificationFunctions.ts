@@ -6,7 +6,7 @@
 
 import { UserType, NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
-import { logInfo, logError, logWarn } from '@/lib/logger';
+import { logInfo, logError } from '@/lib/logger';
 import { 
   getNotifications, 
   saveNotifications,

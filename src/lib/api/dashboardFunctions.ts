@@ -14,7 +14,7 @@ import {
   getUsers 
 } from '@/lib/localDb';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
-import type { Appointment, Notification } from '@/types/schemas';
+import type { Appointment } from '@/types/schemas';
 
 /**
  * Get dashboard stats for the current user
