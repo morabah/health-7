@@ -32,7 +32,7 @@ const RootErrorFallback = ({ error, resetError }: { error: Error | null; resetEr
               Application Error
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              We're sorry, but the application has encountered a critical error.
+              We&apos;re sorry, but the application has encountered a critical error.
             </p>
           </div>
 

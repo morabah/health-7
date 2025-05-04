@@ -5,13 +5,13 @@ import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { CalendarPlus, RefreshCw, ArrowLeft, PhoneOutgoing, HelpCircle, AlertCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { errorMonitor } from '@/lib/errorMonitoring';
-import { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+import { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import Alert from '@/components/ui/Alert';
 
 interface BookingError extends Error {
   code?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /**

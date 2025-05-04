@@ -13,7 +13,7 @@ interface TimeSlotError extends Error {
   details?: {
     date?: string;
     doctorId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

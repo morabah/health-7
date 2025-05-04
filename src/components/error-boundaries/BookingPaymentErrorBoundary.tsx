@@ -16,7 +16,7 @@ interface PaymentError extends Error {
     appointmentId?: string;
     paymentMethod?: string;
     amount?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
