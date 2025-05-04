@@ -76,11 +76,15 @@ export const useCompleteAppointment = () => {
   return useMutation({
     mutationFn: async (params: { appointmentId: string; notes?: string }) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('completeAppointment', { 
+      
+      // Create the context object separate from the data payload
+      const context = {
         uid: user.uid, 
-        role: UserType.DOCTOR,
-        ...params
-      });
+        role: UserType.DOCTOR
+      };
+      
+      // Pass context as first argument and params as second argument
+      return callApi('completeAppointment', context, params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctorAppointments'] });

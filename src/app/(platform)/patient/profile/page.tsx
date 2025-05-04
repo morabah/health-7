@@ -10,6 +10,7 @@ import { User, Save } from 'lucide-react';
 import { usePatientProfile, useUpdatePatientProfile } from '@/data/patientLoaders';
 import { Gender, BloodType } from '@/types/enums';
 import { DataLoadingErrorBoundary } from '@/components/error-boundaries';
+import { formatDateForInput, formatDateForApi } from '@/lib/dateUtils';
 
 /**
  * Patient Profile Page
@@ -60,13 +61,14 @@ function PatientProfileContent() {
         'success' in profileData && 
         profileData.success) {
       const { userProfile, roleProfile } = profileData as any; // Type assertion as a temporary fix
+      
       setFormData({
         firstName: userProfile?.firstName || '',
         lastName: userProfile?.lastName || '',
         email: userProfile?.email || '',
         phone: userProfile?.phone || '',
         address: roleProfile?.address || '',
-        dateOfBirth: roleProfile?.dateOfBirth || '',
+        dateOfBirth: formatDateForInput(roleProfile?.dateOfBirth),
         gender: roleProfile?.gender || '',
         bloodType: roleProfile?.bloodType || '',
         allergies: roleProfile?.allergies?.join(', ') || '',
@@ -104,7 +106,7 @@ function PatientProfileContent() {
         lastName: formData.lastName,
         phone: formData.phone,
         address: formData.address,
-        dateOfBirth: formData.dateOfBirth,
+        dateOfBirth: formatDateForApi(formData.dateOfBirth),
         gender: formData.gender as Gender,
         bloodType: formData.bloodType as BloodType,
         allergies: allergiesArray,

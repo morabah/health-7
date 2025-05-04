@@ -57,7 +57,7 @@ export interface ErrorDisplayProps {
   /**
    * Optional additional error context (for developers)
    */
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   
   /**
    * Optional identifier for this error instance

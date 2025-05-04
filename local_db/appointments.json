@@ -358,5 +358,23 @@
     "videoCallUrl": null,
     "createdAt": "2025-05-04T10:23:21.325Z",
     "updatedAt": "2025-05-04T10:23:21.325Z"
+  },
+  {
+    "id": "v04w02nz2dhb52kjzlvpgk",
+    "patientId": "u-007",
+    "patientName": "Anita D'AmoreeAsd",
+    "doctorId": "u-000",
+    "doctorName": "Geraldd Reynolds-Millermm",
+    "doctorSpecialty": "Cardiology",
+    "appointmentDate": "2025-05-05",
+    "startTime": "12:00",
+    "endTime": "12:30",
+    "status": "pending",
+    "reason": "General consultation",
+    "notes": null,
+    "appointmentType": "IN_PERSON",
+    "videoCallUrl": null,
+    "createdAt": "2025-05-04T11:27:19.408Z",
+    "updatedAt": "2025-05-04T11:27:19.408Z"
   }
 ]

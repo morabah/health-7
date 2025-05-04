@@ -770,7 +770,7 @@ export function createFirebaseError(error: { code: string; message: string }): E
   
   // Add all error info as properties
   Object.entries(errorInfo).forEach(([key, value]) => {
-    (standardError as any)[key] = value;
+    ((standardError as unknown) as Record<string, unknown>)[key] = value;
   });
   
   // Log the enriched error

@@ -935,5 +935,35 @@
     "isRead": false,
     "createdAt": "2025-05-04T10:32:47.186Z",
     "relatedId": "k537r03g7ihe6w2gpbczi"
+  },
+  {
+    "id": "notif-w2ja3zek0cap9yjqe1lqek",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-05 at 12:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T11:27:19.435Z",
+    "relatedId": "v04w02nz2dhb52kjzlvpgk"
+  },
+  {
+    "id": "notif-5en5ejsh49d01e6cr0b08jk",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Geraldd Reynolds-Millermm on 2025-05-05 at 12:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T11:27:19.435Z",
+    "relatedId": "v04w02nz2dhb52kjzlvpgk"
+  },
+  {
+    "id": "notif-s49aqnlejvg7k0ezxwz9qf",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T11:46:46.863Z",
+    "relatedId": null
   }
 ]

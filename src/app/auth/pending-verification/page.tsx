@@ -190,6 +190,10 @@ export default function PendingVerificationPage() {
             <div 
               className="bg-primary h-2.5 rounded-full transition-all duration-300" 
               style={{ width: `${verificationProgress}%` }}
+              role="progressbar"
+              aria-valuenow={verificationProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
             ></div>
           </div>
         </Card>

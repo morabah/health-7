@@ -46,7 +46,12 @@ export const useUpdatePatientProfile = () => {
   return useMutation({
     mutationFn: async (data: any) => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('updateMyUserProfile', { ...data });
+      
+      // Add the proper context to the API call
+      return callApi('updateMyUserProfile', {
+        uid: user.uid,
+        role: UserType.PATIENT
+      }, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientProfile'] });
@@ -86,7 +91,14 @@ export function useAppointmentDetails(appointmentId: string) {
         throw new Error('User not authenticated');
       }
       
-      return await callApi('getAppointmentDetails', { appointmentId });
+      // Create the context object
+      const context = {
+        uid: user.uid,
+        role: UserType.PATIENT
+      };
+      
+      // Pass context as first argument and data as second argument
+      return await callApi('getAppointmentDetails', context, { appointmentId });
     },
     enabled: !!appointmentId && !!user,
   });
@@ -105,7 +117,14 @@ export function useCancelAppointment() {
         throw new Error('User not authenticated');
       }
       
-      return await callApi('cancelAppointment', { appointmentId, reason });
+      // Create the context object separate from the data payload
+      const context = {
+        uid: user.uid,
+        role: UserType.PATIENT
+      };
+      
+      // Pass context as first argument and data as second argument
+      return await callApi('cancelAppointment', context, { appointmentId, reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });

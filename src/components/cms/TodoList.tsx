@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash, Calendar, AlertCircle } from 'lucide-react';
+import { formatDateForInput, formatDateForApi } from '@/lib/dateUtils';
 
 type TodoPriority = 'low' | 'medium' | 'high';
 
@@ -66,30 +67,37 @@ export default function TodoList({
 
   const addTodo = () => {
     if (newTodoText.trim() === '') return;
-
+    
+    // Format date properly for API storage
+    const formattedDueDate = newTodoDueDate ? formatDateForApi(newTodoDueDate) : undefined;
+    
+    // Create new todo
     const newTodo: TodoItem = {
-      id: Date.now().toString(),
+      id: 'todo-' + Date.now() + Math.floor(Math.random() * 1000),
       text: newTodoText,
       completed: false,
       priority: newTodoPriority,
+      dueDate: formattedDueDate,
       category: newTodoCategory,
-      notes: newTodoNotes.trim() === '' ? undefined : newTodoNotes,
-      dueDate: newTodoDueDate === '' ? undefined : newTodoDueDate,
+      notes: newTodoNotes || undefined,
     };
-
-    setTodos([...todos, newTodo]);
-    newlyAddedTodoRef.current = newTodo.id;
-
+    
+    // Add to list
+    const updatedTodos = [...todos, newTodo];
+    setTodos(updatedTodos);
+    if (onSave) onSave(updatedTodos);
+    
+    // Reset form
     setNewTodoText('');
-    setNewTodoNotes('');
     setNewTodoPriority('medium');
     setNewTodoCategory(categories[0]);
     setNewTodoDueDate('');
-
-    // Focus back to input field after adding
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 0);
+    setNewTodoNotes('');
+    
+    // Set focus back to the text input
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   const toggleTodo = (id: string) => {
@@ -477,9 +485,9 @@ export default function TodoList({
                           id={`edit-due-date-${todo.id}`}
                           type="date"
                           className="border rounded-md px-2 py-1 text-sm"
-                          value={todo.dueDate || ''}
+                          value={todo.dueDate ? formatDateForInput(todo.dueDate) : ''}
                           onChange={e =>
-                            updateTodo(todo.id, { dueDate: e.target.value || undefined })
+                            updateTodo(todo.id, { dueDate: e.target.value ? formatDateForApi(e.target.value) : undefined })
                           }
                           aria-label="Edit due date"
                         />

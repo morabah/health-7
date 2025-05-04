@@ -661,7 +661,8 @@ export async function updateMyUserProfile(
 
     allowedBaseUpdates.forEach(field => {
       if (data[field] !== undefined && data[field] !== user[field]) {
-        (user as any)[field] = data[field];
+        // Use type assertion with Record
+        (user as Record<string, unknown>)[field] = data[field];
         hasChanges = true;
       }
     });
@@ -697,7 +698,8 @@ export async function updateMyUserProfile(
 
       allowedPatientUpdates.forEach(field => {
         if (data[field] !== undefined && data[field] !== patient[field]) {
-          (patient as any)[field] = data[field];
+          // Use type assertion with Record
+          (patient as Record<string, unknown>)[field] = data[field];
           hasChanges = true;
         }
       });
@@ -733,7 +735,8 @@ export async function updateMyUserProfile(
 
       allowedDoctorUpdates.forEach(field => {
         if (data[field] !== undefined && data[field] !== doctor[field]) {
-          (doctor as any)[field] = data[field];
+          // Use type assertion with Record
+          (doctor as Record<string, unknown>)[field] = data[field];
           hasChanges = true;
         }
       });

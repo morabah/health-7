@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import {
   Edit2,
   ArrowRight,
   AlertCircle,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { logValidation, logError } from '@/lib/logger';
@@ -25,6 +26,60 @@ import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
 import withErrorBoundary from '@/components/ui/withErrorBoundary';
 import useErrorHandler from '@/hooks/useErrorHandler';
+import { lazyLoad } from '@/lib/lazyLoadUtils';
+import Divider from '@/components/ui/Divider';
+
+// Define types for API responses
+interface DashboardResponse {
+  success: boolean;
+  upcomingCount: number;
+  pastCount: number;
+}
+
+interface AppointmentsResponse {
+  success: boolean;
+  appointments: Appointment[];
+}
+
+interface NotificationsResponse {
+  success: boolean;
+  notifications: Array<{
+    id: string;
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+  }>;
+}
+
+interface ProfileResponse {
+  success: boolean;
+  userProfile: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
+}
+
+// Lazy load the DoctorList component for better performance
+const LazyDoctorList = lazyLoad(
+  () => import('@/components/shared/LazyDoctorList'),
+  { 
+    LoadingComponent: () => (
+      <div className="mt-8 p-4 border rounded-lg animate-pulse bg-gray-50 dark:bg-gray-800">
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-1/3"></div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          ))}
+        </div>
+      </div>
+    ),
+    minimumLoadTime: 500 // Minimum 500ms display time to avoid flicker
+  }
+);
 
 /**
  * Re-usable Stat card
@@ -123,13 +178,24 @@ function PatientDashboard() {
     }
   }, [dashboardError, profileError, appointmentsError, handleError]);
 
-  // Extract data from dashboard response
-  const upcomingCount = dashboardData?.success ? dashboardData.upcomingCount : 0;
-  const pastCount = dashboardData?.success ? dashboardData.pastCount : 0;
-  const notifUnread = notificationsData?.success ? notificationsData.notifications.filter((n: any) => !n.isRead).length : 0;
+  // Extract data from dashboard response with type assertions
+  const upcomingCount = (dashboardData as DashboardResponse | undefined)?.success 
+    ? (dashboardData as DashboardResponse).upcomingCount 
+    : 0;
+    
+  const pastCount = (dashboardData as DashboardResponse | undefined)?.success 
+    ? (dashboardData as DashboardResponse).pastCount 
+    : 0;
+    
+  const notifUnread = (notificationsData as NotificationsResponse | undefined)?.success 
+    ? (notificationsData as NotificationsResponse).notifications.filter(n => !n.isRead).length 
+    : 0;
 
-  // Get upcoming appointments for the quick view (from real data)
-  const allAppointments = appointmentsData?.success ? appointmentsData.appointments : [];
+  // Get upcoming appointments for the quick view (from real data) with type assertions
+  const allAppointments = (appointmentsData as AppointmentsResponse | undefined)?.success 
+    ? (appointmentsData as AppointmentsResponse).appointments 
+    : [];
+    
   const now = new Date();
   const upcomingAppointments = allAppointments
     .filter((a: any) => {
@@ -202,7 +268,12 @@ function PatientDashboard() {
     }
   }
 
-  const userProfile = profileData?.userProfile || {};
+  const userProfile = (profileData as ProfileResponse | undefined)?.userProfile || {
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: ''
+  };
   const displayName = userProfile.firstName && userProfile.lastName
     ? `${userProfile.firstName} ${userProfile.lastName}`
     : 'Patient';
@@ -266,7 +337,7 @@ function PatientDashboard() {
       </section>
 
       {/* Section Divider */}
-      <div className="border-t border-slate-200 dark:border-slate-700 my-8" />
+      <Divider className="my-8" />
 
       {/* Upcoming appointments - Carousel/Timeline */}
       <div>
@@ -328,7 +399,22 @@ function PatientDashboard() {
       </div>
 
       {/* Section Divider */}
-      <div className="border-t border-slate-200 dark:border-slate-700 my-8" />
+      <Divider className="my-8" />
+
+      {/* Find a Doctor - Lazy Loaded Component */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold">Find a Doctor</h2>
+          <Link href="/find-doctors">
+            <Button variant="link" size="sm" className="text-blue-600 dark:text-blue-400">
+              See All Doctors <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
+        </div>
+        <Card className="p-4">
+          <LazyDoctorList />
+        </Card>
+      </div>
 
       {/* Profile info - Glass Card with FAB */}
       <div className="relative">
@@ -342,7 +428,7 @@ function PatientDashboard() {
               <div className="py-6 text-center">
                 <Spinner />
               </div>
-            ) : profileData?.success ? (
+            ) : (profileData as ProfileResponse | undefined)?.success ? (
               (() => {
                 return (
                   <div className="space-y-2">

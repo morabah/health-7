@@ -48,8 +48,8 @@ export async function readFromJson<T>(filename: string): Promise<T | null> {
     const filePath = path.join(DB_DIR, filename);
     const data = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(data) as T;
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT') {
       console.warn(`File not found: ${filename}`);
       return null;
     }

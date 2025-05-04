@@ -14,6 +14,7 @@ import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
 import { z } from 'zod';
+import { formatDateForApi } from '@/lib/dateUtils';
 
 /**
  * Patient registration form component
@@ -85,43 +86,63 @@ export default function PatientRegisterPage() {
   /**
    * Handle form submission
    */
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // Validate the form
-    if (!validateForm()) {
-      return;
-    }
-    
-    setError(null);
+    setError('');
     setIsSubmitting(true);
     
     try {
-      logInfo('patient_registration', { email });
-      
-      // Register patient via auth context
-      const result = await registerPatient({
+      const { dateOfBirth, allergiesText, medicalHistoryText, ...restFormData } = {
+        dateOfBirth,
+        allergiesText,
+        medicalHistoryText,
         email,
         password,
         userType: UserType.PATIENT,
         firstName,
         lastName,
-        dateOfBirth,
         gender,
-        // Optional fields
-        bloodType: undefined, // We're not collecting this in the form
-        medicalHistory: undefined, // We're not collecting this in the form
-      });
+        phone,
+      };
       
-      if (result && typeof result === 'object' && 'success' in result && result.success) {
-        // Registration successful, redirect to success page
-        router.push(`/auth/registration-success?type=${UserType.PATIENT}&email=${encodeURIComponent(email)}`);
-      } else {
-        // Handle unsuccessful registration
-        const errorMessage = result && typeof result === 'object' && 'error' in result 
-          ? result.error 
-          : 'Registration failed';
-        setError(errorMessage as string);
+      // Format allergies into an array
+      const allergies = allergiesText ? allergiesText.split(',').map(item => item.trim()) : [];
+      
+      try {
+        logInfo('patient_registration', { email });
+        
+        // Format the date properly for API
+        const formattedDateOfBirth = formatDateForApi(dateOfBirth);
+        
+        // Right before calling registerPatient
+        if (dateOfBirth && !dateOfBirth.includes('T')) {
+          // Convert YYYY-MM-DD to ISO format
+          dateOfBirth = `${dateOfBirth}T00:00:00.000Z`;
+        }
+        
+        // Register patient via auth context
+        const result = await registerPatient({
+          ...restFormData,
+          dateOfBirth,
+          gender,
+          // Optional fields
+          bloodType: undefined, // We're not collecting this in the form
+          medicalHistory: undefined, // We're not collecting this in the form
+        });
+        
+        if (result && typeof result === 'object' && 'success' in result && result.success) {
+          // Registration successful, redirect to success page
+          router.push(`/auth/registration-success?type=${UserType.PATIENT}&email=${encodeURIComponent(email)}`);
+        } else {
+          // Handle unsuccessful registration
+          const errorMessage = result && typeof result === 'object' && 'error' in result 
+            ? result.error 
+            : 'Registration failed';
+          setError(errorMessage as string);
+        }
+      } catch (err) {
+        logError('Error during patient registration', err);
+        setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
       }
     } catch (err) {
       logError('Error during patient registration', err);

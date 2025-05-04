@@ -3,4 +3,4 @@ description:
 globs: 
 alwaysApply: true
 ---
-always refer to [APPLICATION_BLUEPRINT.md](mdc:APPLICATION_BLUEPRINT.md) and [README.md](mdc:README.md)
+always refer to [APPLICATION_BLUEPRINT.md](mdc:APPLICATION_BLUEPRINT.md) and [PROJECT_REFERENCE.md](mdc:PROJECT_REFERENCE.md) and [sitemap.txt](mdc:sitemap.txt)

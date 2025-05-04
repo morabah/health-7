@@ -19,7 +19,7 @@ interface ErrorContext {
   severity?: ErrorSeverity;
   category?: ErrorCategory;
   tags?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -222,7 +222,7 @@ class ErrorMonitor {
   private activeSpans: Array<{
     name: string;
     startTime: number;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
   }> = [];
   
   /**
@@ -295,7 +295,7 @@ class ErrorMonitor {
       this.originalConsoleError = console.error;
       
       // Replace with our own version that avoids recursion
-      console.error = (...args: any[]) => {
+      console.error = (...args: unknown[]) => {
         // Only capture if not already in the process of capturing
         // This prevents infinite recursion
         if (!this.isCapturing && !args[0]?.toString().includes('[ErrorMonitor]')) {
@@ -592,7 +592,7 @@ class ErrorMonitor {
    * @param metadata Additional metadata about the operation
    * @returns Object with a finish method to close the span
    */
-  public startSpan(name: string, metadata: Record<string, any> = {}) {
+  public startSpan(name: string, metadata: Record<string, unknown> = {}) {
     const span = {
       name,
       startTime: Date.now(),
@@ -608,7 +608,7 @@ class ErrorMonitor {
           this.activeSpans.splice(index, 1);
         }
       },
-      addMetadata: (key: string, value: any) => {
+      addMetadata: (key: string, value: unknown) => {
         span.metadata[key] = value;
       }
     };
@@ -670,7 +670,7 @@ export function reportError(
   const errorId = errorMonitor.captureException(error, enhancedContext);
   
   // Generate user-friendly message
-  const userMessage = context.message || ErrorClassifier.getUserFriendlyMessage(error, enhancedContext);
+  const userMessage = (context.message as string) || ErrorClassifier.getUserFriendlyMessage(error, enhancedContext);
   
   return { 
     errorId, 

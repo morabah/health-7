@@ -14,12 +14,32 @@ import { logInfo, logError } from './logger';
 import { callApiWithErrorHandling } from './apiErrorHandling';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import { createFirebaseError } from './firebaseErrorMapping';
+import { 
+  getOptimizedDoctors, 
+  getOptimizedUsers, 
+  getOptimizedAppointments,
+  getMemoryCacheData,
+  setMemoryCacheData,
+  clearMemoryCache
+} from './optimizedDataAccess';
+import { cacheKeys, cacheManager } from './queryClient';
 
 // Get the appropriate API based on configuration
 const api = isFirebaseEnabled ? firebaseApi : localAPI.localApi;
 
 // Low-noise API methods that should minimize logging
 const LOW_NOISE_METHODS = ['getAvailableSlots', 'getMyNotifications', 'getMyDashboardStats'];
+
+// Methods that can use optimized data access
+const OPTIMIZED_METHODS: {[key: string]: any} = {
+  'findDoctors': getOptimizedDoctors,
+  'getAllDoctors': getOptimizedDoctors,
+  'getDoctorPublicProfile': null, // Special case handled in code
+  'getAllUsers': getOptimizedUsers,
+  'getMyAppointments': getOptimizedAppointments,
+  'getPatientAppointments': getOptimizedAppointments,
+  'getDoctorAppointments': getOptimizedAppointments,
+};
 
 // Method mapping for backward compatibility
 const METHOD_MAPPING: Record<string, string> = {
@@ -66,6 +86,11 @@ interface CallApiOptions {
    * Force use of local API implementation regardless of configuration
    */
   forceLocal?: boolean;
+  
+  /**
+   * Skip optimized data access and use the standard implementation
+   */
+  skipOptimized?: boolean;
 }
 
 /**
@@ -81,18 +106,106 @@ export async function callApi<T = unknown>(
   method: string, 
   ...args: unknown[]
 ): Promise<T> {
+  return callApiWithOptions<T>(method, {}, ...args);
+}
+
+/**
+ * Call an API function with options and arguments
+ * 
+ * @param method - The API method name to call
+ * @param options - Options for the API call
+ * @param args - Arguments to pass to the API method
+ * @returns Promise with the result of the API call
+ */
+export async function callApiWithOptions<T = unknown>(
+  method: string,
+  options: CallApiOptions = {},
+  ...args: unknown[]
+): Promise<T> {
   // Only log non-low-noise methods to prevent console flooding
   const shouldLog = !LOW_NOISE_METHODS.includes(method);
 
   if (shouldLog) {
     // Log API call for debugging
-    console.log(`[callApi] Calling ${method} with args:`, args);
+    logInfo(`[callApi] Calling ${method} with args:`, args);
   }
 
   // Check if method needs mapping (e.g., login -> signIn)
   const mappedMethod = METHOD_MAPPING[method] || method;
+  
+  // Try to use optimized data access for performance if not explicitly skipped
+  if (!options.skipOptimized && !isFirebaseEnabled && OPTIMIZED_METHODS[method]) {
+    try {
+      const optimizedFn = OPTIMIZED_METHODS[method];
+      
+      // Handle the special case of single doctor fetch
+      if (method === 'getDoctorPublicProfile' && args.length > 0) {
+        // Extract doctor ID from args - could be in different formats
+        let doctorId = '';
+        
+        if (typeof args[0] === 'string') {
+          doctorId = args[0];
+        } else if (typeof args[1] === 'string') {
+          doctorId = args[1];
+        } else if (args[0] && typeof args[0] === 'object' && args[0] !== null && 'doctorId' in args[0]) {
+          doctorId = (args[0] as any).doctorId;
+        }
+        
+        if (doctorId) {
+          // Try to get from cache first
+          const cacheKey = `doctor-${doctorId}`;
+          const cachedDoctor = getMemoryCacheData<any>(cacheKey);
+          
+          if (cachedDoctor) {
+            return { success: true, doctor: cachedDoctor } as T;
+          }
+          
+          // Get all doctors then filter
+          const doctors = await getOptimizedDoctors();
+          const doctor = doctors.find(d => d.id === doctorId || d.userId === doctorId);
+          
+          if (doctor) {
+            setMemoryCacheData(cacheKey, doctor);
+            return { success: true, doctor } as T;
+          }
+        }
+      } 
+      // For other methods that have an optimized implementation
+      else if (optimizedFn) {
+        // Convert args to filters
+        const filters: Record<string, any> = {};
+        
+        // Process args into filter options
+        if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
+          // Skip auth context if present
+          const startIndex = 'uid' in args[0] && 'role' in args[0] ? 1 : 0;
+          
+          if (args[startIndex] && typeof args[startIndex] === 'object') {
+            Object.assign(filters, args[startIndex]);
+          }
+        }
+        
+        const result = await optimizedFn({ filters });
+        
+        // Format the response to match the expected API response
+        const responseKey = method.includes('Doctor') 
+          ? 'doctors' 
+          : method.includes('User')
+            ? 'users'
+            : 'appointments';
+        
+        return { 
+          success: true,
+          [responseKey]: result
+        } as T;
+      }
+    } catch (optimizedError) {
+      // Log but continue with standard implementation if optimization fails
+      logError(`Optimized data access failed for ${method}, falling back:`, optimizedError);
+    }
+  }
 
-  // Create a function to execute the actual API call
+  // Create a function to execute the actual API call using standard implementation
   const executeApiCall = async (): Promise<T> => {
     try {
       // Add artificial delay in development mode to expose loading states
@@ -291,37 +404,6 @@ async function callFirebaseFunction<T>(method: string, ...args: unknown[]): Prom
     logError(`Error calling Firebase function ${method}:`, error);
     throw error;
   }
-}
-
-/**
- * Call an API with options for customizing error handling
- * 
- * @param method API method name
- * @param options Error handling options
- * @param args Arguments to pass to the API method
- * @returns Promise with the API result
- */
-export async function callApiWithOptions<T = unknown>(
-  method: string,
-  options: CallApiOptions = {},
-  ...args: unknown[]
-): Promise<T> {
-  // Determine API category based on method name if not specified
-  let category = options.errorCategory || 'api';
-  
-  if (!options.errorCategory) {
-    if (method.includes('login') || method.includes('register') || method.includes('auth')) {
-      category = 'auth';
-    } else if (method.includes('appointment') || method.includes('booking')) {
-      category = 'appointment';
-    } else if (method.includes('profile') || method.includes('user')) {
-      category = 'data';
-    }
-  }
-  
-  // Implement options handling here if needed
-  // For now, just forward to callApi
-  return callApi<T>(method, ...args);
 }
 
 export default { callApi, callApiWithOptions };

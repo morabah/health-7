@@ -71,4 +71,53 @@ export function formatDateTime(dateString: string | Date | undefined): string {
   } catch (e) {
     return '';
   }
+}
+
+// Add these utility functions to properly format dates for HTML inputs
+
+/**
+ * Format a date string to the yyyy-MM-dd format required by HTML date inputs
+ * @param dateString ISO date string or other date format
+ * @returns A date string in yyyy-MM-dd format, or empty string if invalid
+ */
+export function formatDateForInput(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  
+  try {
+    // Handle ISO strings by splitting at T
+    if (dateString.includes('T')) {
+      return dateString.split('T')[0];
+    }
+    
+    // For other formats, parse with Date and format
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return ''; // Invalid date
+    
+    return date.toISOString().split('T')[0];
+  } catch (err) {
+    console.error('Error formatting date for input:', err);
+    return '';
+  }
+}
+
+/**
+ * Format a date for API submission (add time component)
+ * @param dateString Date in yyyy-MM-dd format
+ * @returns ISO date string with time component
+ */
+export function formatDateForApi(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  
+  try {
+    // If it already has a time component, return as is
+    if (dateString.includes('T')) {
+      return dateString;
+    }
+    
+    // Add time component
+    return `${dateString}T00:00:00.000Z`;
+  } catch (err) {
+    console.error('Error formatting date for API:', err);
+    return '';
+  }
 } 

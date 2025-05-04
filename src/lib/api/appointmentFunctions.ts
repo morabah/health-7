@@ -535,7 +535,7 @@ export async function getAppointmentDetails(
 /**
  * Validates the authentication context for API calls
  */
-function validateAuthContext(ctx: any): { isValid: boolean; error?: string; uid?: string; role?: UserType } {
+function validateAuthContext(ctx: { uid?: string; role?: UserType }): { isValid: boolean; error?: string; uid?: string; role?: UserType } {
   // Validate context
   if (!ctx || typeof ctx !== 'object') {
     logError('API - Invalid context', { ctx });
@@ -578,8 +578,11 @@ function validateDateFormat(date: string): { isValid: boolean; error?: string } 
 /**
  * Validates payload for getAvailableSlots function
  */
-function validateGetAvailableSlotsPayload(payload: any, uid: string, role: UserType): 
-  { isValid: boolean; error?: string; doctorId?: string; date?: string } {
+function validateGetAvailableSlotsPayload(
+  payload: { doctorId?: string; date?: string },
+  uid: string,
+  role: UserType
+): { isValid: boolean; error?: string; doctorId?: string; date?: string } {
   
   // Validate required parameters
   if (!payload || typeof payload !== 'object') {

@@ -10,6 +10,7 @@ import RootErrorBoundary from './RootErrorBoundary';
 /**
  * Client Layout Component
  * Wraps the application in necessary client-side providers
+ * Uses optimized QueryProvider with enhanced caching
  */
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
