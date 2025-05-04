@@ -262,6 +262,158 @@ export async function parseApiError(error: Response): Promise<{
 }
 
 /**
+ * Check if the browser is currently offline
+ * 
+ * @returns True if the browser is offline
+ */
+export function isOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * Monitor online/offline status changes
+ * 
+ * @param onlineCallback Function to call when coming online
+ * @param offlineCallback Function to call when going offline
+ * @returns Cleanup function to remove listeners
+ */
+export function monitorOnlineStatus(
+  onlineCallback: () => void, 
+  offlineCallback: () => void
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}; // No-op for SSR
+  }
+  
+  window.addEventListener('online', onlineCallback);
+  window.addEventListener('offline', offlineCallback);
+  
+  return () => {
+    window.removeEventListener('online', onlineCallback);
+    window.removeEventListener('offline', offlineCallback);
+  };
+}
+
+/**
+ * Categorize an error based on its type and properties
+ * 
+ * @param error Error object
+ * @returns Error category
+ */
+export function categorizeError(error: unknown): ErrorCategory {
+  // Check for offline status first
+  if (isOffline()) {
+    return 'network';
+  }
+  
+  // Check for network errors
+  if (
+    error instanceof TypeError && 
+    (error.message.includes('fetch') || error.message.includes('network'))
+  ) {
+    return 'network';
+  }
+  
+  // Check for Firebase auth errors
+  if (
+    error instanceof Error && 
+    ('code' in error) && 
+    typeof (error as any).code === 'string' && 
+    (error as any).code.startsWith('auth/')
+  ) {
+    return 'auth';
+  }
+  
+  // Check for HTTP status codes
+  if (error instanceof Response) {
+    if (error.status === 401 || error.status === 403) {
+      return 'auth';
+    }
+    if (error.status === 404) {
+      return 'data';
+    }
+    if (error.status >= 500) {
+      return 'server';
+    }
+    return 'api';
+  }
+  
+  // Check for error objects with status
+  if (
+    error && 
+    typeof error === 'object' && 
+    'status' in error && 
+    typeof (error as any).status === 'number'
+  ) {
+    const status = (error as any).status;
+    if (status === 401 || status === 403) {
+      return 'auth';
+    }
+    if (status === 404) {
+      return 'data';
+    }
+    if (status >= 500) {
+      return 'server';
+    }
+    return 'api';
+  }
+  
+  // Default to 'api' for unrecognized errors
+  return 'api';
+}
+
+/**
+ * Check if an API error is related to network connectivity
+ */
+export function isNetworkError(error: unknown): boolean {
+  // Offline browser status
+  if (isOffline()) {
+    return true;
+  }
+  
+  // TypeError with network-related message
+  if (
+    error instanceof TypeError && 
+    (error.message.includes('fetch') || 
+     error.message.includes('network') ||
+     error.message.includes('Failed to fetch'))
+  ) {
+    return true;
+  }
+  
+  // Error with network-related message
+  if (
+    error instanceof Error && 
+    (error.message.includes('network') || 
+     error.message.includes('internet') || 
+     error.message.includes('connection'))
+  ) {
+    return true;
+  }
+  
+  // DOMException with network-related message
+  if (
+    error instanceof DOMException && 
+    (error.name === 'NetworkError' || 
+     error.message.includes('network'))
+  ) {
+    return true;
+  }
+  
+  // Object with status indicating network error
+  if (
+    error && 
+    typeof error === 'object' && 
+    'status' in error && 
+    ((error as any).status === 0 || (error as any).status === 'network_error')
+  ) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Enhance an async function with retry logic and error handling
  * 
  * @param fn Async function to enhance
@@ -504,6 +656,21 @@ export async function callApiWithErrorHandling<T>(
   // Initialize retry counter
   let retryCount = 0;
   
+  // Check for offline status before making the API call
+  if (isOffline()) {
+    const offlineError = new Error('You appear to be offline. Please check your internet connection and try again.');
+    (offlineError as any).isOffline = true;
+    (offlineError as any).category = 'network';
+    (offlineError as any).severity = 'warning';
+    (offlineError as any).recoverable = true;
+    reportError(offlineError, {
+      category: 'network',
+      severity: 'warning',
+      context: { offline: true, ...options.errorContext }
+    });
+    throw offlineError;
+  }
+  
   // Keep trying until we succeed or exceed max retries
   while (true) {
     try {
@@ -538,7 +705,7 @@ export async function callApiWithErrorHandling<T>(
       if (error && typeof error === 'object' && 'code' in error) {
         // This is likely a Firebase error
         const firebaseError = error as { code: string; message: string };
-        
+  
         // Get user-friendly error details from our mapping
         const userMessage = getFirebaseErrorMessage(firebaseError.code, errorMessage);
         const category = getFirebaseErrorCategory(firebaseError.code) || errorCategory;
@@ -571,7 +738,7 @@ export async function callApiWithErrorHandling<T>(
         severity: errorSeverity,
         ...errorContext
       });
-      
+  
       // Rethrow with enhanced context
       if (error instanceof Error) {
         // Add metadata to existing error

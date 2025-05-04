@@ -21,7 +21,7 @@ import { generateId, nowIso } from '@/lib/localApiCore';
 import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
 
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
-import type { Appointment, Notification } from '@/types/schemas';
+import type { Appointment, Notification, DoctorProfile, TimeSlot } from '@/types/schemas';
 
 /**
  * Book an appointment with a doctor
@@ -533,6 +533,183 @@ export async function getAppointmentDetails(
 }
 
 /**
+ * Validates the authentication context for API calls
+ */
+function validateAuthContext(ctx: any): { isValid: boolean; error?: string; uid?: string; role?: UserType } {
+  // Validate context
+  if (!ctx || typeof ctx !== 'object') {
+    logError('API - Invalid context', { ctx });
+    return { isValid: false, error: 'Invalid authentication context' };
+  }
+
+  const { uid, role } = ctx;
+
+  if (!uid || typeof uid !== 'string') {
+    logError('API - Missing uid in context', { ctx });
+    return { isValid: false, error: 'User ID is required' };
+  }
+
+  if (!role) {
+    logError('API - Missing role in context', { uid, ctx });
+    return { isValid: false, error: 'User role is required' };
+  }
+
+  return { isValid: true, uid, role };
+}
+
+/**
+ * Validates date format
+ */
+function validateDateFormat(date: string): { isValid: boolean; error?: string } {
+  try {
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return { 
+        isValid: false, 
+        error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.' 
+      };
+    }
+    return { isValid: true };
+  } catch (error) {
+    return { isValid: false, error: 'Invalid date format' };
+  }
+}
+
+/**
+ * Validates payload for getAvailableSlots function
+ */
+function validateGetAvailableSlotsPayload(payload: any, uid: string, role: UserType): 
+  { isValid: boolean; error?: string; doctorId?: string; date?: string } {
+  
+  // Validate required parameters
+  if (!payload || typeof payload !== 'object') {
+    logError('getAvailableSlots - Missing payload', { uid, role });
+    return { isValid: false, error: 'Missing payload data' };
+  }
+
+  if (!payload.doctorId) {
+    logError('getAvailableSlots - Missing doctorId', { uid, role, payload });
+    return { isValid: false, error: 'Doctor ID is required' };
+  }
+
+  if (!payload.date) {
+    logError('getAvailableSlots - Missing date', { uid, role, doctorId: payload.doctorId });
+    return { isValid: false, error: 'Date is required' };
+  }
+
+  // Validate date format
+  const dateValidation = validateDateFormat(payload.date);
+  if (!dateValidation.isValid) {
+    logError('getAvailableSlots - Invalid date format', {
+      uid, role, doctorId: payload.doctorId, date: payload.date
+    });
+    return { isValid: false, error: dateValidation.error };
+  }
+
+  return { isValid: true, doctorId: payload.doctorId, date: payload.date };
+}
+
+/**
+ * Retrieves and validates the doctor profile
+ */
+async function retrieveDoctorProfile(doctorId: string, uid: string, role: UserType): 
+  Promise<{ success: boolean; doctor?: DoctorProfile; error?: string }> {
+  
+  try {
+    const doctors = await getDoctors();
+    const doctor = doctors.find(d => d.userId === doctorId);
+
+    if (!doctor) {
+      logError('getAvailableSlots - Doctor not found', { uid, role, doctorId });
+      return { success: false, error: 'Doctor not found' };
+    }
+
+    // Check if doctor is verified
+    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
+      logError('getAvailableSlots - Doctor not verified', {
+        uid, role, doctorId, status: doctor.verificationStatus,
+      });
+      return { success: false, error: 'Doctor is not verified' };
+    }
+
+    return { success: true, doctor };
+  } catch (error) {
+    logError('retrieveDoctorProfile - Database error', { error, doctorId });
+    return { success: false, error: 'Error accessing doctor data' };
+  }
+}
+
+/**
+ * Retrieves doctor's appointments
+ */
+async function getDoctorAppointments(doctorId: string): 
+  Promise<{ success: boolean; appointments?: Appointment[]; error?: string }> {
+  
+  try {
+    const appointments = await getAppointments();
+    const doctorAppointments = appointments.filter(
+      a => a.doctorId === doctorId && a.status !== AppointmentStatus.CANCELED
+    );
+    return { success: true, appointments: doctorAppointments };
+  } catch (error) {
+    logError('getDoctorAppointments - Database error', { error, doctorId });
+    return { success: false, error: 'Error retrieving doctor appointments' };
+  }
+}
+
+/**
+ * Ensures the doctor profile has required schedule properties
+ */
+function ensureDoctorScheduleProperties(doctor: DoctorProfile): DoctorProfile {
+  const updatedDoctor = { ...doctor };
+  
+  if (!updatedDoctor.weeklySchedule) {
+    // Initialize with empty default schedule if needed
+    updatedDoctor.weeklySchedule = {
+      monday: [],
+      tuesday: [],
+      wednesday: [],
+      thursday: [],
+      friday: [],
+      saturday: [],
+      sunday: [],
+    };
+  }
+
+  if (!updatedDoctor.blockedDates) {
+    updatedDoctor.blockedDates = [];
+  }
+
+  return updatedDoctor;
+}
+
+/**
+ * Calculates available slots for a doctor on a date
+ */
+function calculateAvailableSlots(doctor: DoctorProfile, date: string, appointments: Appointment[]): 
+  { success: boolean; slots?: TimeSlot[]; error?: string } {
+  
+  try {
+    const preparedDoctor = ensureDoctorScheduleProperties(doctor);
+    const availableSlots = getAvailableSlotsForDate(preparedDoctor, date, appointments);
+    
+    return { 
+      success: true, 
+      slots: availableSlots 
+    };
+  } catch (error) {
+    logError('calculateAvailableSlots - Error', {
+      error,
+      doctorId: doctor.userId,
+      date,
+      hasWeeklySchedule: !!doctor.weeklySchedule,
+      hasBlockedDates: !!doctor.blockedDates,
+    });
+    return { success: false, error: 'Error calculating available slots' };
+  }
+}
+
+/**
  * Get available appointment slots for a doctor on a specific date
  */
 export async function getAvailableSlots(
@@ -545,154 +722,69 @@ export async function getAvailableSlots(
   const perf = trackPerformance('getAvailableSlots');
 
   try {
-    // Validate context first - this is essential for authorization
-    if (!ctx || typeof ctx !== 'object') {
-      logError('getAvailableSlots - Invalid context', { ctx });
-      return { success: false, error: 'Invalid authentication context' };
+    // Step 1: Validate authentication context
+    const contextValidation = validateAuthContext(ctx);
+    if (!contextValidation.isValid) {
+      return { success: false, error: contextValidation.error || 'Invalid authentication context' };
     }
-
-    const { uid, role } = ctx;
-
-    if (!uid || typeof uid !== 'string') {
-      logError('getAvailableSlots - Missing uid in context', { ctx });
-      return { success: false, error: 'User ID is required' };
-    }
-
-    if (!role) {
-      logError('getAvailableSlots - Missing role in context', { uid, ctx });
-      return { success: false, error: 'User role is required' };
+    
+    const { uid, role } = contextValidation;
+    
+    // Ensure uid and role are defined
+    if (!uid || !role) {
+      return { success: false, error: 'Missing user authentication data' };
     }
 
     // Minimize logging to prevent console freeze
-    // Only log core info, not full payload
     logInfo('getAvailableSlots called', {
       uid: uid.substring(0, 6) + '...',
       role,
       doctorId: payload?.doctorId,
     });
 
-    // Validate required parameters
-    if (!payload || typeof payload !== 'object') {
-      logError('getAvailableSlots - Missing payload', { uid, role });
-      return { success: false, error: 'Missing payload data' };
+    // Step 2: Validate payload
+    const payloadValidation = validateGetAvailableSlotsPayload(payload, uid, role);
+    if (!payloadValidation.isValid) {
+      return { success: false, error: payloadValidation.error || 'Invalid payload' };
+    }
+    
+    const { doctorId, date } = payloadValidation;
+    
+    // Ensure doctorId and date are defined
+    if (!doctorId || !date) {
+      return { success: false, error: 'Missing required parameters' };
     }
 
-    if (!payload.doctorId) {
-      logError('getAvailableSlots - Missing doctorId', { uid, role, payload });
-      return { success: false, error: 'Doctor ID is required' };
+    // Step 3: Retrieve and validate doctor profile
+    const doctorResult = await retrieveDoctorProfile(doctorId, uid, role);
+    if (!doctorResult.success || !doctorResult.doctor) {
+      return { success: false, error: doctorResult.error || 'Error retrieving doctor profile' };
     }
 
-    if (!payload.date) {
-      logError('getAvailableSlots - Missing date', { uid, role, doctorId: payload.doctorId });
-      return { success: false, error: 'Date is required' };
+    // Step 4: Get doctor's existing appointments
+    const appointmentsResult = await getDoctorAppointments(doctorId);
+    if (!appointmentsResult.success || !appointmentsResult.appointments) {
+      return { success: false, error: appointmentsResult.error || 'Error retrieving appointments' };
     }
 
-    // Validate date format
-    try {
-      const dateObj = new Date(payload.date);
-      if (isNaN(dateObj.getTime())) {
-        logError('getAvailableSlots - Invalid date format', {
-          uid,
-          role,
-          doctorId: payload.doctorId,
-          date: payload.date,
-        });
-        return { success: false, error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.' };
-      }
-    } catch (dateError) {
-      logError('getAvailableSlots - Date parsing error', {
-        uid,
-        role,
-        doctorId: payload.doctorId,
-        date: payload.date,
-        error: dateError,
-      });
-      return { success: false, error: 'Invalid date format' };
+    // Step 5: Calculate available slots
+    const slotsResult = calculateAvailableSlots(
+      doctorResult.doctor, 
+      date,
+      appointmentsResult.appointments
+    );
+    
+    if (!slotsResult.success || !slotsResult.slots) {
+      return { success: false, error: slotsResult.error || 'Error calculating available slots' };
     }
 
-    // Extract validated data
-    const { doctorId, date } = payload;
+    logInfo('getAvailableSlots - Slots generated successfully', {
+      doctorId,
+      date,
+      slotCount: slotsResult.slots.length,
+    });
 
-    // Get doctor profile
-    try {
-      const doctors = await getDoctors();
-
-      // Try to find doctor by userId first
-      let doctor = doctors.find(d => d.userId === doctorId);
-
-      if (!doctor) {
-        logError('getAvailableSlots - Doctor not found', { uid, role, doctorId });
-        return { success: false, error: 'Doctor not found' };
-      }
-
-      // Check if doctor is verified
-      if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
-        logError('getAvailableSlots - Doctor not verified', {
-          uid,
-          role,
-          doctorId,
-          status: doctor.verificationStatus,
-        });
-        return { success: false, error: 'Doctor is not verified' };
-      }
-
-      // Get existing appointments
-      const appointments = await getAppointments();
-
-      // Find appointments for this doctor
-      const doctorAppointments = appointments.filter(
-        a => a.doctorId === doctorId && a.status !== AppointmentStatus.CANCELED
-      );
-
-      // Safely calculate available slots
-      try {
-        // Make sure doctor has the required properties to generate slots
-        if (!doctor.weeklySchedule) {
-          logInfo('getAvailableSlots - Initializing empty schedule', { doctorId });
-          // Initialize with empty default schedule if needed
-          doctor.weeklySchedule = {
-            monday: [],
-            tuesday: [],
-            wednesday: [],
-            thursday: [],
-            friday: [],
-            saturday: [],
-            sunday: [],
-          };
-        }
-
-        if (!doctor.blockedDates) {
-          doctor.blockedDates = [];
-        }
-
-        // Generate available slots
-        const availableSlots = getAvailableSlotsForDate(doctor, date, doctorAppointments);
-
-        logInfo('getAvailableSlots - Slots generated successfully', {
-          doctorId,
-          date,
-          slotCount: availableSlots.length,
-        });
-
-        return { success: true, slots: availableSlots };
-      } catch (slotError) {
-        logError('Error calculating slots', {
-          error: slotError,
-          doctorId,
-          date,
-          hasWeeklySchedule: !!doctor.weeklySchedule,
-          hasBlockedDates: !!doctor.blockedDates,
-        });
-        return { success: false, error: 'Error calculating available slots' };
-      }
-    } catch (dbError) {
-      logError('getAvailableSlots - Database error', {
-        error: dbError,
-        doctorId,
-        date,
-      });
-      return { success: false, error: 'Error accessing doctor data' };
-    }
+    return { success: true, slots: slotsResult.slots };
   } catch (e) {
     logError('getAvailableSlots failed', e);
     return { success: false, error: 'Error fetching available slots' };

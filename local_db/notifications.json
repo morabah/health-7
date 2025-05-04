@@ -865,5 +865,75 @@
     "isRead": false,
     "createdAt": "2025-05-04T00:04:48.527Z",
     "relatedId": null
+  },
+  {
+    "id": "notif-4kywzksal6dno9pkjn5yw",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-07T00:34:41.458Z at 10:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:34:53.955Z",
+    "relatedId": "hwfl2xxm4fue0a2sdwpjic"
+  },
+  {
+    "id": "notif-qnlhiezt52tv7yoadfbh7h",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Gerald Reynolds-Millermm on 2025-05-07T00:34:41.458Z at 10:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:34:53.955Z",
+    "relatedId": "hwfl2xxm4fue0a2sdwpjic"
+  },
+  {
+    "id": "notif-og4iqcvf3rlq2amyc60m",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-13T07:23:55.193Z at 14:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T07:24:00.101Z",
+    "relatedId": "bpo5prhjisbv6v8vm6er9l"
+  },
+  {
+    "id": "notif-dc58a9laj1vslqe95m6h4q",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-13T07:23:55.193Z at 14:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T07:24:00.101Z",
+    "relatedId": "bpo5prhjisbv6v8vm6er9l"
+  },
+  {
+    "id": "notif-bfnzrvbf624wedexgt6ecl",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-05 at 09:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T10:23:21.374Z",
+    "relatedId": "4xrycf2revhcstpdzsxwfb"
+  },
+  {
+    "id": "notif-spm79vpnw5sd53qho81x",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Geraldd Reynolds-Millermm on 2025-05-05 at 09:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T10:23:21.374Z",
+    "relatedId": "4xrycf2revhcstpdzsxwfb"
+  },
+  {
+    "id": "notif-ufc1jabjeshptamykmu4",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-16T03:05:38.312Z at 09:00 - Reason: jj.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-04T10:32:47.186Z",
+    "relatedId": "k537r03g7ihe6w2gpbczi"
   }
 ]

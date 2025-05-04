@@ -25,8 +25,25 @@ import { AppointmentStatus } from '@/types/enums';
 import { format } from 'date-fns';
 import { logValidation } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
+import { AppointmentErrorBoundary } from '@/components/error-boundaries';
 
+/**
+ * Doctor Appointments Page
+ * Shows all appointments for a doctor with filtering and actions
+ */
 export default function DoctorAppointmentsPage() {
+  return (
+    <AppointmentErrorBoundary componentName="DoctorAppointmentsPage">
+      <DoctorAppointmentsContent />
+    </AppointmentErrorBoundary>
+  );
+}
+
+/**
+ * Doctor Appointments Content Component
+ * Separated to allow error boundary to work properly
+ */
+function DoctorAppointmentsContent() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');

@@ -26,10 +26,10 @@ export const usePatientProfile = (patientId?: string) => {
         );
       } else {
         // For patients viewing their own profile
-        return callApi('getMyUserProfile', { 
-          uid: user.uid,
-          role: UserType.PATIENT
-        });
+      return callApi('getMyUserProfile', { 
+        uid: user.uid,
+        role: UserType.PATIENT
+      });
       }
     },
     enabled: !!user?.uid && (!!patientId || user.role === UserType.PATIENT)

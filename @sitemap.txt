@@ -52,3 +52,20 @@ Health Appointment System Sitemap
    /cms/api-test - API test suite (src/app/cms/api-test/page.tsx)
    /cms-validation - Database schema validation (src/app/cms-validation/page.tsx)
    /dev/ui-test - UI components testing (src/app/dev/ui-test/page.tsx) 
+
+8. REUSABLE COMPONENTS
+   ## UI Components
+   /src/components/ui/ - Base UI components
+   /src/components/layout/ - Layout components including RootErrorBoundary
+   
+   ## Error Handling
+   /src/components/error-boundaries/ - Specialized error boundaries
+      - RootErrorBoundary - Application-wide error boundary (src/components/layout/RootErrorBoundary.tsx)
+      - AppointmentErrorBoundary - For appointment components (src/components/error-boundaries/AppointmentErrorBoundary.tsx)
+      - DoctorProfileErrorBoundary - For doctor profiles (src/components/error-boundaries/DoctorProfileErrorBoundary.tsx)
+      - DataLoadingErrorBoundary - For data fetching (src/components/error-boundaries/DataLoadingErrorBoundary.tsx)
+      - AuthErrorBoundary - For authentication flows (src/components/error-boundaries/AuthErrorBoundary.tsx)
+      - AdminDashboardErrorBoundary - For admin pages (src/components/error-boundaries/AdminDashboardErrorBoundary.tsx)
+      - PaymentProcessingErrorBoundary - For payment processing (src/components/error-boundaries/PaymentProcessingErrorBoundary.tsx)
+      - BookingWorkflowErrorBoundary - For booking process (src/components/error-boundaries/BookingWorkflowErrorBoundary.tsx)
+      - Documentation: src/components/error-boundaries/README.md 

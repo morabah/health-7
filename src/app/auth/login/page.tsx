@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import { logInfo, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
+import { AuthErrorBoundary } from '@/components/error-boundaries';
 
 /**
  * Login Page
@@ -17,6 +18,14 @@ import { useAuth } from '@/context/AuthContext';
  * @returns Login form component
  */
 export default function LoginPage() {
+  return (
+    <AuthErrorBoundary componentName="LoginPage">
+      <LoginPageContent />
+    </AuthErrorBoundary>
+  );
+}
+
+function LoginPageContent() {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

@@ -1,142 +1,653 @@
 /**
  * Firebase Error Code Mapping
  * 
- * Maps Firebase error codes to user-friendly messages.
- * These messages can be shown directly to users in the UI.
+ * Maps Firebase error codes to user-friendly messages and provides tools for
+ * transforming Firebase errors into a standardized format for the application.
  */
 
 import { ErrorCategory, ErrorSeverity } from "@/components/ui/ErrorDisplay";
+import { logError } from "./logger";
 
 /**
- * Firebase error code to user-friendly message mapping
+ * Error domain to help categorize errors by service
  */
-export const FIREBASE_ERROR_MESSAGES: Record<string, string> = {
-  // Authentication errors
-  'auth/email-already-in-use': 'This email address is already in use. Please try logging in or use a different email.',
-  'auth/invalid-email': 'Please enter a valid email address.',
-  'auth/user-disabled': 'This account has been disabled. Please contact support for assistance.',
-  'auth/user-not-found': 'Invalid email or password. Please try again.',
-  'auth/wrong-password': 'Invalid email or password. Please try again.',
-  'auth/weak-password': 'Password should be at least 6 characters long.',
-  'auth/requires-recent-login': 'For security reasons, please log out and log back in to perform this action.',
-  'auth/invalid-credential': 'Your login credentials have expired. Please log in again.',
-  'auth/account-exists-with-different-credential': 'An account already exists with the same email but different sign-in credentials.',
-  'auth/operation-not-allowed': 'This operation is not allowed. Please contact support.',
-  'auth/popup-blocked': 'The sign-in popup was blocked by your browser. Please allow popups for this site.',
-  'auth/popup-closed-by-user': 'The sign-in process was interrupted. Please try again.',
-  'auth/unauthorized-domain': 'This domain is not authorized for sign-in operations. Please contact support.',
-  'auth/invalid-action-code': 'The link you used has expired or is invalid.',
-  'auth/invalid-verification-code': 'The verification code is invalid. Please try again.',
-  'auth/invalid-verification-id': 'The verification ID is invalid. Please try again.',
-  'auth/missing-verification-code': 'Please enter a verification code.',
-  'auth/missing-verification-id': 'A verification ID is required. Please try the operation again.',
-  'auth/network-request-failed': 'A network error occurred. Please check your connection and try again.',
-  'auth/timeout': 'The operation has timed out. Please try again.',
-  'auth/too-many-requests': 'Too many unsuccessful attempts. Please try again later.',
-  
-  // Firestore errors
-  'firestore/cancelled': 'The operation was cancelled. Please try again.',
-  'firestore/unknown': 'An unknown error occurred. Please try again.',
-  'firestore/invalid-argument': 'Invalid data provided. Please check your input and try again.',
-  'firestore/deadline-exceeded': 'The operation timed out. Please try again.',
-  'firestore/not-found': 'The requested document was not found.',
-  'firestore/already-exists': 'The document already exists.',
-  'firestore/permission-denied': 'You do not have permission to perform this action.',
-  'firestore/resource-exhausted': 'System resources have been exhausted. Please try again later.',
-  'firestore/failed-precondition': 'The operation cannot be performed in the current system state.',
-  'firestore/aborted': 'The operation was aborted. Please try again.',
-  'firestore/out-of-range': 'The operation was attempted past the valid range.',
-  'firestore/unimplemented': 'This feature is not implemented yet.',
-  'firestore/internal': 'An internal error occurred. Please try again later.',
-  'firestore/unavailable': 'The service is currently unavailable. Please try again later.',
-  'firestore/data-loss': 'Unrecoverable data loss or corruption occurred.',
-  'firestore/unauthenticated': 'Your session has expired. Please log in again.',
-  
-  // Storage errors
-  'storage/unknown': 'An unknown error occurred. Please try again.',
-  'storage/object-not-found': 'The file you requested does not exist.',
-  'storage/bucket-not-found': 'The storage bucket does not exist.',
-  'storage/project-not-found': 'The project does not exist.',
-  'storage/quota-exceeded': 'Storage quota exceeded. Please contact support.',
-  'storage/unauthorized': 'You are not authorized to access this file.',
-  'storage/retry-limit-exceeded': 'The maximum time limit for this operation has been exceeded. Please try again.',
-  'storage/invalid-checksum': 'The file upload failed. Please try again.',
-  'storage/canceled': 'The file upload was cancelled.',
-  'storage/invalid-event-name': 'Invalid event name provided.',
-  'storage/invalid-url': 'Invalid URL provided.',
-  'storage/invalid-argument': 'Invalid argument provided.',
-  'storage/no-default-bucket': 'No default bucket has been set for this project.',
-  'storage/cannot-slice-blob': 'The file could not be processed. Please try a different file.',
-  'storage/server-file-wrong-size': 'The uploaded file size did not match the expected size.',
-  
-  // Cloud Functions errors
-  'functions/cancelled': 'The operation was cancelled. Please try again.',
-  'functions/unknown': 'An unknown error occurred. Please try again.',
-  'functions/invalid-argument': 'Invalid data provided. Please check your input and try again.',
-  'functions/deadline-exceeded': 'The operation timed out. Please try again.',
-  'functions/not-found': 'The requested resource was not found.',
-  'functions/already-exists': 'The resource already exists.',
-  'functions/permission-denied': 'You do not have permission to perform this action.',
-  'functions/resource-exhausted': 'System resources have been exhausted. Please try again later.',
-  'functions/failed-precondition': 'The operation cannot be performed in the current system state.',
-  'functions/aborted': 'The operation was aborted. Please try again.',
-  'functions/out-of-range': 'The operation was attempted past the valid range.',
-  'functions/unimplemented': 'This feature is not implemented yet.',
-  'functions/internal': 'An internal error occurred. Please try again later.',
-  'functions/unavailable': 'The service is currently unavailable. Please try again later.',
-  'functions/data-loss': 'Unrecoverable data loss or corruption occurred.',
-  'functions/unauthenticated': 'Your session has expired. Please log in again.',
-  
-  // Realtime Database errors
-  'database/permission-denied': 'You do not have permission to access this data.',
-  'database/unavailable': 'The database service is currently unavailable. Please try again later.',
-  
-  // Generic errors
-  'internal-error': 'An internal error occurred. Please try again later.',
-  'network-error': 'A network error occurred. Please check your connection and try again.',
-  'timeout-error': 'The operation timed out. Please try again.',
-  'quota-exceeded': 'Service quota exceeded. Please try again later.',
-  'invalid-data': 'Invalid data provided. Please check your input and try again.',
-  'unauthenticated': 'Authentication required. Please log in to continue.',
-  'unauthorized': 'You are not authorized to perform this action.',
-};
+export type ErrorDomain = 
+  | 'auth' 
+  | 'firestore' 
+  | 'functions' 
+  | 'storage' 
+  | 'database' 
+  | 'general';
 
 /**
- * Firebase error categories for different error codes
+ * Enhanced error information structure
  */
-export const FIREBASE_ERROR_CATEGORIES: Record<string, ErrorCategory> = {
-  // Map error prefixes to categories
-  'auth/': 'auth',
-  'firestore/': 'data',
-  'storage/': 'api',
-  'functions/': 'api',
-  'database/': 'data',
-};
+export interface EnhancedErrorInfo {
+  /** Original Firebase error code */
+  code: string;
+  
+  /** User-friendly message to display */
+  message: string;
+  
+  /** Error category for UI classification */
+  category: ErrorCategory;
+  
+  /** Error severity for UI display */
+  severity: ErrorSeverity;
+  
+  /** Source service/domain of the error */
+  domain: ErrorDomain;
+  
+  /** Whether the operation can be retried */
+  retryable: boolean;
+  
+  /** Whether the error is related to network issues */
+  isNetworkRelated: boolean;
+  
+  /** Whether the error is related to permissions */
+  isPermissionIssue: boolean;
+}
 
 /**
- * Firebase error severities for different error codes
+ * Firebase error code to comprehensive error information mapping
  */
-export const FIREBASE_ERROR_SEVERITIES: Record<string, ErrorSeverity> = {
-  // Auth errors that are user mistakes are warnings
-  'auth/wrong-password': 'warning',
-  'auth/user-not-found': 'warning',
-  'auth/invalid-email': 'warning',
-  'auth/weak-password': 'warning',
-  'auth/email-already-in-use': 'warning',
+export const FIREBASE_ERROR_MAP: Record<string, Omit<EnhancedErrorInfo, 'code'>> = {
+  // ===== Authentication Errors =====
+  'auth/email-already-in-use': {
+    message: 'This email address is already in use. Please try logging in or use a different email.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/invalid-email': {
+    message: 'Please enter a valid email address.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/user-disabled': {
+    message: 'This account has been disabled. Please contact support for assistance.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'auth/user-not-found': {
+    message: 'Invalid email or password. Please try again.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/wrong-password': {
+    message: 'Invalid email or password. Please try again.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/weak-password': {
+    message: 'Password should be at least 6 characters long.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/requires-recent-login': {
+    message: 'For security reasons, please log out and log back in to perform this action.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/invalid-credential': {
+    message: 'Your login credentials have expired. Please log in again.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/account-exists-with-different-credential': {
+    message: 'An account already exists with the same email but different sign-in credentials.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/operation-not-allowed': {
+    message: 'This operation is not allowed. Please contact support.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'auth/popup-blocked': {
+    message: 'The sign-in popup was blocked by your browser. Please allow popups for this site.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/popup-closed-by-user': {
+    message: 'The sign-in process was interrupted. Please try again.',
+    category: 'auth',
+    severity: 'info',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/unauthorized-domain': {
+    message: 'This domain is not authorized for sign-in operations. Please contact support.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'auth/invalid-action-code': {
+    message: 'The link you used has expired or is invalid.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/invalid-verification-code': {
+    message: 'The verification code is invalid. Please try again.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/too-many-requests': {
+    message: 'Too many unsuccessful attempts. Please try again later.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'auth/network-request-failed': {
+    message: 'A network error occurred. Please check your connection and try again.',
+    category: 'network',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'auth/timeout': {
+    message: 'The authentication operation has timed out. Please try again.',
+    category: 'network',
+    severity: 'warning',
+    domain: 'auth',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
   
-  // Quota and permission errors are more serious
-  'auth/too-many-requests': 'error',
-  'firestore/permission-denied': 'error',
-  'firestore/unauthenticated': 'error',
-  'storage/quota-exceeded': 'error',
-  'functions/resource-exhausted': 'error',
-  'functions/permission-denied': 'error',
+  // ===== Firestore Errors =====
+  'firestore/cancelled': {
+    message: 'The database operation was cancelled. Please try again.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/unknown': {
+    message: 'An unknown database error occurred. Please try again.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/invalid-argument': {
+    message: 'Invalid data provided. Please check your input and try again.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/deadline-exceeded': {
+    message: 'The database operation timed out. Please try again.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'firestore/not-found': {
+    message: 'The requested data was not found.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/already-exists': {
+    message: 'This data already exists.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/permission-denied': {
+    message: 'You do not have permission to access this data.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'firestore/resource-exhausted': {
+    message: 'Database resources have been exhausted. Please try again later.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/failed-precondition': {
+    message: 'The operation cannot be performed in the current system state.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/aborted': {
+    message: 'The database operation was aborted. Please try again.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/out-of-range': {
+    message: 'The database operation was attempted past the valid range.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/unimplemented': {
+    message: 'This database feature is not implemented yet.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/internal': {
+    message: 'An internal database error occurred. Please try again later.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/unavailable': {
+    message: 'The database service is currently unavailable. Please try again later.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'firestore/data-loss': {
+    message: 'Unrecoverable data loss or corruption occurred.',
+    category: 'data',
+    severity: 'error',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'firestore/unauthenticated': {
+    message: 'Your session has expired. Please log in again to access this data.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'firestore',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
   
-  // System errors are critical (using 'error' since 'critical' isn't available)
-  'firestore/internal': 'error',
-  'firestore/data-loss': 'error',
-  'functions/internal': 'error',
-  'storage/internal': 'error',
+  // ===== Storage Errors =====
+  'storage/unknown': {
+    message: 'An unknown storage error occurred. Please try again.',
+    category: 'api',
+    severity: 'error',
+    domain: 'storage',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/object-not-found': {
+    message: 'The file you requested does not exist.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'storage',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/bucket-not-found': {
+    message: 'The storage bucket does not exist.',
+    category: 'api',
+    severity: 'error',
+    domain: 'storage',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/quota-exceeded': {
+    message: 'Storage quota exceeded. Please contact support.',
+    category: 'api',
+    severity: 'error',
+    domain: 'storage',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/unauthorized': {
+    message: 'You are not authorized to access this file.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'storage',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'storage/retry-limit-exceeded': {
+    message: 'The maximum time limit for this file operation has been exceeded. Please try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'storage',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'storage/invalid-checksum': {
+    message: 'The file upload failed due to data corruption. Please try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'storage',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/canceled': {
+    message: 'The file upload was cancelled.',
+    category: 'api',
+    severity: 'info',
+    domain: 'storage',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/invalid-url': {
+    message: 'Invalid storage URL provided.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'storage',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'storage/server-file-wrong-size': {
+    message: 'The uploaded file size did not match the expected size.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'storage',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  
+  // ===== Cloud Functions Errors =====
+  'functions/cancelled': {
+    message: 'The server operation was cancelled. Please try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/unknown': {
+    message: 'An unknown server error occurred. Please try again.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/invalid-argument': {
+    message: 'Invalid data provided. Please check your input and try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/deadline-exceeded': {
+    message: 'The server operation timed out. Please try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'functions/not-found': {
+    message: 'The requested resource was not found.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/already-exists': {
+    message: 'The resource already exists.',
+    category: 'data',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/permission-denied': {
+    message: 'You do not have permission to perform this action.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'functions/resource-exhausted': {
+    message: 'Server resources have been exhausted. Please try again later.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/failed-precondition': {
+    message: 'The operation cannot be performed in the current system state.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/aborted': {
+    message: 'The server operation was aborted. Please try again.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/out-of-range': {
+    message: 'The operation was attempted past the valid range.',
+    category: 'api',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/unimplemented': {
+    message: 'This feature is not implemented yet.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/internal': {
+    message: 'An internal server error occurred. Please try again later.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/unavailable': {
+    message: 'The service is currently unavailable. Please try again later.',
+    category: 'api',
+    severity: 'error',
+    domain: 'functions',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'functions/data-loss': {
+    message: 'Unrecoverable data loss or corruption occurred.',
+    category: 'data',
+    severity: 'error',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false,
+  },
+  'functions/unauthenticated': {
+    message: 'Your session has expired. Please log in again.',
+    category: 'auth',
+    severity: 'warning',
+    domain: 'functions',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  
+  // ===== Realtime Database Errors =====
+  'database/permission-denied': {
+    message: 'You do not have permission to access this data.',
+    category: 'auth',
+    severity: 'error',
+    domain: 'database',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: true,
+  },
+  'database/unavailable': {
+    message: 'The database service is currently unavailable. Please try again later.',
+    category: 'data',
+    severity: 'error',
+    domain: 'database',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  
+  // ===== Generic/Network Errors =====
+  'network-error': {
+    message: 'A network error occurred. Please check your connection and try again.',
+    category: 'network',
+    severity: 'warning',
+    domain: 'general',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'timeout-error': {
+    message: 'The operation timed out. Please try again.',
+    category: 'network',
+    severity: 'warning',
+    domain: 'general',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
+  'offline-error': {
+    message: 'You appear to be offline. Please check your internet connection.',
+    category: 'network',
+    severity: 'warning',
+    domain: 'general',
+    retryable: true,
+    isNetworkRelated: true,
+    isPermissionIssue: false,
+  },
 };
 
 /**
@@ -147,7 +658,8 @@ export const FIREBASE_ERROR_SEVERITIES: Record<string, ErrorSeverity> = {
  * @returns User-friendly error message
  */
 export function getFirebaseErrorMessage(code: string, defaultMessage = 'An error occurred. Please try again.'): string {
-  return FIREBASE_ERROR_MESSAGES[code] || defaultMessage;
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  return errorInfo ? errorInfo.message : defaultMessage;
 }
 
 /**
@@ -157,12 +669,18 @@ export function getFirebaseErrorMessage(code: string, defaultMessage = 'An error
  * @returns Error category
  */
 export function getFirebaseErrorCategory(code: string): ErrorCategory {
-  // Check if code starts with any of the category prefixes
-  for (const [prefix, category] of Object.entries(FIREBASE_ERROR_CATEGORIES)) {
-    if (code.startsWith(prefix)) {
-      return category;
-    }
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  if (errorInfo) {
+    return errorInfo.category;
   }
+  
+  // Check if code starts with a known prefix
+  if (code.startsWith('auth/')) return 'auth';
+  if (code.startsWith('firestore/')) return 'data';
+  if (code.startsWith('storage/')) return 'api';
+  if (code.startsWith('functions/')) return 'api';
+  if (code.startsWith('database/')) return 'data';
+  
   return 'api'; // Default category
 }
 
@@ -173,7 +691,70 @@ export function getFirebaseErrorCategory(code: string): ErrorCategory {
  * @returns Error severity
  */
 export function getFirebaseErrorSeverity(code: string): ErrorSeverity {
-  return FIREBASE_ERROR_SEVERITIES[code] || 'error'; // Default severity
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  return errorInfo ? errorInfo.severity : 'error'; // Default severity
+}
+
+/**
+ * Get the error domain for a Firebase error code
+ * 
+ * @param code Firebase error code
+ * @returns Error domain
+ */
+export function getFirebaseErrorDomain(code: string): ErrorDomain {
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  if (errorInfo) {
+    return errorInfo.domain;
+  }
+  
+  // Check if code starts with a known prefix
+  if (code.startsWith('auth/')) return 'auth';
+  if (code.startsWith('firestore/')) return 'firestore';
+  if (code.startsWith('storage/')) return 'storage';
+  if (code.startsWith('functions/')) return 'functions';
+  if (code.startsWith('database/')) return 'database';
+  
+  return 'general'; // Default domain
+}
+
+/**
+ * Check if an error is retryable based on Firebase error code
+ * 
+ * @param code Firebase error code
+ * @returns Whether the error is retryable
+ */
+export function isFirebaseErrorRetryable(code: string): boolean {
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  return errorInfo ? errorInfo.retryable : false;
+}
+
+/**
+ * Get comprehensive error information for a Firebase error code
+ * 
+ * @param code Firebase error code
+ * @returns Enhanced error information
+ */
+export function getFirebaseErrorInfo(code: string): EnhancedErrorInfo {
+  const errorInfo = FIREBASE_ERROR_MAP[code];
+  
+  if (errorInfo) {
+    return {
+      code,
+      ...errorInfo
+    };
+  }
+  
+  // Default error info for unknown codes
+  return {
+    code,
+    message: `An error occurred (${code}). Please try again.`,
+    category: 'api',
+    severity: 'error',
+    domain: 'general',
+    retryable: false,
+    isNetworkRelated: false,
+    isPermissionIssue: false
+  };
 }
 
 /**
@@ -183,15 +764,20 @@ export function getFirebaseErrorSeverity(code: string): ErrorSeverity {
  * @returns Standardized error with additional metadata
  */
 export function createFirebaseError(error: { code: string; message: string }): Error {
-  const message = getFirebaseErrorMessage(error.code, error.message);
-  const category = getFirebaseErrorCategory(error.code);
-  const severity = getFirebaseErrorSeverity(error.code);
+  const errorInfo = getFirebaseErrorInfo(error.code);
   
-  const standardError = new Error(message);
-  (standardError as any).originalCode = error.code;
-  (standardError as any).category = category;
-  (standardError as any).severity = severity;
-  (standardError as any).isFirebaseError = true;
+  const standardError = new Error(errorInfo.message);
+  
+  // Add all error info as properties
+  Object.entries(errorInfo).forEach(([key, value]) => {
+    (standardError as any)[key] = value;
+  });
+  
+  // Log the enriched error
+  logError(`Firebase error (${errorInfo.domain}): ${errorInfo.code}`, { 
+    originalMessage: error.message,
+    enhancedInfo: errorInfo 
+  });
   
   return standardError;
 }
@@ -200,5 +786,8 @@ export default {
   getFirebaseErrorMessage,
   getFirebaseErrorCategory,
   getFirebaseErrorSeverity,
+  getFirebaseErrorDomain,
+  isFirebaseErrorRetryable,
+  getFirebaseErrorInfo,
   createFirebaseError
-}; 
+};

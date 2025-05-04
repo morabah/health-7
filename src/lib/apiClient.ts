@@ -227,7 +227,7 @@ export async function callApi<T = unknown>(
  */
 async function callFirebaseFunction<T>(method: string, ...args: unknown[]): Promise<T> {
   try {
-    // Create a callable reference to the Firebase Function
+    // Create a callable reference to the Firebase Function using the imported functions object
     const callable = functions.httpsCallable(method);
     
     // Prepare payload - combine all arguments into a single object for Cloud Functions

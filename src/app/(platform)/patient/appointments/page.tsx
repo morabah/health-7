@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
 import Link from 'next/link';
 import CancelAppointmentModal from '@/components/patient/CancelAppointmentModal';
+import { AppointmentErrorBoundary } from '@/components/error-boundaries';
 
 const tabs = ['Upcoming', 'Past', 'Cancelled'] as const;
 const statusMap = {
@@ -98,6 +99,18 @@ const AppointmentRow = ({ appointment, onCancel }: {
  * with real data from API
  */
 export default function PatientAppointments() {
+  return (
+    <AppointmentErrorBoundary componentName="PatientAppointmentsPage">
+      <PatientAppointmentsContent />
+    </AppointmentErrorBoundary>
+  );
+}
+
+/**
+ * Patient Appointments Content Component
+ * Separated to allow error boundary to work properly
+ */
+function PatientAppointmentsContent() {
   const [index, setIndex] = useState(0);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);

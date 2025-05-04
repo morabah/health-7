@@ -33,6 +33,7 @@ import { logInfo, logValidation } from '@/lib/logger';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { formatDistanceToNow } from 'date-fns';
 import Badge from '@/components/ui/Badge';
+import { AdminDashboardErrorBoundary } from '@/components/error-boundaries';
 
 // Stat component for dashboard statistics with trend indicator
 function Stat({
@@ -163,6 +164,14 @@ type Appointment = {
 };
 
 export default function AdminDashboard() {
+  return (
+    <AdminDashboardErrorBoundary>
+      <AdminDashboardContent />
+    </AdminDashboardErrorBoundary>
+  );
+}
+
+function AdminDashboardContent() {
   // Use unified dashboard data loader
   const {
     data: dashboardData,

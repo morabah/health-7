@@ -9,6 +9,7 @@ import Alert from '@/components/ui/Alert';
 import { User, Save } from 'lucide-react';
 import { usePatientProfile, useUpdatePatientProfile } from '@/data/patientLoaders';
 import { Gender, BloodType } from '@/types/enums';
+import { DataLoadingErrorBoundary } from '@/components/error-boundaries';
 
 /**
  * Patient Profile Page
@@ -17,6 +18,22 @@ import { Gender, BloodType } from '@/types/enums';
  * @returns Patient profile component
  */
 export default function PatientProfile() {
+  return (
+    <DataLoadingErrorBoundary
+      componentName="PatientProfilePage"
+      title="Profile Loading Error"
+      description="We encountered an issue while loading your profile information."
+    >
+      <PatientProfileContent />
+    </DataLoadingErrorBoundary>
+  );
+}
+
+/**
+ * Patient Profile Content Component
+ * Separated to allow error boundary to work properly
+ */
+function PatientProfileContent() {
   const { data: profileData, isLoading: profileLoading, error: profileError } = usePatientProfile();
   const updateProfileMutation = useUpdatePatientProfile();
   
@@ -38,13 +55,16 @@ export default function PatientProfile() {
 
   // Populate form data when profile data loads
   useEffect(() => {
-    if (profileData?.success) {
-      const { userProfile, roleProfile } = profileData;
+    if (profileData && 
+        typeof profileData === 'object' && 
+        'success' in profileData && 
+        profileData.success) {
+      const { userProfile, roleProfile } = profileData as any; // Type assertion as a temporary fix
       setFormData({
-        firstName: userProfile.firstName || '',
-        lastName: userProfile.lastName || '',
-        email: userProfile.email || '',
-        phone: userProfile.phone || '',
+        firstName: userProfile?.firstName || '',
+        lastName: userProfile?.lastName || '',
+        email: userProfile?.email || '',
+        phone: userProfile?.phone || '',
         address: roleProfile?.address || '',
         dateOfBirth: roleProfile?.dateOfBirth || '',
         gender: roleProfile?.gender || '',
@@ -54,6 +74,13 @@ export default function PatientProfile() {
       });
     }
   }, [profileData]);
+
+  // Handle errors from data fetching by throwing them to the error boundary
+  useEffect(() => {
+    if (profileError) {
+      throw profileError;
+    }
+  }, [profileError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -84,7 +111,10 @@ export default function PatientProfile() {
         medicalHistory: formData.medicalHistory
       });
       
-      if (result.success) {
+      if (result && 
+          typeof result === 'object' && 
+          'success' in result && 
+          result.success) {
       setSaveStatus({
         type: 'success',
         message: 'Profile updated successfully'
@@ -93,7 +123,9 @@ export default function PatientProfile() {
       } else {
         setSaveStatus({
           type: 'error',
-          message: result.error || 'Failed to update profile'
+          message: result && typeof result === 'object' && 'error' in result && typeof result.error === 'string' 
+            ? result.error 
+            : 'Failed to update profile'
         });
       }
     } catch (error) {
@@ -253,16 +285,15 @@ export default function PatientProfile() {
                   ))}
                 </Select>
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <label htmlFor="allergies" className="block text-sm font-medium mb-1">Allergies</label>
-                <textarea
+                <Input
                   id="allergies"
                   name="allergies"
                   value={formData.allergies}
                   onChange={handleInputChange}
                   disabled={!isEditing}
-                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
-                  rows={3}
+                  placeholder="Enter allergies, separated by commas"
                 />
               </div>
               <div className="md:col-span-2">
@@ -273,29 +304,37 @@ export default function PatientProfile() {
                   value={formData.medicalHistory}
                   onChange={handleInputChange}
                   disabled={!isEditing}
-                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
-                  rows={4}
+                  className="w-full p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[120px]"
                 />
               </div>
             </div>
           </Card>
 
           {isEditing && (
-            <div className="mt-6 flex justify-end space-x-4">
+            <div className="mt-6 flex justify-end space-x-3">
               <Button 
-                variant="secondary" 
                 onClick={() => setIsEditing(false)}
-                disabled={updateProfileMutation.isPending}
+                variant="ghost"
+                type="button"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 variant="primary"
-                isLoading={updateProfileMutation.isPending}
+                disabled={updateProfileMutation.isPending}
               >
-                <Save className="h-4 w-4 mr-2" />
+                {updateProfileMutation.isPending ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
                     Save Changes
+                  </>
+                )}
               </Button>
             </div>
           )}

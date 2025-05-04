@@ -21,26 +21,72 @@ import {
 } from 'lucide-react';
 import { logInfo, logValidation, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
-import { useDoctorProfile, useDoctorAvailability, useAvailableSlots } from '@/data/sharedLoaders';
+import { useDoctorProfile, useDoctorAvailability } from '@/data/sharedLoaders';
 import { useBookAppointment } from '@/data/sharedLoaders';
 import { format, addDays } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
 import type { DoctorProfile, TimeSlot } from '@/types/schemas';
-import withErrorBoundary from '@/components/ui/withErrorBoundary';
+import { 
+  BookingWorkflowErrorBoundary, 
+  TimeSlotSelectionErrorBoundary,
+  BookingPaymentErrorBoundary
+} from '@/components/error-boundaries';
 import useErrorHandler from '@/hooks/useErrorHandler';
+import useBookingError from '@/hooks/useBookingError';
+import { callApi } from '@/lib/apiClient';
 
 // Define the merged doctor profile type based on API response
-interface DoctorPublicProfile
-  extends Omit<DoctorProfile, 'servicesOffered' | 'educationHistory' | 'experience'> {
+interface DoctorPublicProfile {
   id: string;
   firstName: string;
   lastName: string;
+  specialty?: string;
+  location?: string;
+  consultationFee?: number;
+  profilePictureUrl?: string;
   rating?: number;
   reviewCount?: number;
   servicesOffered?: string[];
   educationHistory?: { institution: string; degree: string; year: string }[];
   experience?: { position: string; hospital: string; duration: string }[];
+}
+
+// Define API response interfaces
+interface ApiResponse<T> {
+  success: boolean;
+  error?: string;
+  data?: T;
+}
+
+interface AvailableSlotsResponse {
+  success: boolean;
+  error?: string;
+  slots: Array<{ startTime: string; endTime: string }>;
+}
+
+interface DoctorProfileResponse {
+  success: boolean;
+  error?: string;
+  doctor: DoctorPublicProfile;
+}
+
+interface AvailabilityResponse {
+  success: boolean;
+  error?: string;
+  availability: { 
+    weeklySchedule: Record<string, TimeSlot[]>; 
+    blockedDates: string[] 
+  };
+}
+
+interface BookAppointmentParams {
+  doctorId: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+  appointmentType: AppointmentType;
+  reason?: string;
 }
 
 // Create a custom fallback UI specific to the booking page
@@ -68,398 +114,322 @@ const BookingErrorFallback = () => (
   </div>
 );
 
-function BookAppointmentPage() {
+function BookAppointmentPageContent() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const doctorId = params?.doctorId as string;
+  const { throwTimeSlotError, throwBookingError } = useBookingError();
   
-  // Use our enhanced error handler
-  const { 
-    handleError, 
-    tryCatch, 
-    ErrorComponent, 
-    clearError,
-    isErrorVisible
-  } = useErrorHandler({
-    component: 'BookAppointmentPage',
-    defaultCategory: 'appointment',
-    autoDismiss: false
-  });
+  const doctorId = params?.doctorId ? String(params.doctorId) : '';
 
-  // Fetch doctor profile and availability
-  const {
-    data: doctorData,
-    isLoading: doctorLoading,
-    error: doctorError,
-  } = useDoctorProfile(doctorId) as {
-    data?: { success: boolean; doctor: DoctorPublicProfile };
-    isLoading: boolean;
-    error: unknown;
-  };
-  const {
-    data: availabilityData,
-    isLoading: availabilityLoading,
-    error: availabilityError,
-  } = useDoctorAvailability(doctorId) as {
-    data?: {
-      success: boolean;
-      availability: { weeklySchedule: Record<string, TimeSlot[]>; blockedDates: string[] };
-    };
-    isLoading: boolean;
-    error: unknown;
-  };
-  const bookAppointmentMutation = useBookAppointment();
-  const availableSlotsMutation = useAvailableSlots();
-
-  // State variables
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-  const [selectedEndTime, setSelectedEndTime] = useState<string | null>(null);
-  const [appointmentType, setAppointmentType] = useState<AppointmentType>(
-    AppointmentType.IN_PERSON
-  );
-  const [reason, setReason] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [uiError, setUiError] = useState<string | null>(null);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<
-    Array<{ startTime: string; endTime: string }>
-  >([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [selectedEndTime, setSelectedEndTime] = useState<string>('');
+  const [appointmentType, setAppointmentType] = useState<AppointmentType>(AppointmentType.IN_PERSON);
+  const [reason, setReason] = useState<string>('');
+  const [allDates, setAllDates] = useState<Date[]>([]);
   const [selectableDates, setSelectableDates] = useState<Date[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<Array<{ startTime: string; endTime: string }>>([]);
+  const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false);
 
-  // Check for query errors and handle them with the error handler
+  // Fetch doctor profile with proper typing
+  const { 
+    data: doctorDataResponse, 
+    isLoading: isLoadingDoctor,
+    error: doctorError
+  } = useDoctorProfile(doctorId) as {
+    data: DoctorProfileResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+  
+  const doctor = doctorDataResponse?.success ? doctorDataResponse.doctor : null;
+
+  // Fetch doctor availability with proper typing
+  const { 
+    data: availabilityDataResponse, 
+    isLoading: isLoadingAvailability,
+    error: availabilityError
+  } = useDoctorAvailability(doctorId) as {
+    data: AvailabilityResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+
+  const availability = availabilityDataResponse?.success ? availabilityDataResponse.availability : null;
+
+  // Booking mutation
+  const bookAppointmentMutation = useBookAppointment();
+
+  const isLoading = isLoadingDoctor || isLoadingAvailability;
+
+  // Log doctor fetch errors
   useEffect(() => {
     if (doctorError) {
-      handleError(doctorError, {
-        message: 'Unable to load doctor profile',
-        category: 'data',
-        severity: 'error',
-        context: { doctorId },
-        retryable: true
-      });
+      logError('Failed to fetch doctor profile', { doctorId, error: doctorError });
     }
     if (availabilityError) {
-      handleError(availabilityError, {
-        message: 'Unable to load doctor availability',
-        category: 'data',
-        severity: 'error',
-        context: { doctorId },
-        retryable: true
-      });
+      logError('Failed to fetch doctor availability', { doctorId, error: availabilityError });
     }
-  }, [doctorError, availabilityError, handleError, doctorId]);
+  }, [doctorError, availabilityError, doctorId]);
 
-  // Generate dates for the next 14 days
+  // Handle successful booking
+  useEffect(() => {
+    if (bookAppointmentMutation.isSuccess) {
+      setSuccess(true);
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/patient/appointments?justBooked=1');
+      }, 3000);
+    }
+  }, [bookAppointmentMutation.isSuccess, router]);
+
+  // Generate selectable dates based on availability
+  useEffect(() => {
+    generateDates();
+  }, [availabilityDataResponse]);
+
+  // On date selection, fetch available time slots
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedDate]);
+
+  // Generate dates for the next 14 days, marking which ones are available
   const generateDates = () => {
-    const dates = [];
-    const currentDate = new Date();
+    const dates: Date[] = [];
+    const availableDates: Date[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    for (let i = 1; i <= 14; i++) {
-      const date = addDays(currentDate, i);
+    // Get doctor's availability
+    const blockedDates = availability?.blockedDates || [];
+    const weeklySchedule = availability?.weeklySchedule || {};
+
+    // Generate dates for the next 14 days
+    for (let i = 0; i < 14; i++) {
+      const date = addDays(today, i);
       dates.push(date);
+
+      // Check if this date is available
+      const dayOfWeek = format(date, 'EEEE').toLowerCase();
+      const dateString = format(date, 'yyyy-MM-dd');
+      
+      // A date is available if it's not blocked and has a schedule for that day
+      const isBlocked = blockedDates.includes(dateString);
+      const hasSchedule = weeklySchedule[dayOfWeek] && weeklySchedule[dayOfWeek].length > 0;
+      
+      if (!isBlocked && hasSchedule) {
+        availableDates.push(date);
+      }
     }
 
-    return dates;
+    setAllDates(dates);
+    setSelectableDates(availableDates);
+
+    // If we have available dates, pre-select the first one
+    if (availableDates.length > 0 && !selectedDate) {
+      setSelectedDate(availableDates[0]);
+    }
   };
 
-  const allDates = generateDates();
+  // Fetch available time slots for the selected date
+  const fetchAvailableSlots = async () => {
+    if (!selectedDate || !doctorId) return;
 
-  // Determine which dates are actually available based on doctor's schedule and blocked dates
-  useEffect(() => {
-    if (availabilityData?.success) {
-      const { weeklySchedule, blockedDates } = availabilityData.availability;
+    setSlotsLoading(true);
+    setAvailableTimeSlots([]);
+    setSelectedTimeSlot('');
+    setSelectedEndTime('');
 
-      // Filter dates that have slots in weekly schedule and are not blocked
-      const availableDates = allDates.filter(date => {
-        const dayOfWeek = format(date, 'EEEE').toLowerCase();
-        const hasSchedule = weeklySchedule[dayOfWeek] && weeklySchedule[dayOfWeek].length > 0;
-
-        // Check if date is in blocked dates
-        const formattedDate = format(date, 'yyyy-MM-dd');
-        const isBlocked = blockedDates.some(blockedDate => {
-          return blockedDate.includes(formattedDate);
-        });
-
-        return hasSchedule && !isBlocked;
+    try {
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Use callApi directly with proper typing
+      const response = await callApi<AvailableSlotsResponse>('getAvailableSlots', {
+        doctorId,
+        date: dateString
       });
-
-      setSelectableDates(availableDates);
-    }
-  }, [availabilityData]);
-
-  // Update to get available slots from the API when date changes using our enhanced error handling
-  useEffect(() => {
-    const fetchAvailableSlots = async () => {
-      if (!selectedDate || !doctorId) return;
-
-      setSlotsLoading(true);
-      setUiError(null);
-      clearError();
-
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       
-      // Use our enhanced error handling with tryCatch
-      const result = await tryCatch(
-        async () => {
-          logInfo('Fetching available slots', { doctorId, date: formattedDate });
-          
-          return await availableSlotsMutation.mutateAsync({
-            doctorId,
-            date: formattedDate,
-          });
-        },
-        {
-          action: 'fetchAvailableSlots',
-          message: `Unable to load available time slots for ${formatDate(selectedDate)}`,
-          category: 'appointment',
-          severity: 'warning',
-          context: { doctorId, date: formattedDate },
-          retryable: true
-        }
-      );
-      
-      if (result) {
-        if (result.success) {
-          if (!result.slots || !Array.isArray(result.slots)) {
-            setUiError('Invalid response format from server. Please try again later.');
-            logError('Invalid slots response format', { doctorId, date: formattedDate, result });
-            setAvailableTimeSlots([]);
-          } else if (result.slots.length === 0) {
-            setAvailableTimeSlots([]);
-            setUiError(
-              `No available appointment slots for ${formatDate(selectedDate)}. This could be because the doctor's schedule is full or they don't have office hours on this day. Please select another date.`
-            );
-            logInfo('No slots available', { doctorId, date: formattedDate });
-          } else {
-            setAvailableTimeSlots(result.slots);
-            setUiError(null);
-            logInfo('Slots loaded successfully', {
-              doctorId,
-              date: formattedDate,
-              count: result.slots.length,
-            });
-          }
-        } else {
-          const errorMessage = result.error || 'Unknown error';
-          setUiError(`Failed to load available slots: ${errorMessage}`);
-          logError('Failed to fetch available slots', {
-            doctorId,
-            date: formattedDate,
-            error: errorMessage,
-          });
-          setAvailableTimeSlots([]);
-        }
-      } else {
-        // tryCatch returned null, meaning it already handled the error
-        setAvailableTimeSlots([]);
+      if (!response.success) {
+        throwTimeSlotError(
+          'LOADING_FAILED',
+          `Failed to load time slots: ${response.error || 'Unknown error'}`,
+          { doctorId, date: dateString }
+        );
+        return;
       }
       
+      // If no slots are available
+      if (!response.slots || response.slots.length === 0) {
+        throwTimeSlotError(
+          'NO_SLOTS_AVAILABLE',
+          'No available time slots for the selected date',
+          { doctorId, date: dateString }
+        );
+        return;
+      }
+      
+      setAvailableTimeSlots(response.slots);
+    } catch (err) {
+      logError('Error fetching available slots', { error: err, doctorId, date: selectedDate });
+      throwTimeSlotError(
+        'LOADING_FAILED',
+        'An error occurred while loading time slots',
+        { doctorId, date: format(selectedDate, 'yyyy-MM-dd'), error: err }
+      );
+    } finally {
       setSlotsLoading(false);
-    };
-
-    if (selectedDate && doctorId) {
-      fetchAvailableSlots();
-
-      // Reset selected time slot when date changes
-      setSelectedTimeSlot(null);
-      setSelectedEndTime(null);
     }
-    // Only run this effect when the date or doctorId changes
-  }, [selectedDate, doctorId, tryCatch, clearError]);
+  };
 
   // Check if a date is selectable
   const isDateSelectable = (date: Date) => {
-    return selectableDates.some(
-      selectableDate => format(selectableDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-    );
+    return selectableDates.some(d => d.toDateString() === date.toDateString());
   };
 
   // Format date for display
   const formatDate = (date: Date) => {
-    return format(date, 'EEE, MMM d, yyyy');
+    return format(date, 'EEEE, MMMM d, yyyy');
   };
 
-  // Handle booking submission with enhanced error handling
+  // Handle appointment booking
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!selectedDate || !selectedTimeSlot || !selectedEndTime) {
-      setUiError('Please select a date and time for your appointment');
+    
+    if (!user) {
+      throwBookingError(
+        'UNAUTHORIZED',
+        'You must be logged in to book an appointment',
+        { doctorId }
+      );
       return;
     }
 
-    setUiError(null);
-    clearError();
-
-    // Use our enhanced error handling with tryCatch
-    const result = await tryCatch(
-      async () => {
-        return await bookAppointmentMutation.mutateAsync({
-          doctorId,
-          appointmentDate: selectedDate.toISOString(),
-          startTime: selectedTimeSlot,
-          endTime: selectedEndTime,
-          reason,
-          appointmentType: appointmentType,
-        });
-      },
-      {
-        action: 'bookAppointment',
-        message: 'Unable to book appointment',
-        category: 'appointment',
-        severity: 'error',
-        context: { 
-          doctorId, 
-          date: selectedDate.toISOString(), 
-          startTime: selectedTimeSlot,
-          appointmentType
-        },
-        retryable: true
-      }
-    );
-
-    if (result) {
-      if (result.success) {
-        setSuccess(true);
-        setUiError(null);
-        logInfo('appointment', {
-          action: 'book-appointment-success',
-          doctorId,
-          patientId: user?.uid,
-          date: selectedDate.toISOString(),
-          time: selectedTimeSlot,
-        });
-
-        logValidation(
-          '4.11',
-          'success',
-          'Book appointment function fully operational with real data'
-        );
-
-        // Redirect to appointments page with justBooked parameter
-        setTimeout(() => {
-          router.push('/patient/appointments?justBooked=1');
-        }, 1500);
-      } else {
-        setUiError(result.error || 'Failed to book appointment');
-      }
+    if (!selectedDate || !selectedTimeSlot) {
+      throwBookingError(
+        'VALIDATION_ERROR',
+        'Please select a date and time for your appointment',
+        { doctorId, hasDate: !!selectedDate, hasTime: !!selectedTimeSlot }
+      );
+      return;
     }
-    // If result is null, the error has already been handled by tryCatch
+    
+    try {
+      const appointmentDetails: BookAppointmentParams = {
+        doctorId,
+        appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+        startTime: selectedTimeSlot,
+        endTime: selectedEndTime,
+        appointmentType: appointmentType,
+        reason: reason || 'General consultation'
+      };
+      
+      await bookAppointmentMutation.mutateAsync(appointmentDetails);
+    } catch (error) {
+      logError('Failed to book appointment', { error, appointmentDetails: {
+        doctorId,
+        date: selectedDate,
+        startTime: selectedTimeSlot
+      }});
+      
+      throwBookingError(
+        'BOOKING_CONFLICT',
+        'Failed to book the appointment. The time slot may no longer be available.',
+        { doctorId, date: format(selectedDate, 'yyyy-MM-dd'), startTime: selectedTimeSlot }
+      );
+    }
   };
 
-  const isLoading = doctorLoading || availabilityLoading;
-  const doctor = doctorData?.success ? doctorData.doctor : null;
-
-  // Show the error display for critical errors
-  if (isErrorVisible) {
-    return <ErrorComponent />;
-  }
-
-  // Show a simpler UI for data loading errors
   if (doctorError || availabilityError) {
     return (
-      <div className="container mx-auto p-6">
-        <ErrorDisplay
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <ErrorDisplay 
           error={doctorError || availabilityError}
-          message={doctorError ? "Couldn't load doctor profile" : "Couldn't load doctor availability"}
+          message="We couldn't load the doctor's information"
           category="data"
           onRetry={() => window.location.reload()}
         />
-        <div className="mt-6 flex justify-center">
-          <Link href="/find-doctors">
-            <Button variant="primary">Find Another Doctor</Button>
-          </Link>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Book Appointment</h1>
-        <Link href={`/doctor-profile/${doctorId}`}>
-          <Button variant="outline" size="sm">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Profile
-          </Button>
-        </Link>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Back button */}
+      <Link href="/find-doctors" className="inline-flex items-center text-sm text-primary mb-6">
+        <ChevronLeft className="h-4 w-4 mr-1" />
+        Back to Doctors
+      </Link>
 
-      {/* Show UI errors with our ErrorDisplay component */}
-      {uiError && (
-        <ErrorDisplay
-          error={uiError}
-          category="appointment"
-          severity="warning"
-          onDismiss={() => setUiError(null)}
-        />
+      <h1 className="text-2xl font-bold mb-6 dark:text-white">Book an Appointment</h1>
+
+      {/* Error message from mutation */}
+      {bookAppointmentMutation.isError && (
+        <Alert variant="error" className="mb-6">
+          {bookAppointmentMutation.error?.message || 'Failed to book appointment. Please try again.'}
+        </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Doctor Info Sidebar */}
-        <div className="lg:col-span-1">
-          <Card className="p-4 sticky top-4">
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Spinner />
-              </div>
-            ) : doctor ? (
-              <>
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
-                    {doctor.profilePictureUrl ? (
-                      <Image
-                        src={doctor.profilePictureUrl as string}
-                        alt={`Dr. ${doctor.firstName} ${doctor.lastName}`}
-                        className="h-12 w-12 rounded-full object-cover"
-                        width={48}
-                        height={48}
-                      />
-                    ) : (
-                      <span className="text-lg font-bold">
-                        {typeof doctor.firstName === 'string' ? doctor.firstName[0] : ''}
-                        {typeof doctor.lastName === 'string' ? doctor.lastName[0] : ''}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">
-                      Dr. {doctor.firstName ?? ''} {doctor.lastName ?? ''}
-                    </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {doctor.specialty ?? ''}
-                    </p>
-                  </div>
+      {/* Loading state */}
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
+      ) : !doctor ? (
+        <Alert variant="error">
+          Doctor not found or has been removed from the platform.
+        </Alert>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Doctor Info */}
+          <div className="lg:col-span-1">
+            <Card className="p-6">
+              <div className="flex flex-col items-center text-center mb-4">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden mb-4">
+                  <Image
+                    src={doctor.profilePictureUrl || '/images/default-doctor.png'}
+                    alt={`Dr. ${doctor.lastName}`}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
-
-                <div className="space-y-2 mb-4">
-                  {doctor.location && (
-                    <div className="flex items-start text-sm">
-                      <MapPin className="h-4 w-4 mt-0.5 mr-2 text-slate-400" />
-                      <span className="text-slate-600 dark:text-slate-300">
-                        {doctor.location ?? ''}
-                      </span>
-                    </div>
-                  )}
-                  {doctor.consultationFee !== null && doctor.consultationFee !== undefined && (
-                    <div className="flex items-center text-sm">
-                      <Clock className="h-4 w-4 mr-2 text-slate-400" />
-                      <span className="text-slate-600 dark:text-slate-300">
-                        Consultation Fee: ${doctor.consultationFee}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-4 text-slate-500">
-                Doctor information not available
+                <h2 className="text-xl font-semibold">
+                  Dr. {doctor.firstName} {doctor.lastName}
+                </h2>
+                <p className="text-slate-600 dark:text-slate-300">{doctor.specialty}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{doctor.location}</p>
+                
+                {doctor.consultationFee && (
+                  <div className="mt-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                    ${doctor.consultationFee} per visit
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Selected appointment summary */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="font-medium mb-2">Services</h3>
+                <ul className="text-sm space-y-1 text-slate-600 dark:text-slate-300">
+                  {Array.isArray(doctor.servicesOffered) && doctor.servicesOffered.length > 0 ? (
+                    doctor.servicesOffered.map((service: string, index: number) => (
+                      <li key={index} className="flex items-center">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary mr-2"></span>
+                        {service}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="flex items-center">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary mr-2"></span>
+                      General consultation
+                    </li>
+                  )}
+                </ul>
+              </div>
+            
+            {/* Appointment Summary */}
             {selectedDate && selectedTimeSlot && (
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <h4 className="font-medium text-sm mb-2">Appointment Summary</h4>
@@ -519,7 +489,7 @@ function BookAppointmentPage() {
               <Card className="p-6 mb-6">
                 <h2 className="text-lg font-semibold mb-4">1. Select a Date</h2>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  {allDates.map((date, index) => {
+                  {Array.isArray(allDates) && allDates.map((date, index) => {
                     const isSelectable = isDateSelectable(date);
                     return (
                       <button
@@ -551,39 +521,41 @@ function BookAppointmentPage() {
 
               {/* Time Slot Selection */}
               {selectedDate && (
-                <Card className="p-6 mb-6">
-                  <h2 className="text-lg font-semibold mb-4">2. Select a Time Slot</h2>
+                <TimeSlotSelectionErrorBoundary componentName="TimeSlotSelection">
+                  <Card className="p-6 mb-6">
+                    <h2 className="text-lg font-semibold mb-4">2. Select a Time Slot</h2>
 
-                  {slotsLoading ? (
-                    <div className="py-8 flex justify-center">
-                      <Spinner />
-                    </div>
-                  ) : availableTimeSlots.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {availableTimeSlots.map((slot, index: number) => (
-                        <Button
-                          key={index}
-                          type="button"
-                          variant={slot.startTime === selectedTimeSlot ? 'primary' : 'outline'}
-                          size="sm"
-                          className="py-2 px-3 text-center justify-center"
-                          onClick={() => {
-                            setSelectedTimeSlot(slot.startTime);
-                            setSelectedEndTime(slot.endTime);
-                          }}
-                        >
-                          {slot.startTime}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-slate-500">
-                      <Calendar className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                      <p>No available time slots for this date</p>
-                      <p className="text-sm mt-1">Please select another date</p>
-                    </div>
-                  )}
-                </Card>
+                    {slotsLoading ? (
+                      <div className="py-8 flex justify-center">
+                        <Spinner />
+                      </div>
+                    ) : Array.isArray(availableTimeSlots) && availableTimeSlots.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {availableTimeSlots.map((slot, index: number) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            variant={slot.startTime === selectedTimeSlot ? 'primary' : 'outline'}
+                            size="sm"
+                            className="py-2 px-3 text-center justify-center"
+                            onClick={() => {
+                              setSelectedTimeSlot(slot.startTime);
+                              setSelectedEndTime(slot.endTime);
+                            }}
+                          >
+                            {slot.startTime}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-slate-500">
+                        <Calendar className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                        <p>No available time slots for this date</p>
+                        <p className="text-sm mt-1">Please select another date</p>
+                      </div>
+                    )}
+                  </Card>
+                </TimeSlotSelectionErrorBoundary>
               )}
 
               {/* Appointment Type & Reason */}
@@ -641,26 +613,30 @@ function BookAppointmentPage() {
 
               {/* Submit Button */}
               <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={!selectedDate || !selectedTimeSlot || bookAppointmentMutation.isPending}
-                  isLoading={bookAppointmentMutation.isPending}
-                >
-                  Book Appointment
-                </Button>
+                <BookingPaymentErrorBoundary componentName="BookAppointmentSubmit">
+                  <Button
+                    type="submit"
+                    disabled={!selectedDate || !selectedTimeSlot || bookAppointmentMutation.isPending}
+                    isLoading={bookAppointmentMutation.isPending}
+                  >
+                    Book Appointment
+                  </Button>
+                </BookingPaymentErrorBoundary>
               </div>
             </form>
           )}
         </div>
       </div>
+    )}
     </div>
   );
 }
 
 // Export with error boundary
-export default withErrorBoundary(BookAppointmentPage, {
-  fallback: <BookingErrorFallback />,
-  onError: (error) => {
-    logError('BookAppointmentPage error boundary caught error', error);
-  }
-});
+export default function BookAppointmentPage() {
+  return (
+    <BookingWorkflowErrorBoundary componentName="BookAppointmentPage">
+      <BookAppointmentPageContent />
+    </BookingWorkflowErrorBoundary>
+  );
+}

@@ -11,8 +11,27 @@ import { User, Save, GraduationCap, Stethoscope } from 'lucide-react';
 import { useDoctorProfile, useUpdateDoctorProfile } from '@/data/doctorLoaders';
 import { VerificationStatus } from '@/types/enums';
 import { logValidation } from '@/lib/logger';
+import { DoctorProfileErrorBoundary } from '@/components/error-boundaries';
 
+/**
+ * Doctor Profile Page
+ * Allows doctors to view and edit their profile information
+ * 
+ * @returns Doctor profile component
+ */
 export default function DoctorProfilePage() {
+  return (
+    <DoctorProfileErrorBoundary>
+      <DoctorProfileContent />
+    </DoctorProfileErrorBoundary>
+  );
+}
+
+/**
+ * Doctor Profile Content Component
+ * Separated to allow error boundary to work properly
+ */
+function DoctorProfileContent() {
   const { data: profileData, isLoading, error, refetch } = useDoctorProfile();
   const updateProfileMutation = useUpdateDoctorProfile();
   
@@ -49,16 +68,23 @@ export default function DoctorProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{type: 'success' | 'error', message: string} | null>(null);
   
+  // Handle errors from data fetching by throwing them to the error boundary
+  useEffect(() => {
+    if (error) {
+      throw error;
+    }
+  }, [error]);
+  
   // Load profile data when available
   useEffect(() => {
-    if (profileData?.success) {
-      const { userProfile, roleProfile } = profileData;
+    if (profileData && typeof profileData === 'object' && 'success' in profileData && profileData.success) {
+      const { userProfile, roleProfile } = profileData as any;
       
       setProfile({
-        firstName: userProfile.firstName || '',
-        lastName: userProfile.lastName || '',
-        email: userProfile.email || '',
-        phone: userProfile.phone || '',
+        firstName: userProfile?.firstName || '',
+        lastName: userProfile?.lastName || '',
+        email: userProfile?.email || '',
+        phone: userProfile?.phone || '',
         specialty: roleProfile?.specialty || '',
         licenseNumber: roleProfile?.licenseNumber || '',
         yearsOfExperience: roleProfile?.yearsOfExperience?.toString() || '',
