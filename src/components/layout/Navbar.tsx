@@ -11,10 +11,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Loader2, UserCircle, LayoutDashboard } from 'lucide-react';
 import clsx from 'clsx';
-import { logInfo } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 import { callApi } from '@/lib/apiClient';
-import { roleToDashboard, roleToProfile, APP_ROUTES } from '@/lib/router';
+import { APP_ROUTES } from '@/lib/router';
 import type { Notification } from '@/types/schemas';
 import UserSwitcher from '@/components/ui/UserSwitcher';
 
@@ -404,7 +403,7 @@ export default function Navbar() {
                           {/* Account Switcher */}
                           {activeSessions.length > 1 && (
                             <HeadlessMenu.Item>
-                              {({ active, close: closeMenu }) => (
+                              {({ active }) => (
                                 <div>
                                   <button
                                     onClick={() => {

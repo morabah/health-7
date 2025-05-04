@@ -1,6 +1,5 @@
 'use client';
 
-import { lazy } from 'react';
 import { lazyLoad } from '@/lib/lazyLoadUtils';
 
 /**
@@ -36,12 +35,15 @@ export const LazyDoctorSearchResults = lazyLoad(
   }
 );
 
+// Type for dynamic imports
+type DynamicImport = () => Promise<unknown>;
+
 /**
  * Prefetch components that are likely to be used soon
  * @param componentType Which component type to prefetch
  */
 export function prefetchLazyComponents(componentType: 'notifications' | 'doctors' | 'all'): void {
-  const importPromises: Array<() => Promise<any>> = [];
+  const importPromises: DynamicImport[] = [];
   
   // Based on the requested component type, add the appropriate import promise
   if (componentType === 'notifications' || componentType === 'all') {

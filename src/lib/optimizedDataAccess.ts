@@ -19,7 +19,7 @@ interface FilterOptions {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   fields?: string[];
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 // Enhanced Cache Options
@@ -27,6 +27,57 @@ interface CacheOptions {
   ttl?: number;         // Time to live in ms (default: 30000ms)
   priority?: 'high' | 'normal' | 'low'; // Cache priority for memory management
   forceRefresh?: boolean; // Bypass cache and force a fresh fetch
+}
+
+// Base entity interface
+interface BaseEntity {
+  id: string;
+  [key: string]: unknown;
+}
+
+// User entity
+interface User extends BaseEntity {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+}
+
+// Doctor entity
+interface Doctor extends BaseEntity {
+  userId: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  specialty?: string;
+  verificationStatus?: string;
+}
+
+// Appointment entity
+interface Appointment extends BaseEntity {
+  patientId: string;
+  doctorId: string;
+  appointmentDate: string;
+  status: string;
+}
+
+// Notification entity
+interface Notification extends BaseEntity {
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// Cache value type
+interface MemoryCacheItem<T> {
+  data: T;
+  timestamp: number;
+  expiresAt: number;
+  priority: string;
+  size?: number;
 }
 
 // Default cache options
@@ -46,13 +97,7 @@ const CACHE_TTL_CONFIG = {
 };
 
 // Cache storage for in-memory data
-const memoryCache: Record<string, {
-  data: any;
-  timestamp: number;
-  expiresAt: number;
-  priority: string;
-  size?: number;
-}> = {};
+const memoryCache: Record<string, MemoryCacheItem<unknown>> = {};
 
 // Memory cache statistics
 const memoryCacheStats = {
@@ -68,13 +113,13 @@ const notificationRequestTracker = {
   lastRequestTime: 0,
   consecutiveRequests: 0,
   backoffInterval: 0, // Increases on failed or too frequent requests
-  inMemoryCache: new Map<string, { data: any[], timestamp: number }>()
+  inMemoryCache: new Map<string, { data: Notification[], timestamp: number }>()
 };
 
 /**
  * Estimate size of object in bytes (rough approximation)
  */
-function estimateObjectSize(obj: any): number {
+function estimateObjectSize(obj: unknown): number {
   const jsonString = JSON.stringify(obj);
   return jsonString ? jsonString.length * 2 : 0; // Rough estimate: 2 bytes per character
 }
@@ -82,9 +127,9 @@ function estimateObjectSize(obj: any): number {
 /**
  * Set data in the memory cache with expiration
  */
-function setMemoryCacheData(
+function setMemoryCacheData<T>(
   key: string, 
-  data: any, 
+  data: T, 
   options: Partial<CacheOptions> = {}
 ): void {
   const mergedOptions = { ...DEFAULT_CACHE_OPTIONS, ...options };
@@ -202,21 +247,21 @@ export function getMemoryCacheStats(): typeof memoryCacheStats {
 }
 
 /**
- * Get users with optimized filtering and caching
+ * Get optimized users with filtering and caching
  */
-export async function getOptimizedUsers(options: FilterOptions = {}): Promise<any[]> {
+export async function getOptimizedUsers(options: FilterOptions = {}): Promise<User[]> {
   const cacheKey = `users-${JSON.stringify(options)}`;
   
   try {
     // Try memory cache first (30 second TTL)
-    const cachedData = getMemoryCacheData<any[]>(cacheKey);
+    const cachedData = getMemoryCacheData<User[]>(cacheKey);
     if (cachedData) {
       logInfo('Using memory cached users data');
       return cachedData;
     }
     
     // Try React Query cache next
-    const queryData = cacheManager.getQueryData<{ success: boolean; users: any[] }>(
+    const queryData = cacheManager.getQueryData<{ success: boolean; users: User[] }>(
       cacheKeys.users(options.filters)
     );
     
@@ -285,7 +330,7 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<an
 /**
  * Process users data with filtering, sorting and pagination
  */
-function processUsersData(users: any[], options: FilterOptions): any[] {
+function processUsersData(users: User[], options: FilterOptions): User[] {
   let result = [...users];
   
   // Apply filters
@@ -339,14 +384,14 @@ function processUsersData(users: any[], options: FilterOptions): any[] {
 }
 
 /**
- * Get doctors with optimized filtering and caching
+ * Get optimized doctors with filtering and caching
  */
-export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<any[]> {
+export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<Doctor[]> {
   const cacheKey = `doctors-${JSON.stringify(options)}`;
   
   try {
     // Try memory cache first (30 second TTL)
-    const cachedData = getMemoryCacheData<any[]>(cacheKey);
+    const cachedData = getMemoryCacheData<Doctor[]>(cacheKey);
     if (cachedData) {
       logInfo('Using memory cached doctors data');
       return cachedData;
@@ -423,7 +468,7 @@ export async function getOptimizedDoctors(options: FilterOptions = {}): Promise<
 /**
  * Process doctors data with filtering, sorting and pagination
  */
-function processDoctorsData(doctors: any[], options: FilterOptions): any[] {
+function processDoctorsData(doctors: Doctor[], options: FilterOptions): Doctor[] {
   let result = [...doctors];
   
   // Apply filters
@@ -476,14 +521,14 @@ function processDoctorsData(doctors: any[], options: FilterOptions): any[] {
 }
 
 /**
- * Get appointments with optimized filtering and caching
+ * Get optimized appointments with filtering and caching
  */
-export async function getOptimizedAppointments(options: FilterOptions = {}): Promise<any[]> {
+export async function getOptimizedAppointments(options: FilterOptions = {}): Promise<Appointment[]> {
   const cacheKey = `appointments-${JSON.stringify(options)}`;
   
   try {
     // Try memory cache first (15 second TTL for appointments - shorter because they change frequently)
-    const cachedData = getMemoryCacheData<any[]>(cacheKey);
+    const cachedData = getMemoryCacheData<Appointment[]>(cacheKey);
     if (cachedData) {
       logInfo('Using memory cached appointments data');
       return cachedData;
@@ -506,7 +551,7 @@ export async function getOptimizedAppointments(options: FilterOptions = {}): Pro
 /**
  * Process appointments data with filtering, sorting and pagination
  */
-function processAppointmentsData(appointments: any[], options: FilterOptions): any[] {
+function processAppointmentsData(appointments: Appointment[], options: FilterOptions): Appointment[] {
   let result = [...appointments];
   
   // Apply filters
@@ -553,7 +598,7 @@ export async function getOptimizedNotifications(
   userId: string, 
   options: FilterOptions = {},
   cacheOptions: Partial<CacheOptions> = {}
-): Promise<any[]> {
+): Promise<Notification[]> {
   const cacheKey = `notifications-${userId}-${JSON.stringify(options)}`;
   const mergedCacheOptions = { 
     ...DEFAULT_CACHE_OPTIONS, 
@@ -589,7 +634,7 @@ export async function getOptimizedNotifications(
     if (notificationRequestTracker.backoffInterval > 0 && !mergedCacheOptions.forceRefresh) {
       if (now - notificationRequestTracker.lastRequestTime < notificationRequestTracker.backoffInterval) {
         // Try memory cache with extended TTL during backoff period
-        const cachedData = getMemoryCacheData<any[]>(cacheKey);
+        const cachedData = getMemoryCacheData<Notification[]>(cacheKey);
         if (cachedData) {
           // Don't log during backoff to reduce spam
           return cachedData;
@@ -602,7 +647,7 @@ export async function getOptimizedNotifications(
     
     // Try memory cache first with shorter TTL for notifications
     if (!mergedCacheOptions.forceRefresh) {
-      const cachedData = getMemoryCacheData<any[]>(cacheKey, mergedCacheOptions);
+      const cachedData = getMemoryCacheData<Notification[]>(cacheKey, mergedCacheOptions);
       if (cachedData) {
         // Only log cache hits when not in rapid succession
         if (notificationRequestTracker.consecutiveRequests < 3) {
@@ -613,7 +658,7 @@ export async function getOptimizedNotifications(
     }
     
     // Try React Query cache next
-    const queryData = cacheManager.getQueryData<{ success: boolean; notifications: any[] }>(
+    const queryData = cacheManager.getQueryData<{ success: boolean; notifications: Notification[] }>(
       cacheKeys.notifications(userId)
     );
     
@@ -656,7 +701,7 @@ export async function getOptimizedNotifications(
     
     // Try to get user role from cache first
     const usersCacheKey = `users-${JSON.stringify({ filters: { id: userId } })}`;
-    const cachedUsers = getMemoryCacheData<any[]>(usersCacheKey);
+    const cachedUsers = getMemoryCacheData<User[]>(usersCacheKey);
     const userRole = cachedUsers?.[0]?.role || UserType.PATIENT;
     
     // Call API to get notifications
@@ -729,7 +774,7 @@ export async function getOptimizedNotifications(
 /**
  * Process notifications data with filtering, sorting, and pagination
  */
-function processNotificationsData(notifications: any[], options: FilterOptions): any[] {
+function processNotificationsData(notifications: Notification[], options: FilterOptions): Notification[] {
   let result = [...notifications];
   
   // Apply filters

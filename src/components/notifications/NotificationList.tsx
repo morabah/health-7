@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bell, CheckCircle, Info, AlertTriangle, Calendar, Trash } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertTriangle, Calendar } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -13,7 +13,7 @@ import { NotificationType } from '@/types/enums';
 import { useNotifications, useMarkNotificationRead } from '@/data/sharedLoaders';
 import { getOptimizedNotifications } from '@/lib/optimizedDataAccess';
 import { formatDistanceToNow } from 'date-fns';
-import { cacheKeys, cacheManager } from '@/lib/queryClient';
+import { cacheManager } from '@/lib/queryClient';
 
 // Types needed for the component
 interface Notification {
@@ -49,7 +49,7 @@ export default function NotificationList({
   className = '',
 }: NotificationListProps) {
   const { user } = useAuth();
-  const { data, isLoading, error, refetch } = useNotifications();
+  const { data, isLoading, error } = useNotifications();
   const notificationMutation = useMarkNotificationRead();
   const [localData, setLocalData] = useState<Notification[]>([]);
   const [error2, setError2] = useState<string | null>(null);
