@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, ReactElement } from 'react';
+import type { ReactElement } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { reportError, errorMonitor } from '@/lib/errorMonitoring';
-import ErrorDisplay, { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import { logError } from '@/lib/logger';
 import React from 'react';

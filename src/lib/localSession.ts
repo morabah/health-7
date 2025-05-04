@@ -4,7 +4,7 @@
  * Used by AuthContext to keep user logged in between page reloads
  */
 
-import { UserType } from '@/types/enums';
+import type { UserType } from '@/types/enums';
 
 // Storage keys for the session
 const SESSION_KEY = 'health-session';

@@ -965,5 +965,15 @@
     "isRead": false,
     "createdAt": "2025-05-04T11:46:46.863Z",
     "relatedId": null
+  },
+  {
+    "id": "notif-zqv157e6mgzzpr4a1xqji",
+    "userId": "u-009",
+    "title": "Appointment Completed",
+    "message": "Your appointment with Dr. Casey Hilll on 5/4/2025 at 10:00 has been marked as completed.",
+    "type": "appointment_completed",
+    "isRead": false,
+    "createdAt": "2025-05-04T12:49:58.702Z",
+    "relatedId": "a-002"
   }
 ]

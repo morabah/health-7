@@ -4,7 +4,8 @@
  * Functions for managing user notifications
  */
 
-import { UserType, NotificationType } from '@/types/enums';
+import type { UserType} from '@/types/enums';
+import { NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
 import { 
@@ -15,6 +16,17 @@ import {
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Notification } from '@/types/schemas';
+
+// Simple in-memory cache for notifications
+const notificationsCache: {
+  data: Record<string, Notification[]>;
+  timestamp: Record<string, number>;
+  ttl: number; // Time-to-live in ms
+} = {
+  data: {},
+  timestamp: {},
+  ttl: 30000, // Cache notifications for 30 seconds
+};
 
 /**
  * Get notifications for the current user
@@ -27,9 +39,20 @@ export async function getMyNotifications(ctx: {
 
   try {
     const { uid, role } = ctx;
-
     logInfo('getMyNotifications called', { uid, role });
+    
+    // Check cache first
+    const now = Date.now();
+    const cachedData = notificationsCache.data[uid];
+    const cachedTimestamp = notificationsCache.timestamp[uid] || 0;
+    
+    // If we have cached data that's still valid, use it
+    if (cachedData && (now - cachedTimestamp < notificationsCache.ttl)) {
+      logInfo('getMyNotifications: Using cached data', { uid, cacheAge: now - cachedTimestamp });
+      return { success: true, notifications: cachedData };
+    }
 
+    // No valid cache, fetch from database
     const notifications = await getNotifications();
 
     // Filter notifications for this user
@@ -41,6 +64,10 @@ export async function getMyNotifications(ctx: {
       const dateB = new Date(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
+    
+    // Update cache
+    notificationsCache.data[uid] = userNotifications;
+    notificationsCache.timestamp[uid] = now;
 
     return { success: true, notifications: userNotifications };
   } catch (e) {
@@ -89,6 +116,10 @@ export async function markNotificationRead(
     }
 
     await saveNotifications(notifications);
+    
+    // Invalidate cache for this user to ensure fresh data next time
+    delete notificationsCache.data[uid];
+    delete notificationsCache.timestamp[uid];
 
     return { success: true };
   } catch (e) {
@@ -145,6 +176,10 @@ export async function sendDirectMessage(
     };
     notifications.push(notification);
     await saveNotifications(notifications);
+    
+    // Invalidate cache for recipient
+    delete notificationsCache.data[recipientId];
+    delete notificationsCache.timestamp[recipientId];
 
     return { success: true };
   } catch (e) {

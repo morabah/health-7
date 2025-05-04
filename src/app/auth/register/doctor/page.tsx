@@ -14,7 +14,7 @@ import { ChevronLeft, Eye, EyeOff, Upload } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 import { DoctorRegistrationSchema, type DoctorRegistrationPayload } from '@/types/schemas';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 /**
  * Doctor registration form component

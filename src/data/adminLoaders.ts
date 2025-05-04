@@ -378,3 +378,28 @@ export const useAdminUpdateUserProfile = () => {
     }
   });
 };
+
+/**
+ * Hook to fetch a specific doctor by ID for admin
+ */
+export const useDoctorById = (doctorId: string) => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['admin', 'doctor', doctorId],
+    queryFn: async () => {
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new Error('Unauthorized');
+      }
+      
+      const response = await callApi('adminGetDoctorById', {
+        uid: user.uid,
+        role: UserType.ADMIN,
+        doctorId
+      });
+      
+      return response;
+    },
+    enabled: !!user && user.role === UserType.ADMIN && !!doctorId
+  });
+};

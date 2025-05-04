@@ -4,7 +4,7 @@
  * Functions for user authentication, registration, and profile management
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import { UserType, Gender, BloodType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from './performance';
 import { logInfo, logWarn, logError } from './logger';
@@ -18,7 +18,7 @@ import {
 } from './localDb';
 import { generateId, nowIso, sleep, userPasswords, RegisterSchema } from './localApiCore';
 import type { ResultOk, ResultErr } from './localApiCore';
-import { 
+import type { 
   UserProfileSchema, 
   PatientProfileSchema, 
   DoctorProfileSchema

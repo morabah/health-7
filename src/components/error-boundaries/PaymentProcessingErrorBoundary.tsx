@@ -5,7 +5,7 @@ import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { CreditCard, RefreshCw, AlertCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { errorMonitor } from '@/lib/errorMonitoring';
-import { ErrorCategory } from '@/components/ui/ErrorDisplay';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 /**
  * Payment Error Fallback UI

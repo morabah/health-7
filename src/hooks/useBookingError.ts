@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { errorMonitor } from '@/lib/errorMonitoring';
-import { ErrorCategory } from '@/components/ui/ErrorDisplay';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 // Error code types for booking process
 export type BookingErrorCode = 

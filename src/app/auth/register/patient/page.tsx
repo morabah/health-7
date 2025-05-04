@@ -13,7 +13,7 @@ import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { formatDateForApi } from '@/lib/dateUtils';
 
 /**

@@ -5,7 +5,7 @@
  * transforming Firebase errors into a standardized format for the application.
  */
 
-import { ErrorCategory, ErrorSeverity } from "@/components/ui/ErrorDisplay";
+import type { ErrorCategory, ErrorSeverity } from "@/components/ui/ErrorDisplay";
 import { logError } from "./logger";
 
 /**

@@ -8,6 +8,31 @@ let logCounter = 0; // Count logs within time window
 const MAX_LOGS_PER_SECOND = 50; // Throttle if more than this per second
 const LOG_THROTTLE_RESET_MS = 1000; // Reset counter after this time
 
+// Define type for operation log tracking
+type OpLogTracking = {
+  lastLogTime: number;
+  logInterval: number;
+  messageCount: number; // Track number of identical messages
+};
+
+// Track frequent operations to avoid over-logging
+const frequentOpLogs: Record<string, OpLogTracking> = {
+  getMyNotifications: { lastLogTime: 0, logInterval: 60000, messageCount: 0 }, // Log once per minute max
+  getAvailableSlots: { lastLogTime: 0, logInterval: 60000, messageCount: 0 },
+  getMyDashboardStats: { lastLogTime: 0, logInterval: 60000, messageCount: 0 },
+  fetchCollectionData: { lastLogTime: 0, logInterval: 60000, messageCount: 0 },
+  'Using memory cached notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
+  'Using React Query cached notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
+  'Fetching fresh notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
+};
+
+// Track recent log messages to avoid repetition
+const recentLogMessages = new Map<string, { count: number, lastTime: number }>();
+const RECENT_MESSAGE_TTL = 5000; // 5 seconds retention for duplicate detection
+
+// List of operations to be logged less frequently
+const frequentOperations = Object.keys(frequentOpLogs);
+
 /**
  * Base logging function that handles both console output and event emission
  * @param level - The log level (info, warn, error, debug)
@@ -22,6 +47,36 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
   if (now - lastLogTime > LOG_THROTTLE_RESET_MS) {
     logCounter = 0;
     lastLogTime = now;
+  }
+
+  // Check for duplicate recent messages (identical message + level)
+  const msgKey = `${level}-${message}`;
+  const recentMsg = recentLogMessages.get(msgKey);
+  
+  if (recentMsg) {
+    // We've seen this exact message recently
+    recentMsg.count++;
+    
+    // Only log every 5th occurrence or after 5 seconds
+    if (recentMsg.count < 5 && (now - recentMsg.lastTime) < 5000) {
+      return; // Skip this log
+    }
+    
+    // Update the timestamp but allow this one through
+    recentMsg.lastTime = now;
+  } else {
+    // New message, add to tracking
+    recentLogMessages.set(msgKey, { count: 1, lastTime: now });
+    
+    // Clean up old entries every 20 logs
+    if (recentLogMessages.size > 20) {
+      // Use Array.from to convert Map entries to array for iteration compatibility
+      Array.from(recentLogMessages.entries()).forEach(([key, value]) => {
+        if (now - value.lastTime > RECENT_MESSAGE_TTL) {
+          recentLogMessages.delete(key);
+        }
+      });
+    }
   }
 
   // Increment counter
@@ -39,15 +94,49 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
   // Skip logging if disabled
   if (!isLogging) return;
 
-  // Special handling for info logs if too verbose
-  if (level === LogLevel.INFO && process.env.NODE_ENV === 'development') {
-    // Skip certain verbose log types that can cause console freeze
-    if (
-      message.includes('getAvailableSlots') ||
-      message.includes('getMyNotifications') ||
-      message.includes('getMyDashboardStats')
-    ) {
+  // Check for exact message matches in frequent operations
+  if (frequentOperations.includes(message)) {
+    const tracker = frequentOpLogs[message];
+    
+    // Skip if we've logged this operation recently
+    if (now - tracker.lastLogTime < tracker.logInterval) {
+      tracker.messageCount++;
       return;
+    }
+    
+    // Update last log time for this operation
+    tracker.lastLogTime = now;
+    
+    // If we've skipped many messages, add a count
+    const skippedCount = tracker.messageCount;
+    tracker.messageCount = 0;
+    
+    if (skippedCount > 0) {
+      message = `${message} (${skippedCount} similar messages suppressed)`;
+    }
+  } else {
+    // Check for operations contained within the message
+    for (const op of frequentOperations) {
+      if (typeof message === 'string' && message.includes(op)) {
+        // Skip if we've logged this operation recently
+        if (now - frequentOpLogs[op].lastLogTime < frequentOpLogs[op].logInterval) {
+          frequentOpLogs[op].messageCount++;
+          return;
+        }
+        
+        // Update last log time for this operation
+        frequentOpLogs[op].lastLogTime = now;
+        
+        // If we've skipped many messages, add a count
+        const skippedCount = frequentOpLogs[op].messageCount;
+        frequentOpLogs[op].messageCount = 0;
+        
+        if (skippedCount > 0) {
+          message = `${message} (${skippedCount} similar messages suppressed)`;
+        }
+        
+        break;
+      }
     }
   }
 

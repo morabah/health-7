@@ -317,46 +317,45 @@ export default function ApiTestPage() {
             {results.map((result, index) => (
               <div 
                 key={`${result.name}-${index}`} 
-                className={`p-4 rounded-lg ${
-                  result.success 
-                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                }`}
+                className={`border-b border-gray-200 py-3 ${expandedResult === result.name ? 'bg-gray-50' : ''}`}
               >
-                <div 
-                  className="flex justify-between items-center cursor-pointer" 
+                <button
+                  className="flex justify-between items-center w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   onClick={() => toggleExpand(`${result.name}-${index}`)}
+                  aria-expanded={expandedResult === `${result.name}-${index}`}
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-2">
                     {result.success ? (
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                      <CheckCircle className="text-green-500 h-5 w-5" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+                      <XCircle className="text-red-500 h-5 w-5" />
                     )}
-                    <div>
-                      <h3 className="font-medium">{result.name}</h3>
-                      <p className="text-sm">{result.message}</p>
-                    </div>
+                    <span className="font-medium">{result.name}</span>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {expandedResult === `${result.name}-${index}` ? 'Hide Details' : 'Show Details'}
-                  </div>
-                </div>
+                  <span className={`text-sm px-2 py-1 rounded-full ${
+                    result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {result.success ? 'Success' : 'Failed'}
+                  </span>
+                </button>
                 
                 {expandedResult === `${result.name}-${index}` && (
-                  <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                    <h4 className="font-medium mb-2">Response Details:</h4>
+                  <div className="px-4 py-3 text-sm">
+                    <p className="mb-2">{result.message}</p>
+                    
                     {result.data && (
-                      <pre className="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded overflow-auto max-h-60">
-                        {JSON.stringify(result.data, null, 2)}
-                      </pre>
-                    )}
-                    {result.error && (
-                      <div className="mt-2">
-                        <h4 className="font-medium text-red-600 dark:text-red-400 mb-1">Error:</h4>
-                        <pre className="text-xs bg-red-50 dark:bg-red-900/20 p-3 rounded overflow-auto max-h-60 text-red-800 dark:text-red-200">
-                          {result.error}
+                      <div className="mb-2">
+                        <h4 className="font-semibold mb-1">Data:</h4>
+                        <pre className="bg-gray-100 p-2 rounded overflow-x-auto">
+                          {JSON.stringify(result.data, null, 2)}
                         </pre>
+                      </div>
+                    )}
+                    
+                    {result.error && (
+                      <div className="text-red-600">
+                        <h4 className="font-semibold mb-1">Error:</h4>
+                        <p>{result.error}</p>
                       </div>
                     )}
                   </div>

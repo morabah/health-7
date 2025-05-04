@@ -497,7 +497,7 @@ class ErrorMonitor {
    */
   private generateErrorFingerprint(error: unknown, context: ErrorContext): string {
     // Start with the error type
-    let components: string[] = [];
+    const components: string[] = [];
     
     // Add error type and message (if available)
     if (error instanceof Error) {

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
-import { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
+import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 
 // Custom error interface to match our requirements
 interface AppError {

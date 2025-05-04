@@ -27,6 +27,19 @@ interface Doctor {
   createdAt: string;
 }
 
+// Define the API response type
+interface DoctorsApiResponse {
+  success: boolean;
+  doctors: Doctor[];
+  error?: string;
+}
+
+// Define the verification mutation response type
+interface VerifyDoctorResponse {
+  success: boolean;
+  error?: string;
+}
+
 export default function AdminDoctorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,7 +49,17 @@ export default function AdminDoctorsPage() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const { data, isLoading, error: fetchError, refetch } = useAllDoctors();
+  const { 
+    data, 
+    isLoading, 
+    error: fetchError, 
+    refetch 
+  } = useAllDoctors() as {
+    data: DoctorsApiResponse | undefined;
+    isLoading: boolean;
+    error: unknown;
+    refetch: () => Promise<unknown>;
+  };
 
   const verifyDoctorMutation = useVerifyDoctor();
 
@@ -91,7 +114,7 @@ export default function AdminDoctorsPage() {
         doctorId,
         status,
         notes: `Status changed to ${status} by admin`,
-      });
+      }) as VerifyDoctorResponse;
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to update doctor verification status');
@@ -251,73 +274,87 @@ export default function AdminDoctorsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredDoctors.map((doctor: Doctor) => {
-                  const { variant, Icon, text } = getStatusBadgeStyle(doctor.verificationStatus);
-                  const isUpdatingThisDoctor = verifyDoctorMutation.isPending;
-
+                filteredDoctors.map(doctor => {
+                  const status = getStatusBadgeStyle(doctor.verificationStatus);
                   return (
-                    <tr key={doctor.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <tr key={doctor.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                       <td className="px-4 py-3">
-                        {doctor.firstName} {doctor.lastName}
+                        <div className="font-medium">
+                          {doctor.firstName} {doctor.lastName}
+                        </div>
                       </td>
                       <td className="px-4 py-3">{doctor.email}</td>
                       <td className="px-4 py-3">{doctor.specialty}</td>
                       <td className="px-4 py-3">
-                        <Badge variant={variant} className="flex items-center w-fit">
-                          <Icon className="h-3.5 w-3.5 mr-1" /> {text}
+                        <Badge variant={status.variant} className="flex items-center w-fit">
+                          <status.Icon className="h-3 w-3 mr-1" />
+                          {status.text}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">{formatDate(doctor.createdAt)}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                        {formatDate(doctor.createdAt)}
+                      </td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="View Doctor Details"
-                            as={Link}
-                            href={`/admin/doctor-verification/${doctor.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                        <div className="flex items-center justify-center space-x-2">
+                          {/* View doctor profile */}
+                          <Link href={`/admin/doctors/${doctor.id}`} passHref>
+                            <Button variant="outline" size="sm" title="View doctor profile">
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          </Link>
 
+                          {/* Edit doctor */}
+                          <Link href={`/admin/doctors/${doctor.id}/edit`} passHref>
+                            <Button variant="outline" size="sm" title="Edit doctor profile">
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </Link>
+
+                          {/* Verify doctor - only shown for pending doctors */}
                           {doctor.verificationStatus === VerificationStatus.PENDING && (
-                            <>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() =>
-                                  handleVerifyDoctor(doctor.id, VerificationStatus.VERIFIED)
-                                }
-                                disabled={isUpdatingThisDoctor}
-                                isLoading={verifyDoctorMutation.isPending}
-                              >
-                                Verify
-                              </Button>
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() =>
-                                  handleVerifyDoctor(doctor.id, VerificationStatus.REJECTED)
-                                }
-                                disabled={isUpdatingThisDoctor}
-                                isLoading={verifyDoctorMutation.isPending}
-                              >
-                                Reject
-                              </Button>
-                            </>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              title="Approve verification request"
+                              onClick={() =>
+                                handleVerifyDoctor(doctor.id, VerificationStatus.VERIFIED)
+                              }
+                              disabled={verifyDoctorMutation.isPending}
+                              className="text-white bg-green-500 hover:bg-green-600"
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                            </Button>
                           )}
 
+                          {/* Reject doctor - only shown for pending doctors */}
+                          {doctor.verificationStatus === VerificationStatus.PENDING && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              title="Reject verification request"
+                              onClick={() =>
+                                handleVerifyDoctor(doctor.id, VerificationStatus.REJECTED)
+                              }
+                              disabled={verifyDoctorMutation.isPending}
+                              className="text-white bg-red-500 hover:bg-red-600"
+                            >
+                              <XCircle className="h-3 w-3" />
+                            </Button>
+                          )}
+
+                          {/* Verify doctor again - for rejected doctors */}
                           {doctor.verificationStatus === VerificationStatus.REJECTED && (
                             <Button
                               variant="primary"
                               size="sm"
+                              title="Approve previously rejected doctor"
                               onClick={() =>
                                 handleVerifyDoctor(doctor.id, VerificationStatus.VERIFIED)
                               }
-                              disabled={isUpdatingThisDoctor}
-                              isLoading={verifyDoctorMutation.isPending}
+                              disabled={verifyDoctorMutation.isPending}
+                              className="text-white bg-green-500 hover:bg-green-600"
                             >
-                              Approve
+                              <CheckCircle className="h-3 w-3" />
                             </Button>
                           )}
                         </div>

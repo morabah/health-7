@@ -4,7 +4,7 @@
  * Functions for managing doctor profiles, searching, and availability
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import { UserType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';

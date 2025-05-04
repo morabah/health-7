@@ -4,7 +4,7 @@
  * Functions only accessible to admin users
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import { UserType, VerificationStatus, NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
@@ -568,6 +568,56 @@ export async function adminUpdateUserProfile(
   } catch (e) {
     logError('adminUpdateUserProfile failed', e);
     return { success: false, error: 'Error updating user profile' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Get a doctor by ID with detailed information for admin view
+ */
+export async function adminGetDoctorById(
+  ctx: { uid: string; role: UserType; doctorId: string }
+): Promise<ResultOk<{ 
+  doctor: z.infer<typeof DoctorProfileSchema> & { 
+    id: string; 
+    firstName: string; 
+    lastName: string; 
+    email: string;
+  }
+}> | ResultErr> {
+  const perf = trackPerformance('adminGetDoctorById');
+
+  try {
+    const { uid, role, doctorId } = ctx;
+
+    logInfo('adminGetDoctorById called', { uid, role, doctorId });
+
+    // Verify admin permissions
+    if (role !== UserType.ADMIN) {
+      logError('adminGetDoctorById: unauthorized', { uid, role });
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Get all doctors (already includes user data)
+    const allDoctorsResponse = await adminGetAllDoctors({ uid, role });
+    
+    if (!allDoctorsResponse.success) {
+      return { success: false, error: 'Failed to retrieve doctors' };
+    }
+
+    // Find specific doctor
+    const doctor = allDoctorsResponse.doctors.find((doc) => doc.id === doctorId);
+
+    if (!doctor) {
+      logError('adminGetDoctorById: doctor not found', { doctorId });
+      return { success: false, error: 'Doctor not found' };
+    }
+
+    return { success: true, doctor };
+  } catch (e) {
+    logError('adminGetDoctorById failed', e);
+    return { success: false, error: 'Error retrieving doctor details' };
   } finally {
     perf.stop();
   }

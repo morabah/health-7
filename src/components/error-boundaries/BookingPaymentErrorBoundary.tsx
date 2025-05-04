@@ -5,7 +5,7 @@ import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { CreditCard, RefreshCw, ArrowLeft, HelpCircle, AlertTriangle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { errorMonitor } from '@/lib/errorMonitoring';
-import { ErrorCategory } from '@/components/ui/ErrorDisplay';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import Alert from '@/components/ui/Alert';
 

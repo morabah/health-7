@@ -12,7 +12,7 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className }) => {
-  // Handle Escape key press - moved outside conditional to fix Rules of Hooks error
+  // Handle Escape key press
   useEffect(() => {
     if (!isOpen) return;
 
@@ -48,9 +48,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, classNa
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? "modal-title" : undefined}
       >
         <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          {title && <h2 className="text-lg font-semibold">{title}</h2>}
+          {title && <h2 id="modal-title" className="text-lg font-semibold">{title}</h2>}
           <button
             type="button"
             onClick={onClose}

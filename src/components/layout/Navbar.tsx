@@ -55,6 +55,9 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
   const [switchingSession, setSwitchingSession] = useState(false);
+  const [fetchingNotifications, setFetchingNotifications] = useState(false);
+  const [notificationsFetchFailed, setNotificationsFetchFailed] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
   
@@ -64,28 +67,86 @@ export default function Navbar() {
   // Check if a route is active
   const isActive = (href: string) => pathname === href;
 
-  // Fetch unread notifications count
+  // Fetch unread notifications count with optimization
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    // Time between fetches for notifications (in ms)
+    const ACTIVE_FETCH_INTERVAL = 60000; // 1 minute
+    const BACKGROUND_FETCH_INTERVAL = 300000; // 5 minutes
+    const DEBOUNCE_TIME = 5000; // 5 seconds between potential fetches
+    
     const fetchNotifications = async () => {
-      if (user) {
-        try {
-          const response = await callApi('getMyNotifications', { uid: user.uid, role: user.role });
-          if (response?.success) {
-            const count = response.notifications.filter((n: Notification) => !n.isRead).length;
-            setUnreadCount(count);
-          }
-        } catch (error) {
-          console.error('Error fetching notifications:', error);
+      // Don't fetch if we're still in debounce time
+      const now = Date.now();
+      if (
+        !user || 
+        fetchingNotifications || 
+        notificationsFetchFailed || 
+        (now - lastFetchTime < DEBOUNCE_TIME)
+      ) return;
+      
+      setFetchingNotifications(true);
+      setLastFetchTime(now);
+      
+      try {
+        const response = await callApi('getMyNotifications', { uid: user.uid, role: user.role });
+        if (response && typeof response === 'object' && 'success' in response && response.success) {
+          const notifications = 'notifications' in response && Array.isArray(response.notifications) 
+            ? response.notifications as Notification[] 
+            : [];
+          const count = notifications.filter((n: Notification) => !n.isRead).length;
+          setUnreadCount(count);
+          setNotificationsFetchFailed(false);
         }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+        setNotificationsFetchFailed(true);
+        
+        // If we fail, we'll retry after a longer delay (2 minutes)
+        setTimeout(() => {
+          setNotificationsFetchFailed(false);
+        }, 120000);
+      } finally {
+        setFetchingNotifications(false);
       }
     };
     
-    fetchNotifications();
-    // Set up interval to check periodically
-    const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
+    // Track document visibility to optimize fetching
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // If becoming visible, fetch immediately if it's been a while
+        const now = Date.now();
+        if (now - lastFetchTime > DEBOUNCE_TIME) {
+          fetchNotifications();
+        }
+        
+        // Reset to more frequent interval when tab is visible
+        if (interval) clearInterval(interval);
+        interval = setInterval(fetchNotifications, ACTIVE_FETCH_INTERVAL);
+      } else {
+        // Lower frequency polling when tab is not visible
+        if (interval) clearInterval(interval);
+        interval = setInterval(fetchNotifications, BACKGROUND_FETCH_INTERVAL);
+      }
+    };
     
-    return () => clearInterval(interval);
-  }, [user]);
+    if (user) {
+      // Initial fetch (only once)
+      fetchNotifications();
+      
+      // Set up visibility change listener to optimize polling
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Start with active interval (tab is assumed to be visible on load)
+      interval = setInterval(fetchNotifications, ACTIVE_FETCH_INTERVAL);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, fetchingNotifications, notificationsFetchFailed, lastFetchTime]);
 
   // Close account switcher when navigation changes
   useEffect(() => {

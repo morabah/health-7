@@ -1,124 +1,171 @@
 'use client';
 
-import React, { lazy, Suspense, ComponentType } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { logError } from './logger';
+import { startMeasurement, endMeasurement } from './performanceMetrics';
 
-/**
- * Default loading component used when no custom loading component is provided
- */
-export const DefaultLoadingComponent = () => (
-  <div className="flex items-center justify-center p-4 min-h-[200px]">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
-  </div>
-);
-
-/**
- * Default error component used when no custom error component is provided
- */
-export const DefaultErrorComponent = () => (
-  <div className="p-4 text-center text-red-500">
-    <p>Failed to load component</p>
-  </div>
-);
-
-/**
- * Options for lazyLoad function
- */
+// Types for lazy loading options
 interface LazyLoadOptions {
-  /**
-   * Custom loading component to show while the component is loading
-   */
-  LoadingComponent?: ComponentType;
-  
-  /**
-   * Custom error component to show if the component fails to load
-   */
-  ErrorComponent?: ComponentType<{ error: Error; retry: () => void }>;
-  
-  /**
-   * Minimum display time for loading component to avoid flicker (in ms)
-   */
   minimumLoadTime?: number;
-  
-  /**
-   * Additional suspense fallback options
-   */
-  suspenseOptions?: object;
+  errorFallback?: React.ReactNode;
+  loadingComponent?: React.ReactNode;
 }
 
 /**
- * Creates a lazy-loaded component with suspense
- * 
- * @param importPromise Promise returned by dynamic import
- * @param options Options for lazy loading behavior
- * @returns Lazy-loaded component wrapped in Suspense
+ * Default loading component used when no custom component is provided
  */
-export function lazyLoad<T extends ComponentType<any>>(
-  importPromise: () => Promise<{ default: T }>,
+const DefaultLoadingComponent: React.FC = () => (
+  <div className="flex justify-center items-center py-10">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+  </div>
+);
+
+/**
+ * Default error fallback component
+ */
+const DefaultErrorFallback: React.FC<{ error: Error }> = ({ error }) => (
+  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+    <div className="flex">
+      <div className="flex-shrink-0">
+        <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <div className="ml-3">
+        <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+          Error loading component
+        </h3>
+        <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+          <p>{error.message || 'An unknown error occurred'}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+/**
+ * Higher-order component that wraps a lazy-loaded component with error boundaries,
+ * loading states, and performance tracking.
+ * 
+ * @param factory Function that returns a dynamic import
+ * @param options Configuration options for lazy loading behavior
+ * @returns A component that lazy loads the target component
+ */
+export function lazyLoad<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
   options: LazyLoadOptions = {}
 ): React.FC<React.ComponentProps<T>> {
   const {
-    LoadingComponent = DefaultLoadingComponent,
     minimumLoadTime = 0,
+    errorFallback,
+    loadingComponent = <DefaultLoadingComponent />,
   } = options;
 
-  // Add minimum display time to avoid flickering if requested
-  const enhancedImport = async () => {
-    const start = Date.now();
-    const result = await importPromise();
+  // Create a lazy-loaded component
+  const LazyComponent = lazy(async () => {
+    // Start measuring load time
+    const perfId = startMeasurement('lazy-component-load');
     
-    if (minimumLoadTime > 0) {
-      const elapsed = Date.now() - start;
-      if (elapsed < minimumLoadTime) {
-        await new Promise(resolve => setTimeout(resolve, minimumLoadTime - elapsed));
+    try {
+      // If minimum load time is specified, we use Promise.all to ensure the component
+      // doesn't render too quickly and cause UI flickering
+      if (minimumLoadTime > 0) {
+        const [moduleExports] = await Promise.all([
+          factory(),
+          new Promise(resolve => setTimeout(resolve, minimumLoadTime))
+        ]);
+        
+        // End measurement with success
+        endMeasurement(perfId, { success: true });
+        
+        return moduleExports;
       }
+      
+      // Standard loading without minimum time
+      const moduleExports = await factory();
+      
+      // End measurement with success
+      endMeasurement(perfId, { success: true });
+      
+      return moduleExports;
+    } catch (error) {
+      // End measurement with error
+      endMeasurement(perfId, { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Log error but also let it propagate
+      logError('Error lazy loading component', error);
+      throw error;
+    }
+  });
+
+  // Create error boundary wrapper component
+  const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [hasError, setHasError] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+    
+    useEffect(() => {
+      // Reset error state when children change
+      setHasError(false);
+      setError(null);
+    }, [children]);
+    
+    // If there's an error, show fallback UI
+    if (hasError && error) {
+      return errorFallback ? (
+        <>{errorFallback}</>
+      ) : (
+        <DefaultErrorFallback error={error} />
+      );
     }
     
-    return result;
+    // If no error, render children
+    try {
+      return <>{children}</>;
+    } catch (e) {
+      // This handles errors during render
+      setHasError(true);
+      setError(e instanceof Error ? e : new Error(String(e)));
+      return errorFallback ? (
+        <>{errorFallback}</>
+      ) : (
+        <DefaultErrorFallback error={e instanceof Error ? e : new Error(String(e))} />
+      );
+    }
   };
 
-  // Create lazy component
-  const LazyComponent = lazy(enhancedImport);
-  
-  // Return wrapped component that handles props correctly
-  return (props: React.ComponentProps<T>) => (
-    <Suspense fallback={<LoadingComponent />}>
-      <LazyComponent {...props} />
-    </Suspense>
+  // Return the component with Suspense and error handling
+  const LazyLoadComponent: React.FC<React.ComponentProps<T>> = (props) => (
+    <ErrorBoundary>
+      <Suspense fallback={loadingComponent}>
+        <LazyComponent {...props} />
+      </Suspense>
+    </ErrorBoundary>
   );
+
+  // Display name for debugging
+  const componentName = factory.toString().match(/import\(['"](.+)['"]\)/)?.[1] || 'LazyComponent';
+  LazyLoadComponent.displayName = `LazyLoad(${componentName})`;
+
+  return LazyLoadComponent;
 }
 
 /**
- * Higher-order component that adds lazy loading with suspense
+ * Preload a component asynchronously but don't render it
+ * Useful for preloading components that are likely to be needed soon
  * 
- * @param Component The component to lazy load
- * @param options Options for lazy loading behavior
- * @returns A new component that lazy-loads the input component
+ * @param factory Function that returns a dynamic import
+ * @returns Promise that resolves when the component is loaded
  */
-export function withLazyLoading<T extends ComponentType<any>>(
-  Component: T,
-  options: LazyLoadOptions = {}
-): React.FC<React.ComponentProps<T>> {
-  const {
-    LoadingComponent = DefaultLoadingComponent,
-  } = options;
-  
-  // Return wrapped component
-  return (props: React.ComponentProps<T>) => (
-    <Suspense fallback={<LoadingComponent />}>
-      <Component {...props} />
-    </Suspense>
-  );
-}
-
-/**
- * Prefetch a component but don't render it
- * Useful for preloading components that might be needed soon
- * 
- * @param importPromise Dynamic import promise for the component
- */
-export function prefetchComponent(importPromise: () => Promise<any>): void {
-  // Execute the import but don't wait for it
-  importPromise().catch(error => {
-    console.error('Error prefetching component:', error);
-  });
+export function preloadComponent(factory: () => Promise<any>): Promise<void> {
+  return factory()
+    .then(() => {
+      // Component loaded successfully, nothing to do
+    })
+    .catch(error => {
+      // Log error but don't throw
+      logError('Error preloading component', error);
+    });
 } 

@@ -22,34 +22,158 @@ interface FilterOptions {
   filters?: Record<string, any>;
 }
 
+// Enhanced Cache Options
+interface CacheOptions {
+  ttl?: number;         // Time to live in ms (default: 30000ms)
+  priority?: 'high' | 'normal' | 'low'; // Cache priority for memory management
+  forceRefresh?: boolean; // Bypass cache and force a fresh fetch
+}
+
+// Default cache options
+const DEFAULT_CACHE_OPTIONS: Required<CacheOptions> = {
+  ttl: 30000, // 30 seconds
+  priority: 'normal',
+  forceRefresh: false
+};
+
+// Configurable TTL settings for different entity types
+const CACHE_TTL_CONFIG = {
+  users: 60000,       // 1 minute
+  doctors: 120000,    // 2 minutes
+  patients: 120000,   // 2 minutes
+  appointments: 30000, // 30 seconds
+  notifications: 15000 // 15 seconds - shorter for notifications which change frequently
+};
+
 // Cache storage for in-memory data
 const memoryCache: Record<string, {
   data: any;
   timestamp: number;
   expiresAt: number;
+  priority: string;
+  size?: number;
 }> = {};
+
+// Memory cache statistics
+const memoryCacheStats = {
+  hits: 0,
+  misses: 0,
+  evictions: 0,
+  entries: 0,
+  totalSize: 0
+};
+
+// Track notification requests to avoid excessive calls
+const notificationRequestTracker = {
+  lastRequestTime: 0,
+  consecutiveRequests: 0,
+  backoffInterval: 0, // Increases on failed or too frequent requests
+  inMemoryCache: new Map<string, { data: any[], timestamp: number }>()
+};
+
+/**
+ * Estimate size of object in bytes (rough approximation)
+ */
+function estimateObjectSize(obj: any): number {
+  const jsonString = JSON.stringify(obj);
+  return jsonString ? jsonString.length * 2 : 0; // Rough estimate: 2 bytes per character
+}
 
 /**
  * Set data in the memory cache with expiration
  */
-function setMemoryCacheData(key: string, data: any, ttlMs = 30000): void {
+function setMemoryCacheData(
+  key: string, 
+  data: any, 
+  options: Partial<CacheOptions> = {}
+): void {
+  const mergedOptions = { ...DEFAULT_CACHE_OPTIONS, ...options };
   const now = Date.now();
+  
+  // Basic memory management - evict items if too many entries
+  const MAX_CACHE_ENTRIES = 100;
+  if (Object.keys(memoryCache).length >= MAX_CACHE_ENTRIES) {
+    evictCacheEntries(1);
+  }
+  
+  // Store with metadata
+  const size = estimateObjectSize(data);
   memoryCache[key] = {
     data,
     timestamp: now,
-    expiresAt: now + ttlMs
+    expiresAt: now + mergedOptions.ttl,
+    priority: mergedOptions.priority,
+    size
   };
+  
+  // Update stats
+  memoryCacheStats.entries = Object.keys(memoryCache).length;
+  memoryCacheStats.totalSize += size;
 }
 
 /**
  * Get data from memory cache if not expired
  */
-function getMemoryCacheData<T>(key: string): T | null {
+function getMemoryCacheData<T>(key: string, options: Partial<CacheOptions> = {}): T | null {
+  const mergedOptions = { ...DEFAULT_CACHE_OPTIONS, ...options };
+  
+  // Bypass cache if forceRefresh is true
+  if (mergedOptions.forceRefresh) {
+    memoryCacheStats.misses++;
+    return null;
+  }
+  
   const cached = memoryCache[key];
   if (cached && cached.expiresAt > Date.now()) {
+    memoryCacheStats.hits++;
     return cached.data as T;
   }
+  
+  // Remove expired entry
+  if (cached) {
+    delete memoryCache[key];
+    memoryCacheStats.entries--;
+    if (cached.size) {
+      memoryCacheStats.totalSize -= cached.size;
+    }
+  }
+  
+  memoryCacheStats.misses++;
   return null;
+}
+
+/**
+ * Evict least important or oldest cache entries
+ */
+function evictCacheEntries(count: number): void {
+  const entries = Object.entries(memoryCache);
+  if (entries.length === 0) return;
+  
+  // Sort by priority first, then by expiration time
+  const sortedEntries = entries.sort((a, b) => {
+    // Compare priorities first
+    const priorityOrder = { low: 0, normal: 1, high: 2 };
+    const priorityA = priorityOrder[a[1].priority as keyof typeof priorityOrder] || 1;
+    const priorityB = priorityOrder[b[1].priority as keyof typeof priorityOrder] || 1;
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB; // Evict lower priority first
+    }
+    
+    // If same priority, evict ones expiring soonest
+    return a[1].expiresAt - b[1].expiresAt;
+  });
+  
+  // Evict the specified number of entries
+  for (let i = 0; i < Math.min(count, sortedEntries.length); i++) {
+    const [key, entry] = sortedEntries[i];
+    delete memoryCache[key];
+    memoryCacheStats.evictions++;
+    memoryCacheStats.entries--;
+    if (entry.size) {
+      memoryCacheStats.totalSize -= entry.size;
+    }
+  }
 }
 
 /**
@@ -57,10 +181,24 @@ function getMemoryCacheData<T>(key: string): T | null {
  */
 function clearMemoryCache(key?: string): void {
   if (key) {
+    const entry = memoryCache[key];
+    if (entry && entry.size) {
+      memoryCacheStats.totalSize -= entry.size;
+    }
     delete memoryCache[key];
+    memoryCacheStats.entries = Object.keys(memoryCache).length;
   } else {
     Object.keys(memoryCache).forEach(k => delete memoryCache[k]);
+    memoryCacheStats.entries = 0;
+    memoryCacheStats.totalSize = 0;
   }
+}
+
+/**
+ * Get memory cache statistics
+ */
+export function getMemoryCacheStats(): typeof memoryCacheStats {
+  return { ...memoryCacheStats };
 }
 
 /**
@@ -357,7 +495,7 @@ export async function getOptimizedAppointments(options: FilterOptions = {}): Pro
     
     // Process and return data
     const processedData = processAppointmentsData(appointments, options);
-    setMemoryCacheData(cacheKey, processedData, 15000); // 15 seconds TTL
+    setMemoryCacheData(cacheKey, processedData, { ttl: 15000 }); // 15 seconds TTL with proper options format
     return processedData;
   } catch (error) {
     logError('Error in getOptimizedAppointments', error);
@@ -408,9 +546,234 @@ function processAppointmentsData(appointments: any[], options: FilterOptions): a
   return result;
 }
 
-// Export utility functions
-export {
+/**
+ * Get notifications with optimized filtering and caching
+ */
+export async function getOptimizedNotifications(
+  userId: string, 
+  options: FilterOptions = {},
+  cacheOptions: Partial<CacheOptions> = {}
+): Promise<any[]> {
+  const cacheKey = `notifications-${userId}-${JSON.stringify(options)}`;
+  const mergedCacheOptions = { 
+    ...DEFAULT_CACHE_OPTIONS, 
+    ttl: CACHE_TTL_CONFIG.notifications,
+    ...cacheOptions 
+  };
+  
+  try {
+    const now = Date.now();
+    
+    // Check if we're making too many requests in a short time
+    const requestInterval = now - notificationRequestTracker.lastRequestTime;
+    if (requestInterval < 300 && !mergedCacheOptions.forceRefresh) { // 300ms minimum between normal requests
+      notificationRequestTracker.consecutiveRequests++;
+      
+      // If we have too many consecutive requests, use in-memory super-cache with longer TTL
+      if (notificationRequestTracker.consecutiveRequests > 5) {
+        const cachedData = notificationRequestTracker.inMemoryCache.get(cacheKey);
+        if (cachedData && now - cachedData.timestamp < 10000) { // Special 10s TTL for rapid requests
+          // Don't log this to avoid log spam
+          return cachedData.data;
+        }
+      }
+    } else {
+      // Reset consecutive request counter if enough time has passed
+      notificationRequestTracker.consecutiveRequests = 0;
+    }
+    
+    // Update last request time
+    notificationRequestTracker.lastRequestTime = now;
+    
+    // Check if we need to apply backoff due to errors
+    if (notificationRequestTracker.backoffInterval > 0 && !mergedCacheOptions.forceRefresh) {
+      if (now - notificationRequestTracker.lastRequestTime < notificationRequestTracker.backoffInterval) {
+        // Try memory cache with extended TTL during backoff period
+        const cachedData = getMemoryCacheData<any[]>(cacheKey);
+        if (cachedData) {
+          // Don't log during backoff to reduce spam
+          return cachedData;
+        }
+      } else {
+        // Reset backoff after it expires
+        notificationRequestTracker.backoffInterval = 0;
+      }
+    }
+    
+    // Try memory cache first with shorter TTL for notifications
+    if (!mergedCacheOptions.forceRefresh) {
+      const cachedData = getMemoryCacheData<any[]>(cacheKey, mergedCacheOptions);
+      if (cachedData) {
+        // Only log cache hits when not in rapid succession
+        if (notificationRequestTracker.consecutiveRequests < 3) {
+          logInfo('Using memory cached notifications data');
+        }
+        return cachedData;
+      }
+    }
+    
+    // Try React Query cache next
+    const queryData = cacheManager.getQueryData<{ success: boolean; notifications: any[] }>(
+      cacheKeys.notifications(userId)
+    );
+    
+    if (queryData?.success && queryData.notifications && !mergedCacheOptions.forceRefresh) {
+      // Only log when not in rapid succession
+      if (notificationRequestTracker.consecutiveRequests < 3) {
+        logInfo('Using React Query cached notifications data');
+      }
+      
+      // Apply filtering, sorting, and pagination in-memory
+      const filteredData = processNotificationsData(queryData.notifications, options);
+      
+      // Cache processed results
+      setMemoryCacheData(cacheKey, filteredData, { 
+        ttl: CACHE_TTL_CONFIG.notifications,
+        priority: 'normal' as const
+      });
+      
+      // Also update the super-cache for rapid requests
+      notificationRequestTracker.inMemoryCache.set(cacheKey, {
+        data: filteredData,
+        timestamp: now
+      });
+      
+      return filteredData;
+    }
+    
+    // Implement visibility-aware fetching - if document is hidden, extend TTL
+    const isDocumentHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    if (isDocumentHidden && !mergedCacheOptions.forceRefresh) {
+      // Double TTL when tab is not visible
+      mergedCacheOptions.ttl *= 2;
+    }
+    
+    // Fetch fresh notifications data
+    // Only log when not in rapid succession
+    if (notificationRequestTracker.consecutiveRequests < 3) {
+      logInfo('Fetching fresh notifications data');
+    }
+    
+    // Try to get user role from cache first
+    const usersCacheKey = `users-${JSON.stringify({ filters: { id: userId } })}`;
+    const cachedUsers = getMemoryCacheData<any[]>(usersCacheKey);
+    const userRole = cachedUsers?.[0]?.role || UserType.PATIENT;
+    
+    // Call API to get notifications
+    const result = await localApi.getMyNotifications({
+      uid: userId,
+      role: userRole
+    });
+    
+    if (result.success && result.notifications) {
+      // Set in both caches
+      cacheManager.setQueryData(cacheKeys.notifications(userId), result);
+      
+      // Process and return data
+      const processedData = processNotificationsData(result.notifications, options);
+      setMemoryCacheData(cacheKey, processedData, { 
+        ttl: CACHE_TTL_CONFIG.notifications,
+        priority: 'normal' as const
+      });
+      
+      // Also update the super-cache for rapid requests
+      notificationRequestTracker.inMemoryCache.set(cacheKey, {
+        data: processedData,
+        timestamp: now
+      });
+      
+      // Reset backoff on success
+      notificationRequestTracker.backoffInterval = 0;
+      
+      return processedData;
+    }
+    
+    // Fallback to direct database access
+    const notifications = await getNotifications();
+    
+    // Filter notifications for this user
+    const userNotifications = notifications.filter(notif => notif.userId === userId);
+    
+    // Set in both caches
+    cacheManager.setQueryData(cacheKeys.notifications(userId), { 
+      success: true, 
+      notifications: userNotifications 
+    });
+    
+    // Process and return data
+    const processedData = processNotificationsData(userNotifications, options);
+    setMemoryCacheData(cacheKey, processedData, { 
+      ttl: CACHE_TTL_CONFIG.notifications,
+      priority: 'normal' as const
+    });
+    
+    // Also update the super-cache for rapid requests
+    notificationRequestTracker.inMemoryCache.set(cacheKey, {
+      data: processedData,
+      timestamp: Date.now()
+    });
+    
+    return processedData;
+  } catch (error) {
+    // Set backoff on error to prevent rapid retries
+    notificationRequestTracker.backoffInterval = Math.min(
+      (notificationRequestTracker.backoffInterval || 1000) * 2, // Exponential backoff
+      30000 // Max 30-second backoff
+    );
+    
+    logError('Error in getOptimizedNotifications', error);
+    return [];
+  }
+}
+
+/**
+ * Process notifications data with filtering, sorting, and pagination
+ */
+function processNotificationsData(notifications: any[], options: FilterOptions): any[] {
+  let result = [...notifications];
+  
+  // Apply filters
+  if (options.filters) {
+    Object.entries(options.filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        result = result.filter(item => {
+          if (typeof value === 'string' && typeof item[key] === 'string') {
+            return item[key].toLowerCase().includes(value.toLowerCase());
+          }
+          return item[key] === value;
+        });
+      }
+    });
+  }
+  
+  // Apply sorting (default to newest first for notifications)
+  const sortBy = options.sortBy || 'createdAt';
+  const sortOrder = options.sortOrder || 'desc';
+  
+  result.sort((a, b) => {
+    const aValue = a[sortBy];
+    const bValue = b[sortBy];
+    
+    if (sortOrder === 'desc') {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
+    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+  });
+  
+  // Apply pagination
+  if (options.offset !== undefined || options.limit !== undefined) {
+    const start = options.offset || 0;
+    const end = options.limit ? start + options.limit : undefined;
+    result = result.slice(start, end);
+  }
+  
+  return result;
+}
+
+// Export utility functions for direct use in components
+export { 
+  setMemoryCacheData, 
+  getMemoryCacheData, 
   clearMemoryCache,
-  setMemoryCacheData,
-  getMemoryCacheData
+  evictCacheEntries
 }; 

@@ -265,6 +265,113 @@ Errors are categorized to provide appropriate user messages:
 
 ## Performance Optimization
 
+### Notification System Optimization
+
+The notification system has been optimized to reduce excessive API calls and improve performance:
+
+1. **Multi-level Caching Strategy**
+   - Memory cache with configurable TTL (Time To Live)
+   - React Query cache integration
+   - Super-cache for rapid consecutive requests
+
+2. **Request Throttling & Optimization**
+   - Debounced requests to prevent excessive API calls
+   - Consecutive request tracking
+   - Exponential backoff on errors
+   - Visibility-aware polling (reduces frequency when tab not visible)
+
+3. **Component-level Optimizations**
+   - Using refs to prevent unnecessary re-renders
+   - Adaptive polling intervals based on notification activity
+   - Memoized derived state values
+
+### Logging Optimization
+
+The logging system has been enhanced to prevent log flooding:
+
+1. **Message Deduplication**
+   - Tracking and grouping of identical messages
+   - Suppression counts for repeated logs
+   - Automatic cleanup of old log entries
+
+2. **Operation-specific Throttling**
+   - Configurable intervals for different operation types
+   - Special handling for high-frequency operations like notifications
+   - Adaptive throttling based on message frequency
+
+3. **Smart Log Formatting**
+   - Consolidated duplicate messages with counts
+   - Prioritized logging of important events
+   - Context-aware log suppression
+
+### Example Implementations
+
+```tsx
+// Optimized notification fetching with visibility awareness
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      // Refresh immediately when tab becomes visible again
+      loadOptimizedNotifications(true);
+      
+      // Reset to more frequent polling when visible
+      setPollingInterval(30000);
+    } else {
+      // Increase polling interval significantly when tab is hidden
+      setPollingInterval(120000); // 2 minutes when tab not visible
+    }
+  };
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, [loadOptimizedNotifications]);
+```
+
+```typescript
+// Optimized data access with multi-level caching
+export async function getOptimizedNotifications(
+  userId: string, 
+  options: FilterOptions = {},
+  cacheOptions: Partial<CacheOptions> = {}
+): Promise<any[]> {
+  const cacheKey = `notifications-${userId}-${JSON.stringify(options)}`;
+  
+  // Try memory cache first with shorter TTL for notifications
+  if (!cacheOptions.forceRefresh) {
+    const cachedData = getMemoryCacheData<any[]>(cacheKey, cacheOptions);
+    if (cachedData) {
+      return cachedData;
+    }
+  }
+  
+  // Implementation continues with React Query cache check and API fallback
+}
+```
+
+```typescript
+// Smart logger with message deduplication
+const log = (level: LogLevel, message: string, data?: unknown): void => {
+  // Check for duplicate recent messages
+  const msgKey = `${level}-${message}`;
+  const recentMsg = recentLogMessages.get(msgKey);
+  
+  if (recentMsg) {
+    // We've seen this exact message recently
+    recentMsg.count++;
+    
+    // Only log every 5th occurrence or after 5 seconds
+    if (recentMsg.count < 5 && (now - recentMsg.lastTime) < 5000) {
+      return; // Skip this log
+    }
+  }
+  
+  // Log throttling and operation-specific handling continues...
+}
+```
+
 ### React Query Caching
 
 - Enhanced `queryClient` configuration with longer cache times (5-10 minutes)
@@ -278,6 +385,9 @@ Errors are categorized to provide appropriate user messages:
 - `lazyLoad` HOC for dynamic imports with configurable loading states
 - Support for minimum loading display times to prevent UI flickering
 - Component prefetching system for improved user experience
+- Error boundary integration for better error handling during lazy loading
+- Performance monitoring to track component load times
+- Automated retry for failed loads with exponential backoff
 
 ### Optimized Database Access
 
@@ -285,6 +395,8 @@ Errors are categorized to provide appropriate user messages:
 - Time-based cache expiration (30s for most data, 15s for frequently changing data)
 - Client-side filtering, sorting, and pagination for faster UI responses
 - Enhanced data access with proper TypeScript typing
+- Intelligent cache eviction based on priority and usage
+- Cache size monitoring and statistics tracking
 
 ### Enhanced API Client
 
@@ -292,6 +404,97 @@ Errors are categorized to provide appropriate user messages:
 - Type-safe hook factories (`useApiQuery`, `useApiMutation`) for common operations
 - Automatic cache invalidation on mutations
 - Domain-specific hooks for common operations
+- Request batching to reduce API calls
+- Configurable retry strategies with exponential backoff
+
+### Advanced Performance Optimization Implementation
+
+We've implemented a comprehensive performance optimization strategy throughout the application:
+
+#### Memory Caching System
+- Enhanced in-memory cache with configurable Time-To-Live (TTL) settings
+- Cache priority management with intelligent eviction policies (LRU + priority)
+- Size estimation and statistics tracking for memory optimization
+- Entity-specific TTL configurations for optimal freshness vs. performance balance
+- Extended to support all major data types including notifications
+
+#### Optimized Doctor Search
+- Created a lazy-loaded DoctorSearchResults component with React.memo for cards
+- Implemented data prefetching for doctor profiles on mouse hover
+- Added intelligent caching with longer stale times for search results
+- Optimized image loading with proper sizing and placeholders
+
+#### Optimized Appointment Booking Flow
+- Enhanced booking API with adaptive TTL caching
+- Prefetches adjacent dates when a date is selected 
+- Implements intelligent retry with exponential backoff
+- Tracks performance metrics for booking operations
+- Caches doctor details with longer TTL for improved performance
+
+#### API Request Batching
+- Added a request queue system to batch similar API calls
+- Implemented configurable batching windows 
+- Enhanced API client with better error handling
+- Performance tracking for API operations
+
+#### Performance Monitoring
+- Added a comprehensive performance metrics collection system
+- Implemented render-time tracking for React components
+- Added operation timing with success/error tracking
+- Historical performance data for optimization analysis
+
+These optimizations significantly improve application performance by reducing API calls, decreasing initial load time, improving data access efficiency, and creating a smoother user experience with optimistic UI updates and prefetching.
+
+### Bug Fixes
+
+#### Performance Optimization Bug Fixes
+
+- Fixed JSX syntax error in the `performanceMetrics.ts` file by replacing JSX syntax with `React.createElement` in the `withPerformanceTracking` HOC
+- Fixed the `cancelAppointment` function in `doctorLoaders.ts` to properly format API call parameters, separating context and payload correctly
+- Restructured API calls to properly follow the pattern: `callApi(methodName, context, payload)`
+
+#### API Call Parameter Structure Fixes
+
+- Fixed the `useCompleteAppointment` hook in `doctorLoaders.ts` to properly separate authentication context from payload data
+- Fixed the `useCancelAppointment` hook in `patientLoaders.ts` to correctly pass auth context as first parameter
+- Fixed the `useAppointmentDetails` hook in `patientLoaders.ts` to include proper auth context
+- All hooks now follow this pattern:
+
+```ts
+// Correct pattern
+return callApi(
+  'functionName',
+  { uid: user.uid, role: UserType.DOCTOR }, // Auth context as first arg
+  { paramName: paramValue } // Payload as second arg
+);
+```
+
+#### Performance and TypeScript Fixes
+
+- Fixed JSX syntax error in the `performanceMetrics.ts` file by replacing JSX syntax with `React.createElement`
+- Fixed linter errors in `bookingApi.ts` by adding proper TypeScript types and removing unsupported properties
+- Fixed the missing `myDashboard` cache key in the cache invalidation system
+- Implemented a state-based approach for tracking performance measurements instead of using context
+- Added proper type imports from React Query to ensure type safety throughout the application
+
+#### Patient Profile Update Fix
+
+- Fixed the `useUpdatePatientProfile` hook in `patientLoaders.ts` to properly pass user context to the API
+- The prior implementation incorrectly passed the data object in place of the context
+- The fix ensures that profile updates properly reach the backend API and are saved
+
+#### SVG viewBox Error Fix
+
+- Created a custom `Divider` component in `src/components/ui/Divider.tsx` that uses CSS borders instead of SVG
+- Updated the patient dashboard to use the new Divider component
+- This resolves the error: `Error: <svg> attribute viewBox: Expected number, "0 0 100% 4"`
+- The new component is more accessible and performs better
+
+#### Date Format Handling Improvements
+
+- Added utilities in `dateUtils.ts` for properly formatting dates between HTML inputs and APIs
+- Implemented both `formatDateForInput` and `formatDateForApi` functions
+- Fixed date format warnings by ensuring ISO date strings are properly converted to the format expected by date inputs
 
 ---
 
@@ -595,46 +798,142 @@ The application uses the following environment variables:
 3. Optimized database access with multi-level caching
 4. Enhanced the API client with React Query integration
 
+### Advanced Performance Optimization Implementation
+
+### Memory Caching System
+We implemented a sophisticated multi-level caching system to improve application performance:
+
+1. **Enhanced Memory Cache with TTL**
+   - In-memory cache with configurable Time-To-Live (TTL) settings
+   - Cache priority management with eviction policies
+   - Size estimation and statistics tracking
+   - Configurable cache options by entity type
+   
+2. **Optimized Data Access Functions**
+   - Dedicated optimization functions for different entity types
+   - Layered cache approach (memory → React Query → API)
+   - Memory-efficient filtering and sorting
+   - Extended to support all major data types (users, doctors, patients, appointments, notifications)
+
+3. **Adaptive Polling for Real-time Data**
+   - Dynamic polling intervals based on user activity
+   - Reduced polling frequency during inactivity
+   - Accelerated polling when new activity is detected
+   - Buffering to prevent API overload
+
+### API Request Batching
+Added a request batching system to reduce API calls:
+
+1. **Request Queue Management**
+   - Collects similar requests within a configurable time window
+   - Combines requests to reduce network overhead
+   - Intelligent timeout management to balance responsiveness and performance
+
+2. **Enhanced ApiClient**
+   - Improved caching strategies with more granular control
+   - Better error handling with detailed logging
+   - Support for batched operations
+
+### Lazy Loading Architecture
+Implemented comprehensive lazy loading for performance-critical components:
+
+1. **Lazy Component System**
+   - Centralized lazy loading utility with consistent loading states
+   - Configurable minimum display times to prevent UI flicker
+   - Error handling with fallback components
+
+2. **Prefetching Strategy**
+   - Intelligent component prefetching based on navigation patterns
+   - Route-based prefetching for common navigation paths
+   - Data preloading for anticipated user actions
+
+### Performance Monitoring
+Added tools to measure and analyze application performance:
+
+1. **Performance Metrics Collection**
+   - Detailed timing of operations across the application
+   - Component render time tracking
+   - API call performance monitoring
+   - Memory usage tracking
+
+2. **Performance Reporting**
+   - Aggregated metrics by operation type
+   - Detection of slow operations and renders
+   - Historical performance data
+
+These enhancements have significantly improved application responsiveness, reduced API load, and provided better user experience especially for data-intensive screens like the notification system and doctor search.
+
+### Lint and Accessibility Fixes (2023-10-24)
+
+We've made significant improvements to the codebase's quality and accessibility by fixing numerous linting and accessibility issues:
+
+1. **Type Safety Improvements**:
+   - Replaced `any` types with more specific types in key files including `performanceMetrics.ts` and `bookingApi.ts`
+   - Used `Record<string, unknown>` instead of `Record<string, any>` for better type safety
+   - Created custom types like `TrackedProps` for improved type safety
+   - Added proper API response type interfaces for admin dashboard data
+
+2. **Accessibility Enhancements**:
+   - Fixed Modal component by:
+     - Properly handling the React.useEffect hook
+     - Adding `aria-labelledby` for better screen reader support
+   - Improved NotificationPanel with keyboard navigation support (Enter/Space keys)
+   - Fixed form labels in TodoList component
+   - Fixed clickable divs to be keyboard accessible with proper roles and tabIndex
+   - Updated API test page to use proper button elements
+
+3. **Admin Dashboard Improvements**:
+   - Fixed TypeScript typing issues throughout the admin dashboard
+   - Added proper type interfaces for API responses in admin components
+   - Fixed ProgressBar component usage to use className instead of variant
+   - Corrected Button component size values (changed from "xs" to "sm")
+   - Added proper type casting for API responses and mutation results
+   - Added proper typing for mapped items in listings
+
+4. **React Best Practices**:
+   - Fixed conditional hook rendering issues
+   - Resolved callback dependencies in useEffect hooks
+   - Ensured consistent component prop types
+
+These improvements have significantly enhanced the application's code quality, type safety, and accessibility compliance.
+
+### Booking Error Handling
+
+- Created specialized error boundaries and a custom error hook for the booking workflow
+- Implemented `BookingWorkflowErrorBoundary`, `TimeSlotSelectionErrorBoundary`, and `BookingPaymentErrorBoundary`
+- Created `useBookingError.ts` custom hook for standardized booking error handling
+- Added `BookingErrorCode` type with specialized error codes for different booking scenarios
+- Fixed TypeScript errors and improved error handling in the appointment booking process
+- Added explicit type annotations and fixed parameter passing to booking mutations
+- Enhanced error boundary implementation with proper integration in the booking workflow
+
+These additional features enhance the application's functionality, user experience, and error handling capabilities, providing a more robust and maintainable codebase.
+
 ---
 
 ## Bug Fixes & Solutions
 
-### API Call Parameter Structure Fixes
+### Infinite Update Loop in AdminDashboardContent
 
-- Fixed the `useCompleteAppointment` hook in `doctorLoaders.ts` to properly separate authentication context from payload data
-- Fixed the `useCancelAppointment` hook in `patientLoaders.ts` to correctly pass auth context as first parameter
-- Fixed the `useAppointmentDetails` hook in `patientLoaders.ts` to include proper auth context
-- All hooks now follow this pattern:
+- Fixed an infinite update loop in the AdminDashboardContent component that was causing React to warn about "Maximum update depth exceeded"
+- Root cause: Derived state values (recentUsers, pendingDoctors, upcomingAppointments) were being recalculated on every render and included in useEffect dependencies
+- Solution implemented:
+  - Added useMemo to memoize all derived state calculations
+  - Wrapped computations for verifiedDoctorsCount, doctorVerificationRate, recentUsers, pendingDoctors, and upcomingAppointments with useMemo
+  - This prevents the values from changing on every render and breaks the circular dependency
 
-```ts
-// Correct pattern
-return callApi(
-  'functionName',
-  { uid: user.uid, role: UserType.DOCTOR }, // Auth context as first arg
-  { paramName: paramValue } // Payload as second arg
-);
-```
+### Notification Fetching Error Handling
 
-### Patient Profile Update Fix
+- Fixed error handling in the Navbar component's notification fetching mechanism
+- Root cause: The component was trying to fetch notifications repeatedly even when the API server wasn't responding, causing console errors
+- Solution implemented:
+  - Added better error handling with temporary backoff on failures
+  - Added state to track fetch status (fetchingNotifications) and failure state (notificationsFetchFailed)
+  - Implemented longer retry intervals (2 minutes) after a failure instead of constant retries
+  - Added proper TypeScript type checking for API responses to prevent undefined property access
+  - Implemented proper array type checking and casting for the notifications array
 
-- Fixed the `useUpdatePatientProfile` hook in `patientLoaders.ts` to properly pass user context to the API
-- The prior implementation incorrectly passed the data object in place of the context
-- The fix ensures that profile updates properly reach the backend API and are saved
-
-### SVG viewBox Error Fix
-
-- Created a custom `Divider` component in `src/components/ui/Divider.tsx` that uses CSS borders instead of SVG
-- Updated the patient dashboard to use the new Divider component
-- This resolves the error: `Error: <svg> attribute viewBox: Expected number, "0 0 100% 4"`
-- The new component is more accessible and performs better
-
-### Date Format Handling Improvements
-
-- Added utilities in `dateUtils.ts` for properly formatting dates between HTML inputs and APIs
-- Implemented both `formatDateForInput` and `formatDateForApi` functions
-- Fixed date format warnings by ensuring ISO date strings are properly converted to the format expected by date inputs
-
----
+These bug fixes improve application stability, prevent unnecessary API calls, and enhance error resilience in key components.
 
 ## Development Workflow
 
@@ -747,6 +1046,19 @@ By following these guidelines and referencing this document, future development 
 - Fixed TypeScript errors and improved error handling in the appointment booking process
 - Added explicit type annotations and fixed parameter passing to booking mutations
 - Enhanced error boundary implementation with proper integration in the booking workflow
+
+### Notification System Optimization
+
+- Implemented an advanced multi-level caching strategy for notifications
+- Added request debouncing and throttling to prevent excessive API calls
+- Enhanced the NotificationList component with visibility-aware polling
+- Implemented adaptive polling intervals based on user activity
+- Created specialized logging optimization to prevent log flooding
+- Added message deduplication and smart suppression for repeated logs
+- Fixed excessive log messages issue in the notification system
+- Implemented exponential backoff for error recovery
+- Added specialized error handling for notification-related operations
+- Enhanced performance with refs to prevent unnecessary re-renders
 
 These additional features enhance the application's functionality, user experience, and error handling capabilities, providing a more robust and maintainable codebase.
 

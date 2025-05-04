@@ -177,7 +177,7 @@ export default function TodoList({
       {/* Add Todo Form */}
       <div className="space-y-4" role="form" aria-label="Add new task">
         <div>
-          <label htmlFor="new-todo-text" className="sr-only">
+          <label htmlFor="new-todo-text" className="block text-sm font-medium text-gray-700 mb-1">
             Task name
           </label>
           <input
@@ -189,13 +189,12 @@ export default function TodoList({
             value={newTodoText}
             onChange={e => setNewTodoText(e.target.value)}
             onKeyDown={handleKeyDown}
-            aria-label="New task name"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="new-todo-priority" className="sr-only">
+            <label htmlFor="new-todo-priority" className="block text-sm font-medium text-gray-700 mb-1">
               Priority
             </label>
             <select
@@ -203,7 +202,6 @@ export default function TodoList({
               className="border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
               value={newTodoPriority}
               onChange={e => setNewTodoPriority(e.target.value as TodoPriority)}
-              aria-label="Task priority"
             >
               <option value="low">Low Priority</option>
               <option value="medium">Medium Priority</option>
@@ -212,7 +210,7 @@ export default function TodoList({
           </div>
 
           <div>
-            <label htmlFor="new-todo-category" className="sr-only">
+            <label htmlFor="new-todo-category" className="block text-sm font-medium text-gray-700 mb-1">
               Category
             </label>
             <select
@@ -220,7 +218,6 @@ export default function TodoList({
               className="border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
               value={newTodoCategory}
               onChange={e => setNewTodoCategory(e.target.value)}
-              aria-label="Task category"
             >
               {categories.map(category => (
                 <option key={category} value={category}>
@@ -231,7 +228,7 @@ export default function TodoList({
           </div>
 
           <div>
-            <label htmlFor="new-todo-due-date" className="sr-only">
+            <label htmlFor="new-todo-due-date" className="block text-sm font-medium text-gray-700 mb-1">
               Due date
             </label>
             <input
@@ -240,13 +237,12 @@ export default function TodoList({
               className="border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
               value={newTodoDueDate}
               onChange={e => setNewTodoDueDate(e.target.value)}
-              aria-label="Due date"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="new-todo-notes" className="sr-only">
+          <label htmlFor="new-todo-notes" className="block text-sm font-medium text-gray-700 mb-1">
             Notes
           </label>
           <textarea
@@ -256,7 +252,6 @@ export default function TodoList({
             value={newTodoNotes}
             onChange={e => setNewTodoNotes(e.target.value)}
             rows={2}
-            aria-label="Task notes"
           />
         </div>
 
@@ -266,7 +261,6 @@ export default function TodoList({
             onClick={addTodo}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             disabled={newTodoText.trim() === ''}
-            aria-label="Add task"
           >
             Add Task
           </button>
@@ -290,7 +284,6 @@ export default function TodoList({
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
               checked={showCompleted}
               onChange={e => setShowCompleted(e.target.checked)}
-              aria-label="Show completed tasks"
             />
             <span className="text-sm text-gray-700">Show Completed</span>
           </label>
@@ -304,7 +297,6 @@ export default function TodoList({
               className="border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={categoryFilter || ''}
               onChange={e => setCategoryFilter(e.target.value || null)}
-              aria-label="Filter by category"
             >
               <option value="">All Categories</option>
               {categories.map(category => (
@@ -324,7 +316,6 @@ export default function TodoList({
               className="border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={priorityFilter || ''}
               onChange={e => setPriorityFilter((e.target.value as TodoPriority) || null)}
-              aria-label="Filter by priority"
             >
               <option value="">All Priorities</option>
               <option value="low">Low</option>
@@ -360,7 +351,6 @@ export default function TodoList({
                   checked={todo.completed}
                   onChange={() => toggleTodo(todo.id)}
                   id={`todo-${todo.id}`}
-                  aria-label={`Mark "${todo.text}" as ${todo.completed ? 'incomplete' : 'complete'}`}
                 />
               </div>
 
@@ -369,15 +359,6 @@ export default function TodoList({
                   <button
                     className="flex items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
                     onClick={() => toggleExpandTodo(todo.id)}
-                    onKeyDown={e => {
-                      if (e.key === 'Delete') {
-                        e.preventDefault();
-                        deleteTodo(todo.id);
-                      } else if (e.key === 'e' && e.ctrlKey) {
-                        e.preventDefault();
-                        toggleExpandTodo(todo.id);
-                      }
-                    }}
                   >
                     <div className="flex items-center gap-2">
                       <label
@@ -396,13 +377,11 @@ export default function TodoList({
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-green-100 text-green-800'
                           }`}
-                        aria-label={`Priority: ${todo.priority}`}
                       >
                         {todo.priority}
                       </span>
                       <span
                         className="text-xs text-gray-500"
-                        aria-label={`Category: ${todo.category}`}
                       >
                         {todo.category}
                       </span>
@@ -411,7 +390,6 @@ export default function TodoList({
                   <button
                     onClick={() => deleteTodo(todo.id)}
                     className="text-gray-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded p-1"
-                    aria-label={`Delete task: ${todo.text}`}
                   >
                     <Trash size={16} />
                   </button>
@@ -450,7 +428,6 @@ export default function TodoList({
                           onChange={e =>
                             updateTodo(todo.id, { priority: e.target.value as TodoPriority })
                           }
-                          aria-label="Edit priority"
                         >
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
@@ -467,7 +444,6 @@ export default function TodoList({
                           className="border rounded-md px-2 py-1 text-sm"
                           value={todo.category}
                           onChange={e => updateTodo(todo.id, { category: e.target.value })}
-                          aria-label="Edit category"
                         >
                           {categories.map(category => (
                             <option key={category} value={category}>
@@ -489,7 +465,6 @@ export default function TodoList({
                           onChange={e =>
                             updateTodo(todo.id, { dueDate: e.target.value ? formatDateForApi(e.target.value) : undefined })
                           }
-                          aria-label="Edit due date"
                         />
                       </div>
                     </div>
@@ -513,7 +488,6 @@ export default function TodoList({
           <span>
             {todos.filter(todo => todo.priority === 'high' && !todo.completed).length > 0 && (
               <span
-                className="mr-3"
                 aria-label={`${todos.filter(todo => todo.priority === 'high' && !todo.completed).length} high priority tasks remaining`}
               >
                 {todos.filter(todo => todo.priority === 'high' && !todo.completed).length} high
