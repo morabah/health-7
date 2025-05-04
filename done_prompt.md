@@ -311,3 +311,52 @@ Enhanced the booking workflow implementation by fixing TypeScript errors and imp
    - Admin user management
 2. Add error testing to verify error handling in different scenarios
 3. Enhance error analytics to track common error patterns
+
+# TypeScript and Linting Improvements in Error Handling Files
+
+## Overview
+Fixed linting issues and TypeScript errors in the error handling files to improve type safety across the application.
+
+## Actions Taken
+
+1. **Fixed Error Types in useErrorHandler.ts**:
+   - Replaced all `any` types with more specific types like `unknown` or concrete interfaces
+   - Fixed the JSX syntax in ErrorComponent by using React.createElement with proper typing
+   - Fixed return type annotations to properly indicate ReactElement | null
+   - Corrected the startSpan function to use proper typing for metadata and return types
+   - Improved type safety throughout the hook implementation
+
+2. **Enhanced apiErrorHandling.ts Type Safety**:
+   - Replaced all `Record<string, any>` with `Record<string, unknown>` for better type safety
+   - Fixed the network error detection logic with proper type guards
+   - Replaced all error type casts using `as any` with properly typed interfaces
+   - Created specialized interfaces for different error types:
+     - `OfflineError` for offline detection
+     - `EnhancedFirebaseError` for Firebase errors
+     - `EnhancedApiError` for API errors
+     - `EnhancedStandardError` for standardized errors
+   - Improved the parseApiError function to handle unknown response data types safely
+
+3. **Fixed Type Assertions in Error Boundaries**:
+   - Corrected prop types in error boundary components
+   - Replaced direct error message access with proper type guards
+   - Fixed common type issues like apostrophes in strings to &apos;
+   - Removed unused imports in error boundary components
+   - Added proper typing for error properties in context
+
+## Files Modified
+- `src/hooks/useErrorHandler.ts`: Comprehensive type improvements throughout the file
+- `src/lib/apiErrorHandling.ts`: Fixed all 'as any' type assertions with proper interfaces
+- `src/components/error-boundaries/*.tsx`: Fixed various type issues in error boundaries
+
+## Benefits
+1. Improved TypeScript type safety across error handling code
+2. Eliminated any/unknown type usage where more specific types can be used
+3. Better IDE autocomplete and type checking for error handling code
+4. More maintainable code with explicit type definitions
+5. Reduced potential for runtime errors due to incorrect type assumptions
+
+## Next Steps
+1. Continue improving type safety in other parts of the application
+2. Add comprehensive test coverage for error handling code
+3. Document error handling patterns for future developers
