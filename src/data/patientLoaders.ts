@@ -8,19 +8,31 @@ import { UserType } from '@/types/enums';
 /**
  * Hook to fetch patient profile data
  */
-export const usePatientProfile = () => {
+export const usePatientProfile = (patientId?: string) => {
   const { user } = useAuth();
   
+  // If patientId is provided, fetch that patient's profile (for doctors/admins)
+  // Otherwise, fetch the current user's profile
   return useQuery({
-    queryKey: ['patientProfile', user?.uid],
+    queryKey: ['patientProfile', patientId || user?.uid],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getMyUserProfile', { 
-        uid: user.uid,
-        role: UserType.PATIENT
-      });
+      
+      if (patientId) {
+        // For doctors/admins viewing a patient's profile
+        return callApi('getPatientProfile', 
+          { uid: user.uid, role: user.role },
+          { patientId }
+        );
+      } else {
+        // For patients viewing their own profile
+        return callApi('getMyUserProfile', { 
+          uid: user.uid,
+          role: UserType.PATIENT
+        });
+      }
     },
-    enabled: !!user?.uid
+    enabled: !!user?.uid && (!!patientId || user.role === UserType.PATIENT)
   });
 };
 

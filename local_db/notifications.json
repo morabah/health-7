@@ -615,5 +615,255 @@
     "isRead": false,
     "createdAt": "2025-05-02T11:17:08.879Z",
     "relatedId": "u-001"
+  },
+  {
+    "id": "notif-m7sfvztoz1mx1dtxf5pq6p",
+    "userId": "u-005",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-07T21:22:33.507Z at 14:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T21:22:38.188Z",
+    "relatedId": "4qbc6m2vnyqoatc2g14cqr"
+  },
+  {
+    "id": "notif-5kxwsa6y1qygjjs44p7en",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. mohamed rabah on 2025-05-07T21:22:33.507Z at 14:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T21:22:38.188Z",
+    "relatedId": "4qbc6m2vnyqoatc2g14cqr"
+  },
+  {
+    "id": "notif-gzyjc2odemow1vow8v5fcs",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-07T22:18:40.682Z at 16:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T22:18:47.835Z",
+    "relatedId": "udue16mgu9phgh62p3sn"
+  },
+  {
+    "id": "notif-4gbkum19c8m7ss56obxu6k",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-07T22:18:40.682Z at 16:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T22:18:47.835Z",
+    "relatedId": "udue16mgu9phgh62p3sn"
+  },
+  {
+    "id": "notif-j2yfonulk2o8yehvw3neg9",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-11T22:33:33.680Z at 15:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T22:33:38.438Z",
+    "relatedId": "kh3q8qk59p9mv8jlpxroa"
+  },
+  {
+    "id": "notif-9lytb1tvznjqdg1kybktu",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Gerald Reynolds-Millermm on 2025-05-11T22:33:33.680Z at 15:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T22:33:38.438Z",
+    "relatedId": "kh3q8qk59p9mv8jlpxroa"
+  },
+  {
+    "id": "notif-xcdbilonsyinn3rdv0luk",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsd has booked an appointment on 2025-05-06T23:08:58.690Z at 09:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:09:04.687Z",
+    "relatedId": "o54s9sxjodrotibqptg3"
+  },
+  {
+    "id": "notif-i8a2uua4u78ho24m0bw4mc",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Gerald Reynolds-Millermm on 2025-05-06T23:08:58.690Z at 09:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:09:04.687Z",
+    "relatedId": "o54s9sxjodrotibqptg3"
+  },
+  {
+    "id": "notif-7j2nz4gf8n5oxwoe7rjmgh",
+    "userId": "u-000",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-06T23:08:58.690Z at 09:30 - Reason: kk.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:11:54.933Z",
+    "relatedId": "o54s9sxjodrotibqptg3"
+  },
+  {
+    "id": "notif-dote55jiyehzd2sq79plj",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-14T11:44:01.837Z at 15:00 - Reason: j.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:12:04.198Z",
+    "relatedId": "0jq89hwgfr9c1r3gvwr2q9"
+  },
+  {
+    "id": "notif-ytmqjykv4jc739j6d4gdlu",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsd has canceled the appointment scheduled for 2025-05-07T13:36:26.831Z at 14:30 - Reason: jj.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:12:17.724Z",
+    "relatedId": "yfbs96tfahr6z4y9vra6"
+  },
+  {
+    "id": "notif-lp0mhqz9veic9vr4ee2els",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Updated from admin panel",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:52:34.897Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-8l72z84qsnerfnhzkb94h",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Updated from admin panel",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:53:49.657Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-xc9n2w92v5h21p1dlvegu",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:54:14.630Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-qmsa46rukq3sf26i5t6an",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:54:29.946Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-gi22prfqdlr1g370ovkk9ci",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:55:21.761Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-pq8j2boa8mwnfa7tw5efi",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:56:41.079Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-4dmekgrb509n4dwzt4wl4",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. k",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:57:22.943Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-fs04fbp4xjbr5nuhrlod1e",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:57:28.095Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-280rbgejcae3r7dsrkr9od",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-03T23:57:54.361Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-9tf36casxs4jar2u4e0m2",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:00:34.975Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-egf6wo0nsbwjlfl2x3dmfj",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:03:00.494Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-hdgxl27uyfkrxnffie0k2",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. l",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:03:46.644Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-4ft5q4rlwgyznb2h40a6qh",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:03:53.916Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-f6vkwbc0qgciixy3qzppaf",
+    "userId": "u-009",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-04T00:04:48.527Z",
+    "relatedId": null
   }
 ]

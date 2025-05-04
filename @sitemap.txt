@@ -38,7 +38,11 @@ Health Appointment System Sitemap
 6. PLATFORM ROUTES - ADMIN
    /admin/dashboard - Admin dashboard (src/app/(platform)/admin/dashboard/page.tsx)
    /admin/users - User management (src/app/(platform)/admin/users/page.tsx)
+   /admin/users/[userId] - User details (src/app/(platform)/admin/users/[userId]/page.tsx)
+   /admin/users/[userId]/edit - Edit user (src/app/(platform)/admin/users/[userId]/edit/page.tsx)
    /admin/doctors - Doctor verification (src/app/(platform)/admin/doctors/page.tsx)
+   /admin/activity - System activity log (src/app/(platform)/admin/activity/page.tsx)
+   /admin/settings - System settings (src/app/(platform)/admin/settings/page.tsx)
 
 7. CMS & VALIDATION
    /cms - Content management (src/app/cms/page.tsx)

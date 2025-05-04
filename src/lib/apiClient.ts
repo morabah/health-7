@@ -113,7 +113,9 @@ export async function callApi<T = any>(
         if (
           mappedMethod.startsWith('get') ||
           mappedMethod === 'updateMyProfile' ||
-          mappedMethod === 'bookAppointment'
+          mappedMethod === 'bookAppointment' ||
+          mappedMethod === 'cancelAppointment' ||
+          mappedMethod === 'completeAppointment'
         ) {
           // Get current auth context
           const ctx = getCurrentAuthCtx();

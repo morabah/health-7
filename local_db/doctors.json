@@ -40,6 +40,11 @@
       "thursday": [],
       "friday": [
         {
+          "startTime": "08:00",
+          "endTime": "09:00",
+          "isAvailable": true
+        },
+        {
           "startTime": "09:00",
           "endTime": "15:00",
           "isAvailable": true
@@ -53,7 +58,7 @@
       "2025-06-28T20:35:44.186Z"
     ],
     "createdAt": "2025-03-30T20:35:44.186Z",
-    "updatedAt": "2025-05-02T11:17:00.456Z",
+    "updatedAt": "2025-05-03T22:22:57.337Z",
     "id": "u-000"
   },
   {

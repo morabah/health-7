@@ -622,7 +622,7 @@ The Users Management page can be accessed through the CMS at `/cms/users`
 
    - Type-safe wrapper around localStorage for session management
    - `loadSession<T>()` - Generic function to retrieve session data with proper typing
-   - `saveSession()` - Function to store session data
+   - `saveSession()` - Function to store session data 
    - `clearSession()` - Function to remove session data
    - `updateSession()` - Function to partially update existing session data
    - Added server-side safety with `typeof window` checks
@@ -915,7 +915,7 @@ Fixed critical issues in the `localApiFunctions.ts` file, focusing on appointmen
   - Fixed `bookAppointment` function
   - Fixed `cancelAppointment` function
   - Fixed `completeAppointment` function
-  - Fixed `setDoctorAvailability` function
+  - Fixed `setDoctorAvailability` function 
   - Fixed `getDoctorAvailability` function
   - Fixed `getAvailableSlots` function
   - Updated the default export to explicitly include all functions
@@ -1230,7 +1230,7 @@ Fixed a critical syntax error in the `getAvailableSlots` function where an impor
   - Proper accessibility attributes for screen readers
 - Created a separate SortableTodoItem component to handle the sortable functionality
 - Installed required packages:
-  - @dnd-kit/core
+  - @dnd-kit/core 
   - @dnd-kit/sortable
   - @dnd-kit/utilities
 
@@ -1306,7 +1306,7 @@ The validation tools are crucial for development and testing, ensuring data inte
 
 We addressed issues with data validation in the application:
 
-1. **API Endpoint ID Fix**:
+1. **API Endpoint ID Fix**: 
 
    - Updated `/src/app/api/localDb/route.ts` to ensure all records have required ID fields
    - Added explicit ID mapping for patients, doctors, appointments, and notifications collections
@@ -1882,3 +1882,252 @@ Enhanced administrative functionality for better user and doctor management:
    - Updated VerificationForm to support checklist-based verification
 
 These enhancements significantly improve the administrative workflow, making it more efficient to manage users and verify doctors while providing better visibility into system activity.
+
+## Modularizing the localApiFunctions.ts
+
+### Changes Made:
+1. **Split localApiFunctions.ts into modular files:**
+   - Created `src/lib/api/dashboardFunctions.ts` 
+   - Created `src/lib/api/notificationFunctions.ts`
+   - Created `src/lib/api/appointmentFunctions.ts`
+   - Created `src/lib/api/adminFunctions.ts`
+   - Created `src/lib/api/doctorFunctions.ts`
+   - Created `src/lib/userFunctions.ts`
+
+2. **Updated localApiFunctions.ts to import from the individual modules**
+   - Now re-exports functions from each module instead of containing implementation
+   - Fixed circular dependency issues by introducing lazy loading in userFunctions.ts
+
+3. **Fixed issues with data typing:**
+   - Added proper verification status enum values
+   - Added missing id fields to doctor and patient profiles 
+   - Improved error handling and type safety
+
+### Benefits:
+- Better organized codebase following single responsibility principle
+- Easier to maintain with separate files for different functionality
+- Fixed the missing getMyDashboardStats error
+- Prevented circular dependencies between modules
+- Code is now more maintainable and scalable
+
+The codebase now follows a much cleaner modular structure with all API functions correctly grouped by domain.
+
+## Prompt: Modularize localApiFunctions.ts
+
+### Actions Taken
+
+1. **Split monolithic localApiFunctions.ts into domain-specific modules:**
+   - Created `src/lib/api/dashboardFunctions.ts` for dashboard statistics functions
+   - Created `src/lib/api/notificationFunctions.ts` for notification management
+   - Created `src/lib/api/appointmentFunctions.ts` for appointment booking/cancellation
+   - Created `src/lib/api/adminFunctions.ts` for administrative functions
+   - Created `src/lib/api/doctorFunctions.ts` for doctor-specific functionality
+   - Used existing `src/lib/userFunctions.ts` for authentication and user profile management
+
+2. **Updated main localApiFunctions.ts to be a re-export file:**
+   - Now imports and re-exports functions from all the module files
+   - Fixed type definitions in the LocalApi interface
+   - Added proper export statements for all functions
+   - Improved organization with clear comments for different function categories
+
+3. **Fixed technical issues:**
+   - Added proper ID fields to patient and doctor profiles
+   - Fixed circular dependencies using lazy loading patterns for getMockDoctorProfile
+   - Corrected type errors related to the missing doctorFunctions.ts module
+   - Added proper verification status enum values
+   - Fixed issues with the NotificationType enum usage
+   - Improved error handling throughout all API functions
+
+### Benefits
+
+- **Better code organization:** Functions are now grouped by domain, making them easier to find
+- **Improved maintainability:** Each file has a single responsibility, making changes less risky
+- **Fixed circular dependencies:** Removed circular imports that were causing TypeScript errors
+- **Enhanced type safety:** Improved TypeScript typings and interfaces throughout the codebase
+- **Smoother developer experience:** Code is now easier to navigate and understand
+- **Better separation of concerns:** Clear boundaries between different functional areas
+
+The codebase now follows modern JavaScript/TypeScript best practices with proper modularization, making it easier to maintain and extend in the future.
+
+### Files Changed
+
+- Created `src/lib/api/dashboardFunctions.ts`
+- Created `src/lib/api/notificationFunctions.ts`
+- Created `src/lib/api/appointmentFunctions.ts`
+- Created `src/lib/api/adminFunctions.ts`
+- Created `src/lib/api/doctorFunctions.ts`
+- Modified `src/lib/localApiFunctions.ts`
+- Modified `src/lib/userFunctions.ts`
+
+## Prompt: Ensure all functions follow Zod schemas
+
+### Actions Taken
+
+- Fixed TypeScript errors in the codebase related to Zod schema conformance:
+  - Updated `DoctorProfile` type definition in `src/types/schemas.ts` to include the required `id` field: `export type DoctorProfile = z.infer<typeof DoctorProfileSchema> & { id: string };`
+  - Fixed `userFunctions.ts` to ensure all doctor profiles created or retrieved include the `id` field
+  - Improved error handling in the doctor profile creation to prevent potential undefined errors
+  - Made code more robust by adding proper null checks and fallbacks
+  - Ensured all doctor profiles have an `id` field of format `doctor-${uid}` 
+
+### Files Changed
+
+- `src/types/schemas.ts`: Updated type definition for `DoctorProfile` to include `id` field
+- `src/lib/userFunctions.ts`: Fixed handling of doctor profiles to ensure they include the `id` field consistently
+
+### Status
+
+- Patient profile page now loads correctly using the fixed types
+- Server is running successfully with the updated type definitions
+- TypeScript warnings still exist in some areas but functionality is working properly
+- Improved overall type safety throughout the codebase
+
+## Prompt: Create Admin Activity Page
+
+### Actions Taken
+
+- Created a new admin activity page to fix the 404 error when navigating to /admin/activity
+- Implemented a comprehensive activity tracking interface with the following features:
+  - Created `/src/app/(platform)/admin/activity/page.tsx` with a complete UI
+  - Added activity filtering by type (security, system, user, etc.)
+  - Implemented search functionality to filter activities
+  - Created expandable activity items with detailed information
+  - Used proper UI components (Card, Badge, Button) following the application style
+  - Included sample activity data to demonstrate the UI
+  - Added proper status indicators with color coding
+  - Implemented responsive design for both mobile and desktop
+- Updated the sitemap to include the new route:
+  - Added `/admin/activity - System activity log (src/app/(platform)/admin/activity/page.tsx)` to the sitemap
+
+### Files Changed/Created
+
+- Created `src/app/(platform)/admin/activity/page.tsx`
+- Updated `@sitemap.txt` to include the new route
+
+### Benefits
+
+- Fixed the 404 error when navigating to /admin/activity from the admin dashboard
+- Provided administrators with a comprehensive view of system activities
+- Enabled filtering and searching through activity logs
+- Created a consistent UI that matches the rest of the application
+
+## Prompt: Create Admin Settings Page
+
+### Actions Taken
+
+- Created a new admin settings page to fix the 404 error when navigating to /admin/settings
+- Implemented a comprehensive settings interface with multiple categories:
+  - Created `/src/app/(platform)/admin/settings/page.tsx` with a tabbed UI for different settings
+  - Added appearance settings for theme customization
+  - Added notification settings for controlling email and in-app notifications
+  - Added security settings including 2FA and password policies
+  - Added data management settings for retention and export
+  - Added appointment settings for scheduling parameters
+- Implemented interactive UI components:
+  - Toggle switches for enabling/disabling features
+  - Sliders for numeric values with visual feedback
+  - Color pickers for theme customization
+  - Interactive form elements with proper styling
+- Updated the sitemap to include the new route:
+  - Added `/admin/settings - System settings (src/app/(platform)/admin/settings/page.tsx)` to the sitemap
+
+### Files Changed/Created
+
+- Created `src/app/(platform)/admin/settings/page.tsx`
+- Updated `@sitemap.txt` to include the new route
+
+### Benefits
+
+- Fixed the 404 error when navigating to /admin/settings
+- Provided administrators with a comprehensive settings interface
+- Created a clean, organized UI for managing system settings
+- Followed the design patterns and styling of the rest of the application
+
+## Prompt: Fix 404 Errors for Admin Pages
+
+### Actions Taken
+
+- Verified and ensured proper functionality of the following admin pages which were previously showing 404 errors:
+  - Admin Activity Page (/admin/activity)
+  - Admin Settings Page (/admin/settings)
+  
+- Checked both pages are properly implemented and accessible:
+  - Confirmed `/src/app/(platform)/admin/activity/page.tsx` is correctly implemented with:
+    - Activity filtering by type
+    - Search functionality
+    - Expandable activity items
+    - Status indicators with color coding
+  
+  - Confirmed `/src/app/(platform)/admin/settings/page.tsx` is correctly implemented with:
+    - Tabbed interface for different settings categories (appearance, notifications, security, etc.)
+    - Toggle switches for enabling/disabling features
+    - Sliders for numeric values 
+    - Form elements with proper styling
+
+- Verified routes are correctly defined in @sitemap.txt:
+  - `/admin/activity - System activity log (src/app/(platform)/admin/activity/page.tsx)`
+  - `/admin/settings - System settings (src/app/(platform)/admin/settings/page.tsx)`
+
+- Fixed React issues:
+  - Ensured proper usage of Alert component without unsupported onDismiss prop
+  - Fixed select elements to use defaultValue pattern correctly
+
+### Benefits
+
+- Fixed 404 errors when navigating to admin pages
+- Ensured consistent navigation through the admin interface
+- Improved overall admin UX with properly functioning pages
+- Maintained UI consistency with the rest of the application
+- Eliminated React warnings for improved application stability
+
+## Prompt: Create User Detail and Edit Pages for Admin Panel
+
+### Actions Taken:
+
+- Created detailed individual user page at `/admin/users/[userId]` with:
+  - Comprehensive user profile information display
+  - Role-based status badges
+  - Doctor-specific information (specialty, bio, verification status)
+  - Interactive user status management (activate/deactivate)
+  - Modal confirmation for status changes
+
+- Created user edit page at `/admin/users/[userId]/edit` with:
+  - Form for editing basic user information
+  - Status management via dropdown
+  - Validation and error handling
+  - Success messages and redirection
+
+- Fixed TypeScript and linting errors:
+  - Added null checks for useParams() results
+  - Updated Button variants to use available theme options ('primary' instead of 'success')
+  - Used correct AccountStatus enum values (DEACTIVATED instead of INACTIVE)
+
+- Updated sitemap:
+  - Added both new routes to the admin section of @sitemap.txt
+
+### Files Created/Modified:
+
+- Created `src/app/(platform)/admin/users/[userId]/page.tsx`
+- Created `src/app/(platform)/admin/users/[userId]/edit/page.tsx`
+- Updated `@sitemap.txt`
+- Updated `done_prompt.md`
+
+These pages provide a complete user management interface for administrators, allowing them to view detailed information about users and make necessary changes to their accounts.
+
+## Prompt: Fix Admin User Status Update Error
+
+### Actions Taken:
+
+- Fixed a critical error in the `useAdminActivateUser` hook where the parameters were being passed incorrectly to the `adminUpdateUserStatus` API function
+- The issue was that the hook was combining all parameters (context and payload) into a single object, when the API function expected two separate parameters:
+  1. A context object with `uid` and `role`
+  2. A payload object with `userId`, `status`, and optional `reason`
+- Modified the hook in `src/data/adminLoaders.ts` to properly separate these parameters
+- This fix resolves the error: "Cannot destructure property 'userId' of 'payload' as it is undefined"
+- Now both the user details page and edit page can properly activate/deactivate users
+
+### Components Fixed:
+- `src/data/adminLoaders.ts`: Updated `useAdminActivateUser` hook implementation
+- This fixes functionality in:
+  - User detail page: `/admin/users/[userId]`
+  - User edit page: `/admin/users/[userId]/edit`

@@ -177,13 +177,20 @@ export const useAdminActivateUser = () => {
       if (!user || user.role !== UserType.ADMIN) {
         throw new Error('Unauthorized');
       }
-      return callApi('adminUpdateUserStatus', {
+      
+      // Create separate context and payload objects
+      const ctx = {
         uid: user.uid,
-        role: UserType.ADMIN,
+        role: UserType.ADMIN
+      };
+      
+      const payload = {
         userId,
         status,
         reason
-      });
+      };
+      
+      return callApi('adminUpdateUserStatus', ctx, payload);
     },
     onSuccess: () => {
       // Invalidate relevant queries
@@ -312,6 +319,62 @@ export const useAdminTriggerPasswordReset = () => {
       // No need to invalidate queries - password reset doesn't change user data that's displayed
       // But we can log success
       logInfo('Admin triggered password reset successfully');
+    }
+  });
+};
+
+/**
+ * Hook for admin to update a user's profile information
+ */
+export const useAdminUpdateUserProfile = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ 
+      userId, 
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      accountStatus
+    }: { 
+      userId: string; 
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      accountStatus?: AccountStatus;
+    }) => {
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new Error('Unauthorized');
+      }
+      
+      // Create separate context and payload objects
+      const ctx = {
+        uid: user.uid,
+        role: UserType.ADMIN
+      };
+      
+      const payload = {
+        userId,
+        firstName,
+        lastName,
+        email,
+        phone,
+        address,
+        accountStatus: accountStatus ? String(accountStatus).toLowerCase() : undefined
+      };
+      
+      return callApi('adminUpdateUserProfile', ctx, payload);
+    },
+    onSuccess: () => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'doctors'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'patients'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'userDetail'] });
     }
   });
 };

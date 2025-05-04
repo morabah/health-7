@@ -143,11 +143,17 @@ export const useDoctorProfile = (doctorId: string) => {
     queryKey: ['doctorProfile', doctorId],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getDoctorPublicProfile', {
+      
+      // Create separate context and payload objects
+      const ctx = {
         uid: user.uid,
-        role: getUserRole(user.role),
-        doctorId,
-      });
+        role: getUserRole(user.role)
+      };
+      
+      const payload = { doctorId };
+      
+      // Pass context as first param and payload as second param
+      return callApi('getDoctorPublicProfile', ctx, payload);
     },
     enabled: !!user?.uid && !!doctorId,
   });
@@ -163,11 +169,17 @@ export const useDoctorAvailability = (doctorId: string) => {
     queryKey: ['doctorAvailability', doctorId],
     queryFn: async () => {
       if (!user?.uid) throw new Error('User not authenticated');
-      return callApi('getDoctorAvailability', {
+      
+      // Create separate context and payload objects
+      const ctx = {
         uid: user.uid,
-        role: getUserRole(user.role),
-        doctorId,
-      });
+        role: getUserRole(user.role)
+      };
+      
+      const payload = { doctorId };
+      
+      // Pass context as first param and payload as second param
+      return callApi('getDoctorAvailability', ctx, payload);
     },
     enabled: !!user?.uid && !!doctorId,
   });

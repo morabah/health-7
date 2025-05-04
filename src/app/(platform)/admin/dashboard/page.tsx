@@ -19,6 +19,8 @@ import {
   BarChart3,
   Bell,
   CheckCircle,
+  Link as LinkIcon,
+  Settings,
 } from 'lucide-react';
 import {
   useAdminDashboardData,
@@ -350,8 +352,8 @@ export default function AdminDashboard() {
             Refresh Data
           </Button>
           <Button size="sm" variant="secondary" as={Link} href="/admin/settings">
-            <AlertCircle className="h-4 w-4 mr-2" />
-            System Status
+            <Settings className="h-4 w-4 mr-2" />
+            System Settings
           </Button>
         </div>
       </div>

@@ -701,7 +701,7 @@ export type EducationEntry = z.infer<typeof EducationEntrySchema> & { id?: strin
 export type ExperienceEntry = z.infer<typeof ExperienceEntrySchema> & { id?: string };
 export type TimeSlot = z.infer<typeof TimeSlotSchema>; // No separate ID usually
 export type WeeklySchedule = z.infer<typeof WeeklyScheduleSchema>;
-export type DoctorProfile = z.infer<typeof DoctorProfileSchema>; // ID comes from UserProfile
+export type DoctorProfile = z.infer<typeof DoctorProfileSchema> & { id: string }; // ID comes from UserProfile
 export type VerificationDocument = z.infer<typeof VerificationDocumentSchema> & { id?: string };
 
 /** TypeScript type inferred from AppointmentSchema. Represents an appointment record. */
