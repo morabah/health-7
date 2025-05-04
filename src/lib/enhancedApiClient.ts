@@ -2,26 +2,26 @@
 
 import { callApi } from './apiClient';
 import { cacheKeys, cacheManager } from './queryClient';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import type { UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { logInfo, logError } from './logger';
-
-// Type for different entity types
-type EntityType = 'user' | 'doctor' | 'appointment' | 'notification';
 
 /**
  * Enhanced API client that uses React Query for data fetching and caching
  */
 
+// Define type for batch queue item
+interface BatchQueueItem<T = unknown> {
+  params: unknown[];
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+  timestamp: number;
+}
+
 // Define type for API request batcher
 interface BatchQueue {
-  [key: string]: {
-    params: any[];
-    resolve: (value: any) => void;
-    reject: (reason: any) => void;
-    timestamp: number;
-  }[]
+  [key: string]: BatchQueueItem[];
 }
 
 // Batch API request queue
@@ -41,13 +41,11 @@ const DEFAULT_BATCH_WINDOW = 50;
  */
 function batchApiCall<T>(
   method: string, 
-  params: any[],
+  params: unknown[],
   batchWindow = DEFAULT_BATCH_WINDOW
 ): Promise<T> {
-  const requestId = `${method}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
   // Create a new promise that will be resolved when the batch is processed
-  return new Promise((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     // Initialize the batch queue for this method if it doesn't exist
     if (!batchQueue[method]) {
       batchQueue[method] = [];
@@ -56,7 +54,7 @@ function batchApiCall<T>(
     // Add this request to the queue
     batchQueue[method].push({
       params,
-      resolve,
+      resolve: resolve as (value: unknown) => void,
       reject,
       timestamp: Date.now()
     });
@@ -73,11 +71,18 @@ function batchApiCall<T>(
   });
 }
 
+// Define type for batch result
+interface BatchResult {
+  index: number;
+  result: unknown | null;
+  error: unknown | null;
+}
+
 /**
  * Process a batch of API calls for the same method
  * @param method API method to process batch for
  */
-async function processBatch(method: string) {
+async function processBatch(method: string): Promise<void> {
   // Get and clear the queue for this method
   const queue = batchQueue[method] || [];
   batchQueue[method] = [];
@@ -109,13 +114,13 @@ async function processBatch(method: string) {
         index,
         result: await callApi(method, ...request.params),
         error: null
-      };
+      } as BatchResult;
     } catch (error) {
       return {
         index,
         result: null,
         error
-      };
+      } as BatchResult;
     }
   });
   
@@ -178,7 +183,7 @@ export function useApiQuery<TData, TError = Error>(
         const canBatch = ['getUsers', 'getDoctors', 'getNotifications'].includes(method);
         
         const result = canBatch
-          ? await batchApiCall<TData>(method, args as any[])
+          ? await batchApiCall<TData>(method, args)
           : await callApi<TData>(method, ...args);
           
         return result;
@@ -199,7 +204,7 @@ export function useApiQuery<TData, TError = Error>(
  */
 export function useApiMutation<TData, TVariables, TError = Error>(
   method: string,
-  invalidateQueries: unknown[][] | ((data: TData) => unknown[][]) = [],
+  invalidateQueries: Array<Array<string | unknown>> | ((data: TData) => Array<Array<string | unknown>>) = [],
   options: Omit<UseMutationOptions<TData, TError, TVariables>, 'mutationFn'> = {}
 ) {
   return useMutation<TData, TError, TVariables>({
@@ -220,7 +225,7 @@ export function useApiMutation<TData, TVariables, TError = Error>(
       
       // Invalidate each query
       for (const queryKey of queriesToInvalidate) {
-        await cacheManager.invalidateQueries(queryKey as string[]);
+        await cacheManager.invalidateQueries(queryKey as Array<string>);
       }
     },
     ...options,
@@ -232,13 +237,11 @@ export function useApiMutation<TData, TVariables, TError = Error>(
  * @param method API method name
  * @param queryKey Cache key array
  * @param args Arguments to pass to the API method
- * @param staleTime How long the data should remain fresh (ms)
  */
 export async function prefetchApiQuery<TData>(
   method: string,
   queryKey: unknown[],
-  args: unknown[] = [],
-  staleTime = 5 * 60 * 1000
+  args: unknown[] = []
 ): Promise<void> {
   await cacheManager.prefetchQuery<TData>(queryKey, async () => {
     return callApi<TData>(method, ...args);
@@ -340,9 +343,9 @@ export function useBookAppointment(options = {}) {
   return useApiMutation(
     'bookAppointment',
     [
-      { type: 'appointment' },
-      { type: 'doctor' },
-      { type: 'notification' }
+      cacheKeys.appointments(),
+      cacheKeys.doctors(),
+      cacheKeys.notifications()
     ],
     options
   );
@@ -353,8 +356,8 @@ export function useCancelAppointment(options = {}) {
   return useApiMutation(
     'cancelAppointment',
     [
-      { type: 'appointment' },
-      { type: 'notification' }
+      cacheKeys.appointments(),
+      cacheKeys.notifications()
     ],
     options
   );
@@ -365,7 +368,7 @@ export function useUpdateProfile(options = {}) {
   return useApiMutation(
     'updateMyUserProfile',
     [
-      { type: 'user' },
+      cacheKeys.myUserProfile()
     ],
     options
   );
