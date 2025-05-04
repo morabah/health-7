@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * API Client
  *
@@ -10,10 +12,11 @@ import * as localAPI from './localApiFunctions';
 import { isFirebaseEnabled, functions } from './firebaseConfig';
 import { firebaseApi } from './firebaseFunctions';
 import { getCurrentAuthCtx } from './apiAuthCtx';
-import { logInfo, logError } from './logger';
-import { callApiWithErrorHandling } from './apiErrorHandling';
+import { logInfo, logError, logWarn } from './logger';
+import { callApiWithErrorHandling, ErrorHandlingOptions } from './apiErrorHandling';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import { createFirebaseError } from './firebaseErrorMapping';
+import { ApiError } from './errors';
 import { 
   getOptimizedDoctors, 
   getOptimizedUsers, 
@@ -23,15 +26,24 @@ import {
   clearMemoryCache
 } from './optimizedDataAccess';
 import { cacheKeys, cacheManager } from './queryClient';
+import { UserType } from '@/types/enums';
 
 // Get the appropriate API based on configuration
 const api = isFirebaseEnabled ? firebaseApi : localAPI.localApi;
 
+// Type for dynamic API methods
+type ApiMethods = Record<string, (...args: any[]) => Promise<unknown>>;
+
 // Low-noise API methods that should minimize logging
 const LOW_NOISE_METHODS = ['getAvailableSlots', 'getMyNotifications', 'getMyDashboardStats'];
 
+// Interface for optimized method implementations
+interface OptimizedMethod<T> {
+  (options: { filters?: Record<string, unknown>; limit?: number; offset?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<T[]>;
+}
+
 // Methods that can use optimized data access
-const OPTIMIZED_METHODS: {[key: string]: any} = {
+const OPTIMIZED_METHODS: Record<string, OptimizedMethod<unknown> | null> = {
   'findDoctors': getOptimizedDoctors,
   'getAllDoctors': getOptimizedDoctors,
   'getDoctorPublicProfile': null, // Special case handled in code
@@ -93,6 +105,25 @@ interface CallApiOptions {
   skipOptimized?: boolean;
 }
 
+// Interface for auth context in API calls
+interface AuthContext {
+  uid: string;
+  role: UserType;
+}
+
+// Standard API response structure
+interface ApiResponse<T> {
+  success: boolean;
+  [key: string]: unknown;
+}
+
+// Doctor profile type for cache
+interface DoctorProfile {
+  id: string;
+  userId: string;
+  [key: string]: unknown;
+}
+
 /**
  * Call an API function with the provided arguments
  * This function will route to either local implementation or Firebase Functions
@@ -148,16 +179,16 @@ export async function callApiWithOptions<T = unknown>(
         } else if (typeof args[1] === 'string') {
           doctorId = args[1];
         } else if (args[0] && typeof args[0] === 'object' && args[0] !== null && 'doctorId' in args[0]) {
-          doctorId = (args[0] as any).doctorId;
+          doctorId = (args[0] as Record<string, string>).doctorId;
         }
         
         if (doctorId) {
           // Try to get from cache first
           const cacheKey = `doctor-${doctorId}`;
-          const cachedDoctor = getMemoryCacheData<any>(cacheKey);
+          const cachedDoctor = getMemoryCacheData<DoctorProfile>(cacheKey);
           
           if (cachedDoctor) {
-            return { success: true, doctor: cachedDoctor } as T;
+            return { success: true, doctor: cachedDoctor } as unknown as T;
           }
           
           // Get all doctors then filter
@@ -166,14 +197,14 @@ export async function callApiWithOptions<T = unknown>(
           
           if (doctor) {
             setMemoryCacheData(cacheKey, doctor);
-            return { success: true, doctor } as T;
+            return { success: true, doctor } as unknown as T;
           }
         }
       } 
       // For other methods that have an optimized implementation
       else if (optimizedFn) {
         // Convert args to filters
-        const filters: Record<string, any> = {};
+        const filters: Record<string, unknown> = {};
         
         // Process args into filter options
         if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
@@ -197,135 +228,102 @@ export async function callApiWithOptions<T = unknown>(
         return { 
           success: true,
           [responseKey]: result
-        } as T;
+        } as unknown as T;
       }
-    } catch (optimizedError) {
-      // Log but continue with standard implementation if optimization fails
-      logError(`Optimized data access failed for ${method}, falling back:`, optimizedError);
+    } catch (error) {
+      // If optimized access fails, fall back to standard implementation
+      logError('Optimized data access failed, falling back to standard implementation', { method, error });
     }
   }
 
   // Create a function to execute the actual API call using standard implementation
   const executeApiCall = async (): Promise<T> => {
     try {
-      // Add artificial delay in development mode to expose loading states
-      if (process.env.NODE_ENV === 'development' && !method.includes('get')) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-
-      // If Firebase is enabled, use Firebase Functions instead of local implementation
-      if (isFirebaseEnabled) {
+      // For Firebase, create a callable function
+      if (isFirebaseEnabled && !options.forceLocal) {
         return await callFirebaseFunction<T>(mappedMethod, ...args);
       }
 
-      // Special handling for login/signIn
-      if (method === 'login') {
-        // Extract email and password from arguments for login
-        if (args.length === 2 && typeof args[0] === 'string' && typeof args[1] === 'string') {
-          // Args are already [email, password]
-          return (await localAPI.signIn(args[0], args[1])) as T;
-        } else if (
-          args.length === 1 &&
-          typeof args[0] === 'object' &&
-          args[0] !== null &&
-          'email' in args[0] &&
-          'password' in args[0]
-        ) {
-          // Args are in object format {email, password}
-          const { email, password } = args[0] as { email: string; password: string };
-          return (await localAPI.signIn(email, password)) as T;
+      // For local development, call local API directly
+      // Check if method exists
+      if (!(mappedMethod in (api as ApiMethods))) {
+        // If mapped method doesn't exist, check if original method exists
+        if (method !== mappedMethod && method in (api as ApiMethods)) {
+          // Use original method if mapped method doesn't exist
+          return await (api as ApiMethods)[method](...args) as T;
+        }
+        throw new ApiError(`API method ${mappedMethod} not found`, {
+          code: 'API_METHOD_NOT_FOUND',
+          status: 404,
+          retryable: false,
+          severity: 'error',
+          context: { method: mappedMethod, originalMethod: method }
+        });
+      }
+
+      // Special handling for login method to ensure correct parameter passing
+      if (method === 'login' && args.length === 1 && args[0] && typeof args[0] === 'object') {
+        const loginParams = args[0] as Record<string, unknown>;
+        if ('email' in loginParams && 'password' in loginParams) {
+          const email = loginParams.email;
+          const password = loginParams.password;
+          return await (api as ApiMethods)[mappedMethod](email, password) as T;
         }
       }
 
-      // Check if we have the method in our local API
-      if (mappedMethod in api) {
-        // @ts-ignore: dynamic method call
-        const localApiMethod = api[mappedMethod];
-
-        // Special case for methods that need auth context
-        if (
-          mappedMethod.startsWith('get') ||
-          mappedMethod === 'updateMyProfile' ||
-          mappedMethod === 'bookAppointment' ||
-          mappedMethod === 'cancelAppointment' ||
-          mappedMethod === 'completeAppointment'
-        ) {
-          // Get current auth context
-          const ctx = getCurrentAuthCtx();
-
-          // For debug only - Log method called with args
-          if (shouldLog) {
-            logInfo(`Calling ${mappedMethod} with processed args`, args);
+      // If no auth context provided but needed, get from session
+      let callArgs = [...args];
+      if (callArgs.length === 0 || !callArgs[0] || typeof callArgs[0] !== 'object' || !('uid' in callArgs[0])) {
+        // Only inject auth context for methods that typically need it
+        // Skip for public methods like register, login, etc.
+        if (!['registerUser', 'signIn', 'login', 'requestPasswordReset'].includes(mappedMethod)) {
+          const authCtx = getCurrentAuthCtx();
+          if (authCtx && authCtx.uid) {
+            callArgs.unshift(authCtx);
           }
-
-          // Check if this is a method where the user explicitly passed context
-          if (
-            args.length > 0 &&
-            args[0] &&
-            typeof args[0] === 'object' &&
-            args[0] !== null &&
-            'uid' in args[0] &&
-            'role' in args[0]
-          ) {
-            // Use the explicitly provided context instead of the global one
-            return await localApiMethod(args[0], ...args.slice(1));
-          }
-
-          // Return result from local API call with context
-          return await localApiMethod(ctx, ...args);
         }
-
-        // For debug only
-        if (shouldLog) {
-          logInfo(`Calling ${mappedMethod} with processed args`, args);
-        }
-
-        // Return result from local API call
-        return await localApiMethod(...args);
       }
+
+      // Call the API method
+      const result = await (api as ApiMethods)[mappedMethod](...callArgs);
       
-      // Fallback: check if core functions like registerUser are available directly
-      if (mappedMethod === 'registerUser' && 'registerUser' in localAPI) {
-        if (shouldLog) {
-          logInfo(`Calling direct function registerUser for ${method}`, args);
-        }
-        // @ts-ignore: dynamic method call
-        return await localAPI.registerUser(...args) as T;
+      if (shouldLog && result && typeof result === 'object') {
+        // Use optional chaining for safety
+        logInfo(`[callApi] Result from ${method}:`, {
+          success: 'success' in result ? result.success : undefined,
+          hasData: !!(
+            ('data' in result && result.data) || 
+            ('user' in result && result.user) || 
+            ('users' in result && result.users) || 
+            ('doctor' in result && result.doctor)
+          ),
+          error: 'error' in result ? result.error : undefined
+        });
       }
 
-      throw new Error(`API method ${method} not found. Tried looking for '${method}' and '${mappedMethod}'`);
-    } catch (err) {
-      logError(`Error calling ${method}:`, err);
-      throw err;
+      return result as T;
+    } catch (error) {
+      logError(`Error calling API method: ${method}`, { error, args });
+      throw error;
     }
   };
 
-  // Determine API category based on method name
-  let category: ErrorCategory = 'api';
-  
-  if (method.includes('login') || method.includes('register') || method.includes('auth')) {
-    category = 'auth';
-  } else if (method.includes('appointment') || method.includes('booking')) {
-    category = 'appointment';
-  } else if (method.includes('profile') || method.includes('user')) {
-    category = 'data';
-  }
-
-  // Call the API with enhanced error handling
-  return callApiWithErrorHandling(
+  // Fall back to standard implementation with proper error handling
+  return callApiWithErrorHandling<T>(
     executeApiCall,
-    [],
+    [], // Empty args array since we've already processed args in executeApiCall
     {
       endpoint: method,
-      errorCategory: category,
-      errorMessage: `Error calling ${method}`,
-      maxRetries: method.startsWith('get') ? 2 : 0, // Only retry GET methods
-      retryable: true,
+      errorMessage: options.errorMessage || `Error calling API method: ${method}`,
+      retryable: options.retry ?? false,
+      maxRetries: options.maxRetries || 3,
+      errorCategory: options.errorCategory || 'api',
+      errorSeverity: options.errorSeverity || 'error',
       errorContext: {
+        ...options.errorContext,
         method,
-        mappedMethod,
-        arguments: args,
-      },
+        args
+      }
     }
   );
 }

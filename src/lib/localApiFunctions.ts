@@ -10,7 +10,8 @@ import { logValidation } from './logger';
 
 // Import all functions from each module
 import {
-  getMyDashboardStats
+  getMyDashboardStats,
+  adminGetDashboardData
 } from './api/dashboardFunctions';
 
 import {
@@ -71,7 +72,7 @@ import type { ResultOk, ResultErr } from './localApiCore';
 
 // Define the LocalApi type with function signatures that match implementations
 export type LocalApi = {
-  login: (params: { email: string; password: string }) => ReturnType<typeof signIn>;
+  login: (params: { email: string; password: string } | string | any) => ReturnType<typeof signIn>;
   registerPatient: (payload: unknown) => ReturnType<typeof registerUser>;
   registerDoctor: (payload: unknown) => ReturnType<typeof registerUser>;
   getMyUserProfile: typeof getMyUserProfile;
@@ -98,12 +99,27 @@ export type LocalApi = {
   adminCreateUser: typeof adminCreateUser;
   sendDirectMessage: typeof sendDirectMessage;
   getMyDashboardStats: typeof getMyDashboardStats;
+  adminGetDashboardData: typeof adminGetDashboardData;
   getPatientProfile: typeof getPatientProfile;
+  signIn: (email: string, password: string) => ReturnType<typeof signIn>;
 };
 
 // Create a flat localApi object that directly exports all functions
 export const localApi: LocalApi = {
-  login: (params: { email: string; password: string }) => signIn(params.email, params.password),
+  login: function(params: { email: string; password: string } | string | any) {
+    // Handle case where params is an object with email and password properties
+    if (params && typeof params === 'object' && 'email' in params && 'password' in params) {
+      return signIn(params.email, params.password);
+    }
+    
+    // Handle case where params and second argument are strings (direct email and password)
+    if (typeof params === 'string' && arguments.length > 1 && typeof arguments[1] === 'string') {
+      return signIn(params, arguments[1]);
+    }
+    
+    // Default fallback for unknown formats
+    return Promise.resolve({ success: false, error: 'Invalid login parameters format' });
+  },
   registerPatient: (payload: unknown) => registerUser(payload),
   registerDoctor: (payload: unknown) => registerUser(payload),
   getMyUserProfile,
@@ -130,7 +146,9 @@ export const localApi: LocalApi = {
   adminCreateUser,
   sendDirectMessage,
   getMyDashboardStats,
-  getPatientProfile
+  adminGetDashboardData,
+  getPatientProfile,
+  signIn: (email: string, password: string) => signIn(email, password)
 };
 
 // Add validation logging
@@ -178,6 +196,7 @@ export {
   
   // Dashboard functions
   getMyDashboardStats,
+  adminGetDashboardData,
   
   // Mock profile helpers
   getMockUserProfile,

@@ -975,5 +975,25 @@
     "isRead": false,
     "createdAt": "2025-05-04T12:49:58.702Z",
     "relatedId": "a-002"
+  },
+  {
+    "id": "notif-sib0sbovqi75lez19vist",
+    "userId": "u-000",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv has booked an appointment on 2025-05-12 at 12:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T14:53:43.687Z",
+    "relatedId": "0zjcj39cu5sfd29bn04f"
+  },
+  {
+    "id": "notif-ivbla6swhnxb6fccwlj",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Geraldd Reynolds-Millermm on 2025-05-12 at 12:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-04T14:53:43.687Z",
+    "relatedId": "0zjcj39cu5sfd29bn04f"
   }
 ]

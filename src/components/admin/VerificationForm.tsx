@@ -8,6 +8,7 @@ import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { VerificationStatus } from '@/types/enums';
+import { logError } from '@/lib/logger';
 
 interface VerificationFormProps {
   currentStatus: VerificationStatus;
@@ -48,8 +49,7 @@ export default function VerificationForm({
       await onSubmit({ status, notes });
       setSuccess(true);
     } catch (error: unknown) {
-      // Removed unused variable error
-      console.error(error);
+      logError('Error updating verification status', { error, status });
     } finally {
       setLoading(false);
     }

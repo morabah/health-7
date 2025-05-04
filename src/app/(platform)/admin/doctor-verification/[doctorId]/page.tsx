@@ -29,6 +29,26 @@ import Image from 'next/image';
 import Tabs from '@/components/ui/Tabs';
 import Badge from '@/components/ui/Badge';
 import Tooltip from '@/components/ui/Tooltip';
+import { ValidationError, ApiError, PermissionError } from '@/lib/errors';
+
+// Define response types
+interface DoctorDetailResponse {
+  success: boolean;
+  error?: string;
+  user?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    verificationStatus?: string;
+    doctorProfile?: Record<string, unknown>;
+  };
+}
+
+interface VerificationUpdateResponse {
+  success: boolean;
+  error?: string;
+}
 
 type Document = {
   title: string;
@@ -107,15 +127,15 @@ const DoctorVerificationPage = () => {
   useEffect(() => {
     logInfo('DoctorVerificationPage mounted', { doctorId });
     // If doctor data is available and successful, extract documents
+    const typedData = doctorData as DoctorDetailResponse;
     if (
-      doctorData &&
-      'success' in doctorData &&
-      doctorData.success &&
-      doctorData.user &&
-      doctorData.user.doctorProfile &&
-      typeof doctorData.user.doctorProfile === 'object'
+      typedData &&
+      typedData.success &&
+      typedData.user &&
+      typedData.user.doctorProfile &&
+      typeof typedData.user.doctorProfile === 'object'
     ) {
-      const profile = doctorData.user.doctorProfile as Record<string, unknown>;
+      const profile = typedData.user.doctorProfile as Record<string, unknown>;
       const docs: Document[] = [];
       if (typeof profile.licenseDocumentUrl === 'string' && profile.licenseDocumentUrl) {
         docs.push({
@@ -142,17 +162,26 @@ const DoctorVerificationPage = () => {
     try {
       // Require completion of all checklist items for verification
       if (status === VerificationStatus.VERIFIED && !allItemsChecked) {
-        throw new Error('Please complete all verification checklist items before approving.');
+        throw new ValidationError('Please complete all verification checklist items before approving.', {
+          code: 'VERIFICATION_CHECKLIST_INCOMPLETE',
+          validationIssues: {
+            checklist: ['All verification checklist items must be checked before approving.']
+          }
+        });
       }
 
       const result = await verifyDoctorMutation.mutateAsync({
         doctorId,
         status: status as VerificationStatus,
         notes: getVerificationNotes(status as VerificationStatus, notes),
-      });
+      }) as VerificationUpdateResponse;
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to update verification status');
+        throw new ApiError(result.error || 'Failed to update verification status', {
+          code: 'VERIFICATION_UPDATE_FAILED',
+          status: 400,
+          context: { doctorId, status, verificationStatus: status }
+        });
       }
 
       setSuccess(true);
@@ -206,16 +235,17 @@ const DoctorVerificationPage = () => {
     logInfo('doctor-verification rendered (with real data)', { doctorId });
   }, [doctorId]);
 
+  const typedData = doctorData as DoctorDetailResponse;
   const doctor =
-    doctorData && 'success' in doctorData && doctorData.success
-      ? (doctorData.user as Record<string, unknown>)
+    typedData && typedData.success && typedData.user
+      ? typedData.user
       : null;
   const doctorProfile =
     doctor &&
     typeof doctor === 'object' &&
-    'doctorProfile' in doctor &&
+    doctor.doctorProfile &&
     typeof doctor.doctorProfile === 'object'
-      ? (doctor.doctorProfile as Record<string, unknown>)
+      ? doctor.doctorProfile
       : null;
 
   // Loading state

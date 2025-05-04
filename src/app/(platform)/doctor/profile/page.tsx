@@ -27,6 +27,34 @@ export default function DoctorProfilePage() {
   );
 }
 
+// Interface for the doctor profile data structure returned by the API
+interface DoctorProfileData {
+  success: boolean;
+  error?: string;
+  userProfile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    role: string;
+  };
+  roleProfile: {
+    id: string;
+    userId: string;
+    specialty: string;
+    licenseNumber: string;
+    yearsOfExperience: number;
+    location: string | null;
+    languages: string[];
+    consultationFee: number | null;
+    bio: string | null;
+    servicesOffered: string | null;
+    verificationStatus: string;
+    education?: Array<{ institution: string; degree: string; year: string }>;
+  };
+}
+
 /**
  * Doctor Profile Content Component
  * Separated to allow error boundary to work properly
@@ -78,7 +106,9 @@ function DoctorProfileContent() {
   // Load profile data when available
   useEffect(() => {
     if (profileData && typeof profileData === 'object' && 'success' in profileData && profileData.success) {
-      const { userProfile, roleProfile } = profileData as any;
+      // Type guard to ensure profileData conforms to expected structure
+      const typedProfileData = profileData as DoctorProfileData;
+      const { userProfile, roleProfile } = typedProfileData;
       
       setProfile({
         firstName: userProfile?.firstName || '',
@@ -137,14 +167,20 @@ function DoctorProfileContent() {
         servicesOffered: profile.services,
       };
       
-      const result = await updateProfileMutation.mutateAsync(updatePayload);
+      // Define the expected response type
+      interface UpdateProfileResponse {
+        success: boolean;
+        error?: string;
+      }
+      
+      const result = await updateProfileMutation.mutateAsync(updatePayload) as UpdateProfileResponse;
       
       if (result.success) {
         setStatusMessage({
           type: 'success',
           message: 'Profile updated successfully'
         });
-    setIsEditing(false);
+        setIsEditing(false);
         
         // Explicitly refetch to ensure we have the latest data
         refetch();

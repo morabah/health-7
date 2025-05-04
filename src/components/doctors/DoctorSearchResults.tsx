@@ -8,7 +8,6 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
 import {
-  Search,
   MapPin,
   Globe,
   DollarSign,
@@ -17,9 +16,7 @@ import {
   Star,
 } from 'lucide-react';
 import { logInfo } from '@/lib/logger';
-import { useApiQuery } from '@/lib/enhancedApiClient';
-import { prefetchApiQuery } from '@/lib/enhancedApiClient';
-import { getOptimizedDoctors } from '@/lib/optimizedDataAccess';
+import { useApiQuery, prefetchApiQuery } from '@/lib/enhancedApiClient';
 import { cacheKeys } from '@/lib/queryClient';
 
 // Define interface for doctor data
@@ -36,6 +33,37 @@ interface Doctor {
   profilePictureUrl?: string;
 }
 
+// Define interface for doctor profile data
+interface DoctorProfile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  specialty: string;
+  education?: string[];
+  experience?: string[];
+  bio?: string;
+  services?: string[];
+  languages?: string[];
+  consultationFee?: number;
+}
+
+// Define interface for available slots data
+interface AvailableSlot {
+  id: string;
+  doctorId: string;
+  date: string;
+  time: string;
+  isAvailable: boolean;
+}
+
+// Define response type for API calls
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+}
+
 // Define response type for findDoctors API
 interface FindDoctorsResponse {
   success: boolean;
@@ -43,32 +71,37 @@ interface FindDoctorsResponse {
   error?: string;
 }
 
+// Define search parameters interface
+interface DoctorSearchParams extends Record<string, unknown> {
+  specialty?: string;
+  location?: string;
+  name?: string;
+  sortBy?: string;
+  page?: number;
+  limit?: number;
+}
+
 interface DoctorSearchResultsProps {
-  searchParams: {
-    specialty?: string;
-    location?: string;
-    name?: string;
-  };
+  searchParams: DoctorSearchParams;
   className?: string;
 }
 
 // Doctor Card Component with memo to prevent unnecessary re-renders
 const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
-  const router = useRouter();
-  
   // Prefetch doctor profile data on hover to improve perceived speed
   const handleMouseEnter = () => {
-    prefetchApiQuery<any>(
+    prefetchApiQuery<ApiResponse<DoctorProfile>>(
       'getDoctorPublicProfile', 
       cacheKeys.doctor(doctor.id), 
       [{ doctorId: doctor.id }]
     );
     
-    // Also prefetch first page of available slots
-    prefetchApiQuery<any>(
+    // Also prefetch first page of available slots for current date
+    const currentDate = new Date().toISOString().split('T')[0];
+    prefetchApiQuery<ApiResponse<AvailableSlot[]>>(
       'getAvailableSlots',
-      cacheKeys.availableSlots(doctor.id, new Date().toISOString().split('T')[0]),
-      [{ doctorId: doctor.id, date: new Date().toISOString().split('T')[0] }]
+      cacheKeys.availableSlots(doctor.id, currentDate),
+      [{ doctorId: doctor.id, date: currentDate }]
     );
   };
   
@@ -235,7 +268,7 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
       {/* Doctor Cards */}
       {!isLoading && !error && doctors && doctors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {doctors.map((doctor: Doctor) => (
+          {doctors.map((doctor) => (
             <DoctorCard key={doctor.id} doctor={doctor} />
           ))}
         </div>
@@ -248,6 +281,9 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
             <p className="text-slate-500 mb-4">
               Try adjusting your search filters to find more results.
             </p>
+            <Button variant="outline">
+              Clear Filters
+            </Button>
           </div>
         )
       )}

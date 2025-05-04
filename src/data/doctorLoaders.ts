@@ -6,6 +6,7 @@ import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
 import type { z } from 'zod';
 import type { UpdateProfileSchema, SetDoctorAvailabilitySchema, Appointment } from '@/types/schemas';
+import { AuthError } from '@/lib/errors';
 
 /**
  * Hook to fetch doctor profile data
@@ -16,7 +17,7 @@ export const useDoctorProfile = () => {
   return useQuery({
     queryKey: ['doctorProfile', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyUserProfile', { uid: user.uid, role: UserType.DOCTOR });
     },
     enabled: !!user?.uid
@@ -32,7 +33,7 @@ export const useUpdateDoctorProfile = () => {
   
   return useMutation({
     mutationFn: async (data: z.infer<typeof UpdateProfileSchema>) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       // Create the context object separate from the data payload
       const context = {
         uid: user.uid,
@@ -56,7 +57,7 @@ export const useDoctorAppointments = () => {
   return useQuery({
     queryKey: ['doctorAppointments', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyAppointments', { 
         uid: user.uid, 
         role: UserType.DOCTOR 
@@ -75,7 +76,7 @@ export const useCompleteAppointment = () => {
   
   return useMutation({
     mutationFn: async (params: { appointmentId: string; notes?: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Create the context object separate from the data payload
       const context = {
@@ -102,7 +103,7 @@ export const useDoctorCancelAppointment = () => {
   
   return useMutation({
     mutationFn: async (params: { appointmentId: string; reason: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Fix: Create proper context and payload objects
       const context = { 
@@ -132,7 +133,7 @@ export const useDoctorAvailability = () => {
   return useQuery({
     queryKey: ['doctorAvailability', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getDoctorAvailability', { 
         uid: user.uid, 
         role: UserType.DOCTOR,
@@ -151,7 +152,7 @@ export const useSetAvailability = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: z.infer<typeof SetDoctorAvailabilitySchema>) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       // Create the context object separate from the data payload
       const context = {
         uid: user.uid,
@@ -175,7 +176,7 @@ export const useAppointmentDetails = (appointmentId: string) => {
   return useQuery({
     queryKey: ['appointmentDetails', appointmentId, user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       return await callApi('getAppointmentDetails', { 
         appointmentId 

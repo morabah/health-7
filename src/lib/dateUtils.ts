@@ -3,6 +3,7 @@
  */
 
 import { format, parseISO, isValid } from 'date-fns';
+import { logError, logWarn } from './logger';
 
 /**
  * Formats a date string into a localized, human-readable format
@@ -17,13 +18,13 @@ export function formatDate(dateString: string | Date, formatStr: string = 'MMM d
     const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
     
     if (!isValid(date)) {
-      console.warn(`Invalid date provided to formatDate: ${dateString}`);
+      logWarn(`Invalid date provided to formatDate`, { dateString });
       return '';
     }
     
     return format(date, formatStr);
   } catch (error) {
-    console.error(`Error formatting date: ${dateString}`, error);
+    logError(`Error formatting date`, { dateString, error });
     return '';
   }
 }
@@ -95,7 +96,7 @@ export function formatDateForInput(dateString: string | null | undefined): strin
     
     return date.toISOString().split('T')[0];
   } catch (err) {
-    console.error('Error formatting date for input:', err);
+    logError('Error formatting date for input', { dateString, error: err });
     return '';
   }
 }
@@ -117,7 +118,7 @@ export function formatDateForApi(dateString: string | null | undefined): string 
     // Add time component
     return `${dateString}T00:00:00.000Z`;
   } catch (err) {
-    console.error('Error formatting date for API:', err);
+    logError('Error formatting date for API', { dateString, error: err });
     return '';
   }
 } 

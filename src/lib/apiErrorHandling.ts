@@ -7,8 +7,21 @@ import {
   getFirebaseErrorMessage, 
   getFirebaseErrorCategory,
   getFirebaseErrorSeverity,
-  createFirebaseError
+  createFirebaseError,
+  isFirebaseErrorRetryable
 } from './firebaseErrorMapping';
+import { trackPerformance } from './performance';
+import { 
+  ApiError, 
+  ApiResponseError, 
+  NetworkError, 
+  TimeoutError, 
+  ValidationError,
+  AuthError,
+  SessionExpiredError,
+  enhanceError,
+  throwHttpError
+} from './errors';
 
 /**
  * Configuration options for API calls
@@ -475,8 +488,12 @@ export function withApiErrorHandling<T extends unknown[], R>(
             context: errorContext,
           });
           
-          // Rethrow with additional info
-          throw new Error('Authentication required. Please log in again.');
+          // Throw session expired error with additional info
+          throw new SessionExpiredError('Authentication required. Please log in again.', {
+            code: 'SESSION_EXPIRED',
+            retryable: false,
+            context: errorContext
+          });
         }
         
         // If we've exhausted retries or this isn't a retryable error, report and throw
@@ -662,159 +679,200 @@ export async function callApiWithErrorHandling<T>(
   args: unknown[] = [],
   options: ErrorHandlingOptions = {}
 ): Promise<T> {
-  // Set default options
-  const {
-    endpoint = 'unknown-endpoint',
-    errorMessage = 'API call failed',
-    retryable = true,
-    maxRetries = DEFAULT_MAX_RETRIES,
-    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
-    errorCategory = 'api',
-    errorSeverity = 'error',
-    errorContext = {}
-  } = options;
-  
-  // Initialize retry counter
-  let retryCount = 0;
-  
-  // Check for offline status before making the API call
-  if (isOffline()) {
-    const offlineError = new Error('You appear to be offline. Please check your internet connection and try again.');
-    
-    // Define the extended error type
-    interface OfflineError extends Error {
-      isOffline: boolean;
-      category: ErrorCategory;
-      severity: ErrorSeverity;
-      recoverable: boolean;
-    }
-    
-    // Cast to the extended type and set properties
-    (offlineError as OfflineError).isOffline = true;
-    (offlineError as OfflineError).category = 'network';
-    (offlineError as OfflineError).severity = 'warning';
-    (offlineError as OfflineError).recoverable = true;
-    
-    reportError(offlineError, {
-      category: 'network',
-      severity: 'warning',
-      context: { offline: true, ...options.errorContext }
-    });
-    throw offlineError;
-  }
-  
-  // Keep trying until we succeed or exceed max retries
-  while (true) {
-    try {
-      // Call the function with provided arguments
-      return await fn(...args);
-    } catch (error) {
-      // Check if we should retry
-      if (retryable && retryCount < maxRetries) {
-        // Increment retry counter
-        retryCount++;
-        
-        // Calculate delay with exponential backoff
-        const delay = retryDelayMs * Math.pow(EXPONENTIAL_BACKOFF_FACTOR, retryCount - 1);
-        
-        // Log retry attempt
-        logWarn(`API call to ${endpoint} failed. Retrying (${retryCount}/${maxRetries}) in ${delay}ms`, { 
-          error,
-          retryCount,
-          maxRetries,
-          delay,
-          ...errorContext
-        });
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Retry the operation (continue to next loop iteration)
-        continue;
-      }
-      
-      // Add error handling - map Firebase errors to standard format
-      if (error && typeof error === 'object' && 'code' in error) {
-        // This is likely a Firebase error
-        const firebaseError = error as { code: string; message: string };
-  
-        // Get user-friendly error details from our mapping
-        const userMessage = getFirebaseErrorMessage(firebaseError.code, errorMessage);
-        const category = getFirebaseErrorCategory(firebaseError.code) || errorCategory;
-        const severity = getFirebaseErrorSeverity(firebaseError.code) || errorSeverity;
-        
-        // Map Firebase error codes to our standard error format
-        logError(`Firebase API Error in ${endpoint}: ${firebaseError.code}`, {
-          code: firebaseError.code,
-          message: firebaseError.message,
-          userMessage,
-          endpoint,
-          category,
-          severity,
-          ...errorContext
-        });
-        
-        // Format as a standard error object with Firebase error properties
-        const standardError = createFirebaseError(firebaseError);
-        
-        // Define extended error type with additional properties
-        interface EnhancedFirebaseError extends Error {
-          endpoint: string;
-          errorContext: Record<string, unknown>;
-        }
-        
-        // Cast and set properties
-        (standardError as EnhancedFirebaseError).endpoint = endpoint;
-        (standardError as EnhancedFirebaseError).errorContext = errorContext;
-        
-        throw standardError;
-      }
-      
-      // Standard error logging
-      logError(`API Error in ${endpoint}: ${errorMessage}`, {
-        error,
-        endpoint,
-        category: errorCategory,
-        severity: errorSeverity,
-        ...errorContext
+  // Start performance tracking
+  const endpoint = options.endpoint || 'unknown';
+  const perf = trackPerformance(`api:${endpoint}`);
+
+  try {
+    // If offline, throw a special offline error that can be handled appropriately
+    if (isOffline()) {
+      // Create a network error for offline state
+      throw new NetworkError('You appear to be offline. Please check your internet connection.', {
+        retryable: true,
+        severity: 'warning',
+        context: { endpoint, args: JSON.stringify(args) }
       });
-  
-      // Rethrow with enhanced context
-      if (error instanceof Error) {
-        // Define enhanced error type
-        interface EnhancedApiError extends Error {
-          category: ErrorCategory;
-          severity: ErrorSeverity;
-          context: Record<string, unknown>;
+    }
+
+    // Try to execute the function
+    const result = await fn(...args);
+    perf.stop();
+    return result;
+  } catch (error) {
+    perf.stop();
+    
+    // Handle errors with specific error classes based on error type
+    
+    // Handle Firebase errors
+    if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && error.code.includes('/')) {
+      // This is likely a Firebase error
+      const firebaseError = createFirebaseError(error as { code: string; message: string });
+      
+      // Check if it's an auth error
+      if (error.code.startsWith('auth/')) {
+        // Convert to our AuthError type
+        throw new AuthError(getFirebaseErrorMessage(error.code), {
+          code: error.code,
+          severity: getFirebaseErrorSeverity(error.code),
+          retryable: isFirebaseErrorRetryable(error.code),
+          context: { 
+            endpoint,
+            firebaseError: error,
+            ...options.errorContext 
+          }
+        });
+      }
+      
+      // Report and rethrow Firebase error
+      logError(`Firebase error in ${endpoint}: ${error.code}`, {
+        error: firebaseError,
+        endpoint,
+        category: getFirebaseErrorCategory(error.code),
+        severity: getFirebaseErrorSeverity(error.code),
+        method: endpoint
+      });
+      
+      throw firebaseError;
+    }
+    
+    // Handle network errors
+    if (isNetworkError(error)) {
+      const networkError = new NetworkError(
+        'There was a problem connecting to the server. Please check your connection and try again.',
+        {
+          code: 'NETWORK_ERROR',
+          context: { endpoint, args: JSON.stringify(args), originalError: error, ...options.errorContext },
+          retryable: true,
+          severity: 'warning'
         }
+      );
+      
+      logError(`Network error in ${endpoint}`, {
+        error: networkError,
+        endpoint,
+        category: 'network',
+        severity: 'warning',
+        method: endpoint
+      });
+      
+      throw networkError;
+    }
+    
+    // Handle timeout errors
+    if (error instanceof Error && error.message.includes('timeout')) {
+      const timeoutError = new TimeoutError('The request took too long to complete. Please try again.', {
+        context: { endpoint, args: JSON.stringify(args), originalError: error, ...options.errorContext },
+        severity: 'warning'
+      });
+      
+      logError(`Timeout error in ${endpoint}`, {
+        error: timeoutError,
+        endpoint,
+        category: 'network',
+        severity: 'warning',
+        method: endpoint
+      });
+      
+      throw timeoutError;
+    }
+    
+    // Handle HTTP errors with status codes
+    if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number') {
+      const statusCode = error.status as number;
+      
+      // Handle authentication errors
+      if (statusCode === 401) {
+        const authError = new SessionExpiredError('Your session has expired. Please log in again.', {
+          context: { endpoint, statusCode, ...options.errorContext },
+          retryable: false
+        });
         
-        // Add metadata to existing error
-        (error as EnhancedApiError).category = errorCategory;
-        (error as EnhancedApiError).severity = errorSeverity;
-        (error as EnhancedApiError).context = errorContext;
+        logError(`Authentication error in ${endpoint}`, {
+          error: authError,
+          endpoint,
+          category: 'auth',
+          severity: 'warning',
+          method: endpoint
+        });
         
-        throw error;
-      } else {
-        // Wrap non-Error objects
-        const standardError = new Error(errorMessage);
+        throw authError;
+      }
+      
+      // Handle other HTTP status codes
+      try {
+        throwHttpError(statusCode, options.errorMessage, { 
+          endpoint, 
+          originalError: error,
+          ...options.errorContext 
+        });
+      } catch (httpError) {
+        logError(`HTTP error in ${endpoint}: ${statusCode}`, {
+          error: httpError,
+          endpoint,
+          category: categorizeError(error),
+          severity: 'error',
+          method: endpoint,
+          statusCode
+        });
         
-        // Define enhanced error type
-        interface EnhancedStandardError extends Error {
-          category: ErrorCategory;
-          severity: ErrorSeverity;
-          originalError: unknown;
-          context: Record<string, unknown>;
-        }
-        
-        // Add metadata
-        (standardError as EnhancedStandardError).category = errorCategory;
-        (standardError as EnhancedStandardError).severity = errorSeverity;
-        (standardError as EnhancedStandardError).originalError = error;
-        (standardError as EnhancedStandardError).context = errorContext;
-        
-        throw standardError;
+        throw httpError;
       }
     }
+    
+    // For validation errors (API contracts, etc.)
+    if (
+      error && 
+      typeof error === 'object' && 
+      ('validationErrors' in error || 'zod' in error || 'validationError' in error)
+    ) {
+      const validationError = new ValidationError(
+        options.errorMessage || 'Validation failed for your request', 
+        {
+          context: { 
+            endpoint, 
+            validationDetails: error,
+            ...options.errorContext 
+          },
+          retryable: false
+        }
+      );
+      
+      logError(`Validation error in ${endpoint}`, {
+        error: validationError,
+        endpoint,
+        category: 'validation',
+        severity: 'warning',
+        method: endpoint
+      });
+      
+      throw validationError;
+    }
+    
+    // For any other errors, convert to ApiError
+    const apiError = new ApiError(
+      options.errorMessage || 'An error occurred while processing your request',
+      {
+        context: { 
+          endpoint, 
+          originalError: error,
+          ...options.errorContext 
+        },
+        retryable: options.retryable !== undefined ? options.retryable : true,
+        severity: options.errorSeverity || 'error',
+        code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'API_ERROR'
+      }
+    );
+    
+    logError(`API Error in ${endpoint}: ${options.errorMessage || 'Error calling API method: ' + endpoint}`, {
+      error: apiError,
+      endpoint,
+      category: options.errorCategory || 'api',
+      severity: options.errorSeverity || 'error',
+      method: endpoint,
+      args: JSON.stringify(args)
+    });
+    
+    throw apiError;
   }
 }
 

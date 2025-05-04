@@ -16,6 +16,7 @@ import { callApi } from '@/lib/apiClient';
 import { APP_ROUTES } from '@/lib/router';
 import type { Notification } from '@/types/schemas';
 import UserSwitcher from '@/components/ui/UserSwitcher';
+import { logError } from '@/lib/logger';
 
 // Format the last active timestamp
 const formatLastActive = (timestamp: number): string => {
@@ -99,7 +100,7 @@ export default function Navbar() {
           setNotificationsFetchFailed(false);
         }
       } catch (error) {
-        console.error('Error fetching notifications:', error);
+        logError('Error fetching notifications', { error, userId: user?.uid });
         setNotificationsFetchFailed(true);
         
         // If we fail, we'll retry after a longer delay (2 minutes)

@@ -1,7 +1,7 @@
 'use client';
 
 import { logInfo } from './logger';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, ComponentType, PropsWithChildren } from 'react';
 
 /**
  * Performance metrics tracking utility
@@ -27,14 +27,16 @@ const MAX_METRICS_HISTORY = 100;
 const activeSpans: Record<string, PerformanceMetric> = {};
 
 // Aggregated metrics by operation type
-const metricsByOperation: Record<string, {
+interface OperationMetrics {
   count: number;
   totalDuration: number;
   minDuration: number;
   maxDuration: number;
   lastDuration: number;
   lastTimestamp: number;
-}> = {};
+}
+
+const metricsByOperation: Record<string, OperationMetrics> = {};
 
 /**
  * Start a performance measurement
@@ -43,7 +45,7 @@ const metricsByOperation: Record<string, {
  * @returns ID of the measurement span
  */
 export function startMeasurement(name: string, metadata?: Record<string, unknown>): string {
-  const id = `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = `${name}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const metric: PerformanceMetric = {
     name,
     start: performance.now(),
@@ -164,10 +166,31 @@ export function measure<T>(
 }
 
 /**
+ * Interface for performance metrics summary
+ */
+export interface PerformanceMetricsSummary {
+  name: string;
+  count: number;
+  avgDuration: number;
+  minDuration: number;
+  maxDuration: number;
+  lastDuration: number;
+  lastExecuted: Date;
+}
+
+/**
+ * Interface for all performance metrics data
+ */
+export interface AllPerformanceMetrics {
+  summary: PerformanceMetricsSummary[];
+  recentOperations: PerformanceMetric[];
+}
+
+/**
  * Get performance metrics for all operations
  * @returns Summary of all tracked operations
  */
-export function getPerformanceMetrics() {
+export function getPerformanceMetrics(): AllPerformanceMetrics {
   const summary = Object.entries(metricsByOperation).map(([name, metrics]) => ({
     name,
     count: metrics.count,
@@ -191,37 +214,55 @@ export function getPerformanceMetrics() {
  * @returns Wrapped component with performance measurement
  */
 export function withPerformanceTracking<P extends object>(
-  Component: React.ComponentType<P>,
+  Component: ComponentType<P>,
   name?: string
 ): React.FC<P> {
   const displayName = name || Component.displayName || Component.name || 'UnknownComponent';
   const metricName = `render_${displayName}`;
   
-  function WrappedComponent(props: P) {
-    const id = startMeasurement(metricName);
+  // Properly typed wrapped component
+  const WrappedComponent: React.FC<P> = (props: P) => {
+    const id = useRef<string | null>(null);
     
-    // We can't easily measure the exact render time in React,
-    // but we can approximate it with a cleanup function
     useEffect(() => {
-      // End measurement after render is complete
-      const duration = endMeasurement(id);
+      // Start measurement after initial render
+      id.current = startMeasurement(metricName);
       
-      // Log unusually slow renders
-      if (duration > 100) {
-        logInfo('SLOW_RENDER', { component: displayName, duration });
-      }
-      
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once per render
+      return () => {
+        // End measurement during cleanup
+        if (id.current) {
+          const duration = endMeasurement(id.current);
+          
+          // Log unusually slow renders
+          if (duration > 100) {
+            logInfo('SLOW_RENDER', { component: displayName, duration });
+          }
+        }
+      };
+    }, []);
     
+    // Using React.createElement for better type safety
     return React.createElement(Component, props);
-  }
+  };
   
   WrappedComponent.displayName = `WithPerformanceTracking(${displayName})`;
   return WrappedComponent;
 }
 
-type TrackedProps = Record<string, unknown>;
+/**
+ * Type for tracked props in components
+ */
+export type TrackedProps = Record<string, unknown>;
+
+/**
+ * Interface for the return value of usePerformanceTracking
+ */
+export interface PerformanceTrackingHook {
+  startMeasurement: (operationName: string, metadata?: Record<string, unknown>) => string;
+  endMeasurement: typeof endMeasurement;
+  renderCount: number;
+  trackPropsChange: (currentProps: TrackedProps) => void;
+}
 
 /**
  * Performance measurement hook for React components
@@ -229,7 +270,7 @@ type TrackedProps = Record<string, unknown>;
  * @param trackProps Whether to track prop changes
  * @returns Performance tracking helpers
  */
-export function usePerformanceTracking(name: string, trackProps = false) {
+export function usePerformanceTracking(name: string, trackProps = false): PerformanceTrackingHook {
   const renderCount = useRef(0);
   const prevProps = useRef<TrackedProps | null>(null);
   
@@ -237,7 +278,7 @@ export function usePerformanceTracking(name: string, trackProps = false) {
   renderCount.current++;
   
   // Track what caused re-renders by comparing props
-  const trackPropsChange = (currentProps: TrackedProps) => {
+  const trackPropsChange = (currentProps: TrackedProps): void => {
     if (trackProps && renderCount.current > 1 && prevProps.current) {
       const propsChanged: Record<string, { from: unknown; to: unknown }> = {};
       

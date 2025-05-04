@@ -91,14 +91,68 @@ export default function NotificationPanel({
   const handleNotificationClick = (notification: Notification) => {
     if (onClose) onClose();
     
-    // TODO: Handle different notification types with different routes
-    // For now, just go to notifications page
-    router.push('/notifications');
+    // Handle different notification types with different routes
+    switch (notification.type) {
+      case NotificationType.APPOINTMENT_REQUEST:
+      case NotificationType.APPOINTMENT_CONFIRMED:
+      case NotificationType.APPOINTMENT_CANCELED:
+      case NotificationType.APPOINTMENT_REMINDER:
+      case NotificationType.APPOINTMENT_COMPLETED:
+      case NotificationType.APPOINTMENT_RESCHEDULED:
+        // For appointment-related notifications, go to appointments page
+        router.push(user?.role === 'doctor' ? '/doctor/appointments' : '/patient/appointments');
+        break;
+        
+      case NotificationType.VERIFICATION_STATUS_CHANGE:
+        // For verification status changes, go to profile
+        router.push(user?.role === 'doctor' ? '/doctor/profile' : '/patient/profile');
+        break;
+        
+      case NotificationType.ACCOUNT_STATUS_CHANGE:
+        // For account status changes, go to profile
+        router.push(user?.role === 'doctor' ? '/doctor/profile' : '/patient/profile');
+        break;
+        
+      case NotificationType.NEW_MESSAGE:
+        // For messages, go to messages page
+        router.push('/messages');
+        break;
+        
+      default:
+        // For all other notification types, go to notifications page
+        router.push('/notifications');
+        break;
+    }
     
     logInfo('notification-panel', { 
       action: 'notification-clicked', 
-      notificationId: notification.id 
+      notificationId: notification.id,
+      notificationType: notification.type,
+      routeTarget: getRouteForNotificationType(notification.type, user?.role || 'patient')
     });
+  };
+  
+  // Helper function to get the appropriate route for a notification type
+  const getRouteForNotificationType = (type: string, userRole: string): string => {
+    switch (type) {
+      case NotificationType.APPOINTMENT_REQUEST:
+      case NotificationType.APPOINTMENT_CONFIRMED:
+      case NotificationType.APPOINTMENT_CANCELED:
+      case NotificationType.APPOINTMENT_REMINDER:
+      case NotificationType.APPOINTMENT_COMPLETED:
+      case NotificationType.APPOINTMENT_RESCHEDULED:
+        return userRole === 'doctor' ? '/doctor/appointments' : '/patient/appointments';
+        
+      case NotificationType.VERIFICATION_STATUS_CHANGE:
+      case NotificationType.ACCOUNT_STATUS_CHANGE:
+        return userRole === 'doctor' ? '/doctor/profile' : '/patient/profile';
+        
+      case NotificationType.NEW_MESSAGE:
+        return '/messages';
+        
+      default:
+        return '/notifications';
+    }
   };
   
   // Get icon based on notification type

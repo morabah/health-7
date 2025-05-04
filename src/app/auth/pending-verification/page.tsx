@@ -10,6 +10,8 @@ import { CheckCircle, Mail, ArrowLeft, RefreshCw, Clock, Lock } from 'lucide-rea
 import { useAuth } from '@/context/AuthContext';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
+import { NetworkError } from '@/lib/errors';
+import { AuthErrorBoundary } from '@/components/error-boundaries';
 
 /**
  * Pending verification page shown to users after they register
@@ -104,7 +106,12 @@ export default function PendingVerificationPage() {
       
       // Randomly simulate occasional failures (10% chance)
       if (Math.random() < 0.1) {
-        throw new Error('Failed to send verification email. Server temporarily unavailable.');
+        throw new NetworkError('Failed to send verification email. Server temporarily unavailable.', {
+          code: 'EMAIL_SERVICE_UNAVAILABLE',
+          retryable: true,
+          severity: 'warning',
+          context: { timestamp: new Date().toISOString() }
+        });
       }
       
       setResendSuccess(true);

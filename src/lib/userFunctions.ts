@@ -204,8 +204,8 @@ export async function getMockUserProfile(
  * Sign in a user with email and password
  */
 export async function signIn(
-  email: string,
-  password: string
+  email: string | { email: string; password?: string } | Record<string, any>,
+  password?: string | { password: string } | Record<string, any>
 ): Promise<
   | ResultOk<{
       user: { id: string; email: string | null };
@@ -221,16 +221,48 @@ export async function signIn(
 
   try {
     /* 1  log and validate */
-    logInfo('signIn attempt', { email });
+    // Handle case where email might be an object
+    let emailStr: string;
+    let passwordStr: string;
+    
+    // Handle the case where a single object containing both email and password is passed
+    if (typeof email === 'object' && email !== null && 'email' in email && 'password' in email && password === undefined) {
+      // Extract both email and password from the first parameter
+      emailStr = email.email as string;
+      passwordStr = email.password as string;
+    } else {
+      // Handle normal case where email and password are separate parameters
+      if (typeof email === 'object' && email !== null && 'email' in email) {
+        emailStr = email.email as string;
+      } else if (typeof email === 'string') {
+        emailStr = email;
+      } else {
+        return { success: false, error: 'Invalid email format' };
+      }
+      
+      if (typeof password === 'object' && password !== null && 'password' in password) {
+        passwordStr = password.password as string;
+      } else if (typeof password === 'string') {
+        passwordStr = password;
+      } else {
+        return { success: false, error: 'Invalid password format' };
+      }
+    }
+    
+    if (!emailStr || !passwordStr) {
+      return { success: false, error: 'Email and password are required' };
+    }
+    
+    logInfo('signIn attempt', { email: emailStr });
 
     /* 2  find user in users.json */
     const users = await getUsers();
-    const userMatch = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const userMatch = users.find(u => u.email?.toLowerCase() === emailStr.toLowerCase());
 
     // Special case for admin@example.com auto-creation
     if (
-      email === 'admin@example.com' &&
-      (password === 'Targo2000!' || password === 'password123')
+      emailStr === 'admin@example.com' &&
+      (passwordStr === 'Targo2000!' || passwordStr === 'password123')
     ) {
       logInfo('Admin auto-login detected, creating admin user if needed');
 
@@ -269,22 +301,22 @@ export async function signIn(
     }
 
     if (!userMatch) {
-      logWarn('Login attempt: email not found', { email });
+      logWarn('Login attempt: email not found', { email: emailStr });
       return { success: false, error: 'Invalid email or password' };
     }
 
     /* 3  validate password */
-    const storedPassword = userPasswords[email.toLowerCase()];
+    const storedPassword = userPasswords[emailStr.toLowerCase()];
     const defaultPasswords = ['password123', 'password', 'Targo2000!', 'Password123'];
 
     // Check if the password matches either the stored password or any of the default passwords
-    if (storedPassword !== password && !defaultPasswords.includes(password)) {
-      logWarn('Login attempt: incorrect password', { email });
+    if (storedPassword !== passwordStr && !defaultPasswords.includes(passwordStr)) {
+      logWarn('Login attempt: incorrect password', { email: emailStr });
       return { success: false, error: 'Invalid email or password' };
     }
 
     // Support automatic mock user generation in dev
-    if (userMatch.userType === UserType.ADMIN && email === 'admin@example.com') {
+    if (userMatch.userType === UserType.ADMIN && emailStr === 'admin@example.com') {
       logInfo('Admin auto-login detected');
     }
 

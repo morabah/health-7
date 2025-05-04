@@ -30,6 +30,20 @@ import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentMod
 import CancelAppointmentModal from '@/components/doctor/CancelAppointmentModal';
 import type { Appointment } from '@/types/schemas';
 import { useQueryClient } from '@tanstack/react-query';
+import { AppointmentErrorBoundary } from "@/components/error-boundaries";
+import { ApiError, AppointmentError, SlotUnavailableError } from "@/lib/errors";
+
+// Define response types
+interface AppointmentDetailResponse {
+  success: boolean;
+  error?: string;
+  appointment?: Appointment;
+}
+
+interface AppointmentActionResponse {
+  success: boolean;
+  error?: string;
+}
 
 export default function AppointmentDetailsPage() {
   const params = useParams();
@@ -60,10 +74,14 @@ export default function AppointmentDetailsPage() {
       const result = await completeMutation.mutateAsync({
         appointmentId,
         notes
-      });
+      }) as AppointmentActionResponse;
       
       if (!result.success) {
-        throw new Error(result.error);
+        throw new ApiError(result.error || 'Failed to mark appointment as completed', {
+          code: 'APPOINTMENT_COMPLETION_FAILED', 
+          status: 400,
+          context: { appointmentId }
+        });
       }
       
       setConfirmCompleteOpen(false);
@@ -79,7 +97,14 @@ export default function AppointmentDetailsPage() {
       });
     } catch (err) {
       logInfo(`Error completing appointment: ${err instanceof Error ? err.message : String(err)}`);
-      throw new Error(err instanceof Error ? err.message : "An error occurred while completing the appointment");
+      throw new AppointmentError(
+        err instanceof Error ? err.message : "An error occurred while completing the appointment",
+        { 
+          appointmentId,
+          code: 'APPOINTMENT_COMPLETION_ERROR',
+          context: { notes, error: err }
+        }
+      );
     }
   };
   
@@ -90,10 +115,14 @@ export default function AppointmentDetailsPage() {
       const result = await cancelMutation.mutateAsync({
         appointmentId: id,
         reason: reason
-      });
+      }) as AppointmentActionResponse;
       
       if (!result.success) {
-        throw new Error(result.error || 'Failed to cancel appointment');
+        throw new ApiError(result.error || 'Failed to cancel appointment', {
+          code: 'APPOINTMENT_CANCELLATION_FAILED',
+          status: 400,
+          context: { appointmentId: id, reason }
+        });
       }
       
       setConfirmCancelOpen(false);
@@ -107,7 +136,14 @@ export default function AppointmentDetailsPage() {
         description: "The appointment has been cancelled successfully.",
       });
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'An error occurred while cancelling the appointment');
+      throw new AppointmentError(
+        err instanceof Error ? err.message : 'An error occurred while cancelling the appointment',
+        {
+          appointmentId: id,
+          code: 'APPOINTMENT_CANCELLATION_ERROR',
+          context: { reason, error: err }
+        }
+      );
     }
   };
 
@@ -129,7 +165,8 @@ export default function AppointmentDetailsPage() {
     );
   }
 
-  const appointment = data?.appointment as Appointment;
+  const typedData = data as AppointmentDetailResponse;
+  const appointment = typedData?.appointment;
   if (!appointment) {
     return (
       <Alert variant="error">Appointment not found</Alert>
@@ -330,7 +367,7 @@ export default function AppointmentDetailsPage() {
       <CompleteAppointmentModal
         isOpen={confirmCompleteOpen}
         onClose={() => setConfirmCompleteOpen(false)}
-        appt={data?.appointment}
+        appt={typedData?.appointment || null}
         onConfirm={handleCompleteAppointment}
       />
 
@@ -338,7 +375,7 @@ export default function AppointmentDetailsPage() {
       <CancelAppointmentModal
         isOpen={confirmCancelOpen}
         onClose={() => setConfirmCancelOpen(false)}
-        appt={data?.appointment}
+        appt={typedData?.appointment || null}
         onConfirm={handleCancelAppointment}
       />
     </div>

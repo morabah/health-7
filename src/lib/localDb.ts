@@ -13,6 +13,7 @@ import type {
   Notification 
 } from '../types/schemas';
 import { logError, logInfo } from '@/lib/logger';
+import { DataError } from './errors';
 
 /**
  * Generic function to fetch collection data from the local DB API
@@ -23,7 +24,10 @@ async function fetchCollectionData<T>(collection: string): Promise<T[]> {
     
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `Error fetching ${collection}`);
+      throw new DataError(error.error || `Error fetching ${collection}`, {
+        code: 'LOCAL_DB_FETCH_ERROR',
+        context: { collection, status: response.status }
+      });
     }
     
     const result = await response.json();
@@ -49,7 +53,10 @@ async function saveCollectionData<T>(collection: string, data: T[]): Promise<boo
     
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || `Error saving ${collection}`);
+      throw new DataError(error.error || `Error saving ${collection}`, {
+        code: 'LOCAL_DB_SAVE_ERROR',
+        context: { collection, status: response.status, dataLength: data.length }
+      });
     }
     
     logInfo(`Saved ${data.length} items to ${collection}`);

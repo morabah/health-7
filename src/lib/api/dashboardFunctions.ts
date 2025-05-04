@@ -123,4 +123,61 @@ export async function getMyDashboardStats(ctx: { uid: string; role: UserType }):
   } finally {
     perf.stop();
   }
+}
+
+/**
+ * Get dashboard data for admin users
+ */
+export async function adminGetDashboardData(ctx: { uid: string; role: UserType }): Promise<
+  | ResultOk<{
+      adminStats: {
+        totalPatients: number;
+        totalDoctors: number;
+        pendingVerifications: number;
+      };
+    }>
+  | ResultErr
+> {
+  const perf = trackPerformance('adminGetDashboardData');
+
+  try {
+    const { uid, role } = ctx;
+
+    logInfo('adminGetDashboardData called', { uid, role });
+
+    // Verify admin role
+    if (role !== UserType.ADMIN) {
+      return {
+        success: false,
+        error: 'Only administrators can access this data'
+      };
+    }
+
+    // Get users and doctors data
+    const users = await getUsers();
+    const doctors = await getDoctors();
+
+    // Calculate statistics
+    const totalPatients = users.filter(u => u.userType === UserType.PATIENT).length;
+    const totalDoctors = doctors.length;
+    const pendingVerifications = doctors.filter(
+      d => d.verificationStatus === VerificationStatus.PENDING
+    ).length;
+
+    const adminStats = {
+      totalPatients,
+      totalDoctors,
+      pendingVerifications,
+    };
+
+    return {
+      success: true,
+      adminStats
+    };
+  } catch (e) {
+    logError('adminGetDashboardData failed', e);
+    return { success: false, error: 'Error fetching admin dashboard data' };
+  } finally {
+    perf.stop();
+  }
 } 

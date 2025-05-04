@@ -10,6 +10,7 @@ import Alert from '@/components/ui/Alert';
 import { logInfo, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import { AuthErrorBoundary } from '@/components/error-boundaries';
+import { ValidationError } from '@/lib/errors';
 
 /**
  * Login Page
@@ -54,11 +55,15 @@ function LoginPageContent() {
 
       // Validate email and password
       if (!email || typeof email !== 'string') {
-        throw new Error('Valid email is required');
+        throw new ValidationError('Valid email is required', {
+          validationIssues: { email: ['Email is required and must be a valid format'] }
+        });
       }
 
       if (!password || typeof password !== 'string') {
-        throw new Error('Valid password is required');
+        throw new ValidationError('Valid password is required', {
+          validationIssues: { password: ['Password is required'] }
+        });
       }
 
       // Log authentication attempt

@@ -5,6 +5,7 @@ import type { VerificationStatus, AccountStatus } from '@/types/enums';
 import { UserType, VerificationStatus as VerificationStatusEnum } from '@/types/enums';
 import type { DoctorProfile } from '@/types/schemas';
 import { logInfo } from '@/lib/logger';
+import { UnauthorizedError, AuthError } from '@/lib/errors';
 
 /**
  * Hook to fetch all users
@@ -16,7 +17,7 @@ export const useAllUsers = () => {
     queryKey: ['admin', 'users'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access user management');
       }
       
       return callApi('adminGetAllUsers', {
@@ -38,7 +39,7 @@ export const useAllPatients = () => {
     queryKey: ['admin', 'patients'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access patient records');
       }
       
       const response = await callApi('adminGetAllUsers', {
@@ -66,7 +67,7 @@ export const useAllDoctors = () => {
     queryKey: ['admin', 'doctors'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access doctor records');
       }
       
       return callApi('adminGetAllDoctors', {
@@ -88,7 +89,7 @@ export const useAllAppointments = () => {
     queryKey: ['admin', 'appointments'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access all appointments');
       }
       
       return callApi('adminGetAllAppointments', {
@@ -110,7 +111,7 @@ export const useUserDetail = (userId: string) => {
     queryKey: ['admin', 'userDetail', userId],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access user details');
       }
       
       return callApi('adminGetUserDetail', {
@@ -140,7 +141,7 @@ export const useVerifyDoctor = () => {
       notes?: string 
     }) => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can verify doctors');
       }
       return callApi('adminVerifyDoctor', {
         uid: user.uid,
@@ -175,7 +176,7 @@ export const useAdminActivateUser = () => {
       reason?: string 
     }) => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can update user status');
       }
       
       // Create separate context and payload objects
@@ -202,7 +203,7 @@ export const useAdminActivateUser = () => {
 };
 
 /**
- * Hook to fetch pending doctor verifications
+ * Hook to fetch doctors pending verification
  */
 export const useAdminGetPendingDoctors = () => {
   const { user } = useAuth();
@@ -211,7 +212,7 @@ export const useAdminGetPendingDoctors = () => {
     queryKey: ['admin', 'pendingDoctors'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access verification queue');
       }
       
       const response = await callApi('adminGetAllDoctors', {
@@ -219,12 +220,13 @@ export const useAdminGetPendingDoctors = () => {
         role: UserType.ADMIN
       });
       
-      // Filter for pending doctors only
-      if (response.success) {
+      if (response && typeof response === 'object' && 'success' in response && response.success) {
+        // Filter for pending verification doctors only
+        const doctors = Array.isArray(response.doctors) ? response.doctors : [];
         return {
           ...response,
-          doctors: response.doctors.filter((doctor: DoctorProfile) => 
-            doctor.verificationStatus === VerificationStatusEnum.PENDING
+          doctors: doctors.filter((d: DoctorProfile) => 
+            d.verificationStatus === VerificationStatusEnum.PENDING
           )
         };
       }
@@ -236,57 +238,68 @@ export const useAdminGetPendingDoctors = () => {
 };
 
 /**
- * Hook to get appointment details by ID for admin
+ * Hook to fetch a single appointment details - admin version
  */
 export function useAppointmentDetails(appointmentId: string) {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['admin', 'appointment', appointmentId],
+    queryKey: ['admin', 'appointmentDetail', appointmentId],
     queryFn: async () => {
       if (!user) {
-        throw new Error('User not authenticated');
+        throw new AuthError('User not authenticated');
       }
       
-      return await callApi('getAppointmentDetails', { appointmentId });
+      if (user.role !== UserType.ADMIN) {
+        throw new UnauthorizedError('Only administrators can access this appointment');
+      }
+      
+      return await callApi('getAppointmentDetails', { 
+        uid: user.uid,
+        role: UserType.ADMIN,
+        appointmentId 
+      });
     },
     enabled: !!appointmentId && !!user,
   });
 }
 
 /**
- * Hook to get all appointments for admin
+ * Hook to fetch filtered appointments for the admin dashboard
  */
 export function useAdminAppointments() {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['admin', 'all-appointments'],
+    queryKey: ['admin', 'dashboardAppointments'],
     queryFn: async () => {
-      if (!user) {
-        throw new Error('User not authenticated');
+      if (!user || user.role !== UserType.ADMIN) {
+        throw new UnauthorizedError('Only administrators can access this data');
       }
       
-      return await callApi('getMyAppointments', {});
+      return callApi('adminGetAllAppointments', {
+        uid: user.uid,
+        role: UserType.ADMIN
+      });
     },
-    enabled: !!user,
+    enabled: !!user && user.role === UserType.ADMIN
   });
 }
 
 /**
- * Hook to get admin dashboard data with all metrics
+ * Hook to get admin dashboard summary data
  */
 export const useAdminDashboardData = () => {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['admin', 'dashboard'],
+    queryKey: ['admin', 'dashboardData'],
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can access dashboard data');
       }
       
-      return callApi('getMyDashboardStats', {
+      return callApi('adminGetDashboardData', {
         uid: user.uid,
         role: UserType.ADMIN
       });
@@ -296,91 +309,78 @@ export const useAdminDashboardData = () => {
 };
 
 /**
- * Hook for admin to trigger password reset for user
+ * Hook for admin to trigger password reset for a user
  */
 export const useAdminTriggerPasswordReset = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ userId, notifyUser = true }: { userId: string; notifyUser?: boolean }) => {
+    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can reset user passwords');
       }
       
       return callApi('adminTriggerPasswordReset', {
         uid: user.uid,
-        role: UserType.ADMIN,
+        role: UserType.ADMIN
+      }, {
         userId,
-        notifyUser
+        email
       });
     },
     onSuccess: () => {
-      // No need to invalidate queries - password reset doesn't change user data that's displayed
-      // But we can log success
-      logInfo('Admin triggered password reset successfully');
+      // Invalidate relevant queries if needed
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     }
   });
 };
 
 /**
- * Hook for admin to update a user's profile information
+ * Hook for admin to update a user's profile
  */
 export const useAdminUpdateUserProfile = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
   return useMutation({
     mutationFn: async ({ 
       userId, 
-      firstName,
-      lastName,
-      email,
-      phone,
-      address,
-      accountStatus
+      profileData 
     }: { 
       userId: string; 
-      firstName?: string;
-      lastName?: string;
-      email?: string;
-      phone?: string;
-      address?: string;
-      accountStatus?: AccountStatus;
+      profileData: Record<string, unknown>
     }) => {
       if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+        throw new UnauthorizedError('Only administrators can update user profiles');
       }
       
-      // Create separate context and payload objects
-      const ctx = {
+      // Create context and payload objects
+      const context = {
         uid: user.uid,
         role: UserType.ADMIN
       };
       
       const payload = {
         userId,
-        firstName,
-        lastName,
-        email,
-        phone,
-        address,
-        accountStatus: accountStatus ? String(accountStatus).toLowerCase() : undefined
+        ...profileData
       };
       
-      return callApi('adminUpdateUserProfile', ctx, payload);
+      return callApi('adminUpdateUserProfile', context, payload);
     },
-    onSuccess: () => {
-      // Invalidate relevant queries
+    onSuccess: (data, variables) => {
+      // Invalidate all potentially affected queries
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'userDetail', variables.userId] });
+      
+      // If it's a doctor, also invalidate doctor-specific queries
       queryClient.invalidateQueries({ queryKey: ['admin', 'doctors'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'patients'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'userDetail'] });
     }
   });
 };
 
 /**
- * Hook to fetch a specific doctor by ID for admin
+ * Hook to get a single doctor by ID - admin version
  */
 export const useDoctorById = (doctorId: string) => {
   const { user } = useAuth();
@@ -388,17 +388,19 @@ export const useDoctorById = (doctorId: string) => {
   return useQuery({
     queryKey: ['admin', 'doctor', doctorId],
     queryFn: async () => {
-      if (!user || user.role !== UserType.ADMIN) {
-        throw new Error('Unauthorized');
+      if (!user) {
+        throw new AuthError('User not authenticated');
       }
       
-      const response = await callApi('adminGetDoctorById', {
+      if (user.role !== UserType.ADMIN) {
+        throw new UnauthorizedError('Only administrators can access this doctor information');
+      }
+      
+      return callApi('adminGetDoctorById', {
         uid: user.uid,
         role: UserType.ADMIN,
         doctorId
       });
-      
-      return response;
     },
     enabled: !!user && user.role === UserType.ADMIN && !!doctorId
   });

@@ -26,6 +26,35 @@ import { formatDistanceToNow } from 'date-fns';
 import { UserType, AccountStatus, VerificationStatus } from '@/types/enums';
 import { useUserDetail, useAdminActivateUser } from '@/data/adminLoaders';
 import { logInfo, logError } from '@/lib/logger';
+import { ApiError, DataError } from '@/lib/errors';
+
+// Define types for the API response
+interface UserDetailResponse {
+  success: boolean;
+  error?: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    userType: UserType;
+    isActive: boolean;
+    createdAt?: string;
+    lastLoginTime?: string;
+    phone?: string;
+    address?: string;
+  };
+  doctorProfile?: {
+    verificationStatus?: VerificationStatus;
+    specialty?: string;
+    bio?: string;
+  };
+}
+
+interface UserStatusUpdateResponse {
+  success: boolean;
+  error?: string;
+}
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -67,10 +96,14 @@ export default function UserDetailPage() {
         userId,
         status,
         reason: reason || undefined
-      });
+      }) as UserStatusUpdateResponse;
       
       if (!result.success) {
-        throw new Error(result.error || 'Failed to update user status');
+        throw new ApiError(result.error || 'Failed to update user status', {
+          code: 'USER_STATUS_UPDATE_FAILED',
+          status: 400,
+          context: { userId, status, reason }
+        });
       }
       
       setShowActionModal(false);
@@ -131,11 +164,11 @@ export default function UserDetailPage() {
   }
 
   // If error
-  if (error || !data?.success) {
+  if (error || !(data as UserDetailResponse)?.success) {
     return (
       <div className="space-y-4">
         <Alert variant="error" className="mb-4">
-          {error ? String(error) : data?.error || 'Failed to load user details'}
+          {error ? String(error) : (data as UserDetailResponse)?.error || 'Failed to load user details'}
         </Alert>
         <div className="flex justify-between">
           <Button 
@@ -155,7 +188,8 @@ export default function UserDetailPage() {
   }
 
   // Extract data
-  const { user, doctorProfile } = data;
+  const typedData = data as UserDetailResponse;
+  const { user, doctorProfile } = typedData;
 
   if (!user) {
     return (

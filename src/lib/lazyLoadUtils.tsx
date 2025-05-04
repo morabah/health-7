@@ -11,6 +11,12 @@ interface LazyLoadOptions {
   loadingComponent?: React.ReactNode;
 }
 
+// Type for dynamic imports of React components
+interface ComponentModule {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  default: React.ComponentType<any>;
+}
+
 /**
  * Default loading component used when no custom component is provided
  */
@@ -51,6 +57,10 @@ const DefaultErrorFallback: React.FC<{ error: Error }> = ({ error }) => (
  * @param options Configuration options for lazy loading behavior
  * @returns A component that lazy loads the target component
  */
+// We need to use 'any' here for component props because we don't know the exact prop types
+// of the dynamically imported component, and TypeScript can't infer them correctly.
+// Using a more specific type like Record<string, unknown> causes type errors with spread props.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyLoad<T extends React.ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
   options: LazyLoadOptions = {}
@@ -159,6 +169,8 @@ export function lazyLoad<T extends React.ComponentType<any>>(
  * @param factory Function that returns a dynamic import
  * @returns Promise that resolves when the component is loaded
  */
+// We need to use a generic type parameter here for dynamic imports
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function preloadComponent(factory: () => Promise<any>): Promise<void> {
   return factory()
     .then(() => {

@@ -5,6 +5,7 @@ import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
+import { AuthError } from '@/lib/errors';
 
 /**
  * Helper function to get user role as UserType
@@ -32,7 +33,7 @@ export const useMyDashboard = () => {
   return useQuery({
     queryKey: ['dashboard', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyDashboardStats', {
         uid: user.uid,
         role: getUserRole(user.role),
@@ -51,7 +52,7 @@ export const useNotifications = () => {
   return useQuery({
     queryKey: ['notifications', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyNotifications', {
         uid: user.uid,
         role: getUserRole(user.role),
@@ -69,7 +70,7 @@ export function useMarkNotificationRead() {
 
   return useMutation({
     mutationFn: async (notificationId: string) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
 
       return callApi('markNotificationRead', {
         uid: user.uid,
@@ -92,7 +93,7 @@ export const useMarkAllNotificationsRead = () => {
 
   return useMutation({
     mutationFn: async (notificationIds: string[]) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
 
       // Process each notification sequentially
       for (const id of notificationIds) {
@@ -120,7 +121,7 @@ export const useFindDoctors = () => {
 
   return useMutation({
     mutationFn: async (searchParams?: { specialty?: string; location?: string; name?: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi(
         'findDoctors',
         {
@@ -142,7 +143,7 @@ export const useDoctorProfile = (doctorId: string) => {
   return useQuery({
     queryKey: ['doctorProfile', doctorId],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Create separate context and payload objects
       const ctx = {
@@ -168,7 +169,7 @@ export const useDoctorAvailability = (doctorId: string) => {
   return useQuery({
     queryKey: ['doctorAvailability', doctorId],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Create separate context and payload objects
       const ctx = {
@@ -193,7 +194,7 @@ export const useAvailableSlots = () => {
 
   return useMutation({
     mutationFn: async (data: { doctorId: string; date: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
 
       // Ensure the user context is correctly passed as a separate first parameter
       const ctx = { uid: user.uid, role: getUserRole(user.role) };
@@ -223,7 +224,7 @@ export const useBookAppointment = () => {
       reason?: string;
       appointmentType: string;
     }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       // Only pass booking data; context is handled by apiClient
       return callApi('bookAppointment', { ...data });
     },
@@ -243,7 +244,7 @@ export const useDirectMessage = () => {
 
   return useMutation({
     mutationFn: async (data: { recipientId: string; message: string; subject?: string }) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('sendDirectMessage', {
         uid: user.uid,
         role: getUserRole(user.role),
@@ -265,7 +266,7 @@ export const useMyAppointments = (role: UserType) => {
   return useQuery({
     queryKey: ['myAppointments', user?.uid, role],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyAppointments', {
         uid: user.uid,
         role,

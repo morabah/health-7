@@ -9,6 +9,7 @@
 import { UserType } from '@/types/enums';
 import { isFirebaseEnabled, auth } from './firebaseConfig';
 import { logError, logInfo } from './logger';
+import { AuthError } from './errors';
 
 // Auth context interface - used across the application
 export interface AuthContext {
@@ -99,7 +100,7 @@ export function mapFirebaseUserToRole(user: FirebaseUser): UserType {
  * 
  * @param forceRefresh Force refresh from Firebase
  * @returns Current auth context
- * @throws Error if not authenticated
+ * @throws AuthError if not authenticated
  */
 export function getCurrentAuthCtx(forceRefresh = false): AuthContext {
   // If Firebase is enabled, try to get the current user from Firebase Auth
@@ -124,14 +125,14 @@ export function getCurrentAuthCtx(forceRefresh = false): AuthContext {
         uid: currentAuthContext.uid, 
         role: currentAuthContext.role 
       });
-}
+    }
 
     return currentAuthContext;
   }
   
   // Otherwise, use the stored context
   if (!currentAuthContext) {
-    throw new Error('No authentication context available. User must be logged in.');
+    throw new AuthError('No authentication context available. User must be logged in.');
   }
   
   return {

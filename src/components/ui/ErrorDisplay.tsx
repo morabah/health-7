@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronUp, RefreshCw, XCircle } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, RefreshCw, XCircle, ExternalLink } from 'lucide-react';
 import Button from './Button';
 import Alert from './Alert';
 
@@ -16,13 +16,21 @@ export type ErrorCategory =
   | 'permission'
   | 'appointment'
   | 'data'
-  | 'server';
+  | 'server'
+  | 'cache'; // Added cache category for cache-related errors
+
+// Interface for enhanced error types
+export interface EnhancedError extends Error {
+  code?: string;
+  context?: Record<string, unknown>;
+  retryable?: boolean;
+}
 
 export interface ErrorDisplayProps {
   /**
    * The error object or message to display
    */
-  error: Error | string | unknown;
+  error: Error | EnhancedError | string | unknown;
   
   /**
    * Optional user-friendly message to display instead of the raw error
@@ -68,6 +76,16 @@ export interface ErrorDisplayProps {
    * Optional CSS class name
    */
   className?: string;
+  
+  /**
+   * Whether to automatically show technical details
+   */
+  showTechnicalDetails?: boolean;
+  
+  /**
+   * URL with more information about the error
+   */
+  docsUrl?: string;
 }
 
 /**
@@ -86,15 +104,44 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   context,
   errorId,
   className,
+  showTechnicalDetails = false,
+  docsUrl,
 }) => {
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(showTechnicalDetails);
+  
+  // Determine if error is retryable
+  const isRetryable = (): boolean => {
+    if (onRetry) return true;
+    if (error && typeof error === 'object' && 'retryable' in error) {
+      return !!error.retryable;
+    }
+    return category === 'network' || category === 'api' || category === 'cache';
+  };
+  
+  // Get error code if available
+  const getErrorCode = (): string | undefined => {
+    if (error && typeof error === 'object' && 'code' in error) {
+      return error.code as string;
+    }
+    return undefined;
+  };
   
   // Get error message from various error types
   const getErrorMessage = (err: unknown): string => {
     if (typeof err === 'string') return err;
     if (err instanceof Error) return err.message;
-    if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
-      return err.message;
+    if (err && typeof err === 'object') {
+      if ('message' in err && typeof err.message === 'string') {
+        return err.message;
+      }
+      
+      // Extract nested error message if available
+      if ('error' in err && err.error) {
+        if (typeof err.error === 'string') return err.error;
+        if (typeof err.error === 'object' && 'message' in err.error && typeof err.error.message === 'string') {
+          return err.error.message;
+        }
+      }
     }
     return 'An unknown error occurred';
   };
@@ -104,6 +151,21 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
     if (message) return message;
     
     const errorMessage = getErrorMessage(error);
+    const errorCode = getErrorCode();
+    
+    // Use error code for more specific messages if available
+    if (errorCode) {
+      switch (errorCode) {
+        case 'CACHE_ERROR':
+          return 'There was a problem retrieving cached data. Fresh data will be loaded.';
+        case 'DATA_FETCH_ERROR':
+          return 'There was a problem fetching the required data from the server.';
+        case 'INVALID_USER_DATA':
+          return 'The user data received was invalid or corrupted.';
+        case 'INVALID_NOTIFICATION_DATA':
+          return 'Your notifications could not be loaded correctly.';
+      }
+    }
     
     // Return category-specific messages
     switch (category) {
@@ -125,6 +187,8 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         return 'We couldn\'t load your data. Please try refreshing.';
       case 'server':
         return 'The server is currently experiencing issues. Please try again later.';
+      case 'cache':
+        return 'There was an issue with cached data. Try refreshing for the latest information.';
       default:
         // If we have a specific error message, use it
         return errorMessage || 'Something went wrong. Please try again.';
@@ -150,6 +214,12 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   const getErrorDetails = (): React.ReactNode => {
     if (!showDetails) return null;
     
+    // Merge error context with provided context
+    const mergedContext = {
+      ...(error && typeof error === 'object' && 'context' in error ? error.context as Record<string, unknown> : {}),
+      ...context
+    };
+    
     return (
       <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded text-sm font-mono overflow-auto">
         <div className="mb-2 font-bold text-xs uppercase text-gray-500 dark:text-gray-400">
@@ -157,17 +227,17 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         </div>
         <pre className="whitespace-pre-wrap break-words">
           {error instanceof Error ? 
-            `${error.name}: ${error.message}\n${error.stack || ''}` : 
+            `${error.name}${getErrorCode() ? ` (${getErrorCode()})` : ''}: ${error.message}\n${error.stack || ''}` : 
             JSON.stringify(error, null, 2)}
         </pre>
         
-        {context && Object.keys(context).length > 0 && (
+        {mergedContext && Object.keys(mergedContext).length > 0 && (
           <>
             <div className="mt-4 mb-2 font-bold text-xs uppercase text-gray-500 dark:text-gray-400">
               Error Context
             </div>
             <pre className="whitespace-pre-wrap break-words">
-              {JSON.stringify(context, null, 2)}
+              {JSON.stringify(mergedContext, null, 2)}
             </pre>
           </>
         )}
@@ -184,6 +254,26 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   // Get recovery suggestions based on error category
   const getRecoverySuggestions = (): React.ReactNode => {
     if (helpText) return <p className="mt-2 text-sm">{helpText}</p>;
+    
+    // Get code-specific suggestions
+    const errorCode = getErrorCode();
+    if (errorCode) {
+      switch (errorCode) {
+        case 'CACHE_ERROR':
+          return (
+            <p className="mt-2 text-sm">
+              Try refreshing the page to load fresh data from the server.
+            </p>
+          );
+        case 'INVALID_USER_DATA':
+        case 'INVALID_NOTIFICATION_DATA':
+          return (
+            <p className="mt-2 text-sm">
+              Try logging out and logging back in to refresh your data.
+            </p>
+          );
+      }
+    }
     
     // Default recovery suggestions based on category
     switch (category) {
@@ -216,6 +306,12 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             <li>Try selecting a different time slot</li>
             <li>Refresh the page to see updated availability</li>
           </ul>
+        );
+      case 'cache':
+        return (
+          <p className="mt-2 text-sm">
+            This is often a temporary issue. Try refreshing the page.
+          </p>
         );
       default:
         return null;
@@ -251,8 +347,8 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
           {getErrorDetails()}
           
           {/* Actions */}
-          <div className="mt-4 flex space-x-2">
-            {onRetry && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {isRetryable() && onRetry && (
               <Button 
                 variant="primary" 
                 size="sm"
@@ -282,6 +378,18 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
                 </>
               )}
             </Button>
+            
+            {docsUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(docsUrl, '_blank')}
+                className="flex items-center"
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                More Info
+              </Button>
+            )}
             
             {onDismiss && (
               <Button

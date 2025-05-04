@@ -30,6 +30,30 @@ export default function PatientProfile() {
   );
 }
 
+// Interface for the patient profile data structure returned by the API
+interface PatientProfileData {
+  success: boolean;
+  error?: string;
+  userProfile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    role: string;
+  };
+  roleProfile: {
+    id: string;
+    userId: string;
+    address: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    bloodType: string | null;
+    allergies: string[] | null;
+    medicalHistory: string | null;
+  };
+}
+
 /**
  * Patient Profile Content Component
  * Separated to allow error boundary to work properly
@@ -60,7 +84,9 @@ function PatientProfileContent() {
         typeof profileData === 'object' && 
         'success' in profileData && 
         profileData.success) {
-      const { userProfile, roleProfile } = profileData as any; // Type assertion as a temporary fix
+      // Type guard to ensure profileData conforms to expected structure
+      const typedProfileData = profileData as PatientProfileData;
+      const { userProfile, roleProfile } = typedProfileData;
       
       setFormData({
         firstName: userProfile?.firstName || '',

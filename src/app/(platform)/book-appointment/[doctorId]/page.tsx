@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
@@ -21,8 +21,7 @@ import {
 } from 'lucide-react';
 import { logInfo, logValidation, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
-import { useDoctorProfile, useDoctorAvailability } from '@/data/sharedLoaders';
-import { useBookAppointment } from '@/data/sharedLoaders';
+import { useDoctorProfile, useDoctorAvailability, useBookAppointment } from '@/data/sharedLoaders';
 import { format, addDays } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
@@ -33,8 +32,9 @@ import {
   BookingPaymentErrorBoundary
 } from '@/components/error-boundaries';
 import useErrorHandler from '@/hooks/useErrorHandler';
-import useBookingError from '@/hooks/useBookingError';
+import useBookingError, { BookingError, BookingErrorCode } from '@/hooks/useBookingError';
 import { callApi } from '@/lib/apiClient';
+import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors';
 
 // Define the merged doctor profile type based on API response
 interface DoctorPublicProfile {
@@ -118,7 +118,7 @@ function BookAppointmentPageContent() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { throwTimeSlotError, throwBookingError } = useBookingError();
+  const { BookingError } = useBookingError();
   
   const doctorId = params?.doctorId ? String(params.doctorId) : '';
 
@@ -238,49 +238,69 @@ function BookAppointmentPageContent() {
 
   // Fetch available time slots for the selected date
   const fetchAvailableSlots = async () => {
-    if (!selectedDate || !doctorId) return;
-
-    setSlotsLoading(true);
-    setAvailableTimeSlots([]);
-    setSelectedTimeSlot('');
-    setSelectedEndTime('');
-
+    if (!selectedDate) return;
+    
     try {
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      // Show loading indicator
+      setSlotsLoading(true);
+      setAvailableTimeSlots([]);
       
-      // Use callApi directly with proper typing
-      const response = await callApi<AvailableSlotsResponse>('getAvailableSlots', {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Create a request cache key for performance monitoring
+      const requestId = `slots_${doctorId}_${formattedDate}_${Date.now()}`;
+      
+      logInfo('Fetching available slots', {
         doctorId,
-        date: dateString
+        date: formattedDate,
+        requestId
       });
       
-      if (!response.success) {
-        throwTimeSlotError(
-          'LOADING_FAILED',
-          `Failed to load time slots: ${response.error || 'Unknown error'}`,
-          { doctorId, date: dateString }
-        );
-        return;
-      }
-      
-      // If no slots are available
-      if (!response.slots || response.slots.length === 0) {
-        throwTimeSlotError(
-          'NO_SLOTS_AVAILABLE',
-          'No available time slots for the selected date',
-          { doctorId, date: dateString }
-        );
-        return;
-      }
-      
-      setAvailableTimeSlots(response.slots);
-    } catch (err) {
-      logError('Error fetching available slots', { error: err, doctorId, date: selectedDate });
-      throwTimeSlotError(
-        'LOADING_FAILED',
-        'An error occurred while loading time slots',
-        { doctorId, date: format(selectedDate, 'yyyy-MM-dd'), error: err }
+      const response = await callApi<AvailableSlotsResponse>(
+        'getAvailableSlots',
+        { doctorId, date: formattedDate }
       );
+      
+      if (response.success && response.slots && Array.isArray(response.slots)) {
+        setAvailableTimeSlots(response.slots);
+        
+        // If no slots are available, provide a user-friendly error
+        if (response.slots.length === 0) {
+          throw new BookingError('No available appointment slots for this date', 'NO_SLOTS_AVAILABLE', { doctorId, date: formattedDate });
+        }
+        
+        logInfo('Successfully fetched slots', {
+          doctorId,
+          date: formattedDate,
+          slotCount: response.slots.length,
+          requestId
+        });
+      } else {
+        // Handle the case when API returns success: false
+        logError('Failed to fetch available slots', {
+          doctorId,
+          date: formattedDate,
+          error: response.error || 'Unknown error',
+          requestId
+        });
+        
+        throw new BookingError('Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: formattedDate });
+      }
+    } catch (error) {
+      // Log the error
+      logError('Error fetching available slots', {
+        doctorId,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        error
+      });
+      
+      // If it's already a BookingError (thrown by throwTimeSlotError), just rethrow
+      if (error instanceof BookingError) {
+        throw error;
+      }
+      
+      // Otherwise, create a standardized error
+      throw new BookingError(error instanceof Error ? error.message : 'Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: format(selectedDate, 'yyyy-MM-dd') });
     } finally {
       setSlotsLoading(false);
     }
@@ -301,45 +321,179 @@ function BookAppointmentPageContent() {
     e.preventDefault();
     
     if (!user) {
-      throwBookingError(
-        'UNAUTHORIZED',
-        'You must be logged in to book an appointment',
-        { doctorId }
-      );
+      throw new AuthError('You must be logged in to book an appointment', {
+        code: 'UNAUTHORIZED',
+        context: { doctorId },
+        retryable: false
+      });
       return;
     }
-
+    
     if (!selectedDate || !selectedTimeSlot) {
-      throwBookingError(
-        'VALIDATION_ERROR',
-        'Please select a date and time for your appointment',
-        { doctorId, hasDate: !!selectedDate, hasTime: !!selectedTimeSlot }
-      );
+      throw new ValidationError('Please select a date and time for your appointment', {
+        code: 'APPOINTMENT_VALIDATION_ERROR',
+        validationIssues: {
+          date: !selectedDate ? ['Date is required'] : [],
+          time: !selectedTimeSlot ? ['Time slot is required'] : []
+        },
+        context: { doctorId, date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null }
+      });
       return;
     }
     
     try {
-      const appointmentDetails: BookAppointmentParams = {
+      // Prepare the appointment data
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const endTime = selectedEndTime || selectedTimeSlot; // Fallback if somehow endTime wasn't set
+      
+      // Create a booking context for tracking
+      const bookingContext = {
         doctorId,
-        appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+        date: formattedDate,
         startTime: selectedTimeSlot,
-        endTime: selectedEndTime,
-        appointmentType: appointmentType,
-        reason: reason || 'General consultation'
+        endTime,
+        appointmentType,
+        hasReason: Boolean(reason.trim()),
+        timestamp: new Date().toISOString()
       };
       
-      await bookAppointmentMutation.mutateAsync(appointmentDetails);
-    } catch (error) {
-      logError('Failed to book appointment', { error, appointmentDetails: {
-        doctorId,
-        date: selectedDate,
-        startTime: selectedTimeSlot
-      }});
+      logInfo('Booking appointment', bookingContext);
       
-      throwBookingError(
-        'BOOKING_CONFLICT',
-        'Failed to book the appointment. The time slot may no longer be available.',
-        { doctorId, date: format(selectedDate, 'yyyy-MM-dd'), startTime: selectedTimeSlot }
+      // Prepare the appointment data
+      const appointmentData: BookAppointmentParams = {
+        doctorId,
+        appointmentDate: formattedDate,
+        startTime: selectedTimeSlot,
+        endTime,
+        appointmentType,
+        reason: reason.trim() || undefined
+      };
+      
+      // Check for potential booking conflicts by re-verifying slot availability
+      const verifyResponse = await callApi<AvailableSlotsResponse>(
+        'getAvailableSlots',
+        { doctorId, date: formattedDate }
+      );
+      
+      if (!verifyResponse.success || !verifyResponse.slots) {
+        throw new ApiError('Could not verify appointment slot availability', {
+          code: 'SLOT_VERIFICATION_FAILED',
+          retryable: true,
+          context: bookingContext,
+          severity: 'warning'
+        });
+        return;
+      }
+      
+      // Find if our selected slot still exists
+      const slotStillAvailable = verifyResponse.slots.some(
+        slot => slot.startTime === selectedTimeSlot && slot.endTime === endTime
+      );
+      
+      if (!slotStillAvailable) {
+        throw new SlotUnavailableError('This time slot is no longer available. Please select another time.', {
+          code: 'SLOT_UNAVAILABLE',
+          context: bookingContext,
+          retryable: true,
+          severity: 'warning'
+        });
+        return;
+      }
+      
+      // Call the booking mutation
+      const result = await bookAppointmentMutation.mutateAsync(appointmentData);
+      
+      // Define the expected mutation result type
+      interface BookingResult {
+        success: boolean;
+        error?: string;
+        appointmentId?: string;
+      }
+      
+      // Type guard to check if result is a valid booking result
+      const isBookingResult = (value: unknown): value is BookingResult => 
+        typeof value === 'object' && 
+        value !== null && 
+        'success' in value;
+      
+      if (isBookingResult(result) && result.success) {
+        logInfo('Appointment booked successfully', {
+          ...bookingContext,
+          appointmentId: result.appointmentId || 'unknown'
+        });
+      } else {
+        const errorMessage = isBookingResult(result) && result.error
+          ? result.error
+          : 'Failed to book appointment';
+        
+        // Determine the appropriate error class based on error details
+        if (errorMessage.includes('already booked') || errorMessage.includes('conflict')) {
+          throw new AppointmentError(errorMessage, {
+            code: 'APPOINTMENT_CONFLICT',
+            context: bookingContext,
+            retryable: true,
+            severity: 'warning'
+          });
+        } else if (errorMessage.includes('limit')) {
+          throw new AppointmentError(errorMessage, {
+            code: 'APPOINTMENT_LIMIT_EXCEEDED',
+            context: bookingContext,
+            retryable: false,
+            severity: 'warning'
+          });
+        } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+          throw new ValidationError(errorMessage, {
+            code: 'APPOINTMENT_VALIDATION_ERROR',
+            validationIssues: {
+              appointment: ['Invalid appointment data']
+            },
+            context: bookingContext
+          });
+        } else if (errorMessage.includes('unauthorized') || errorMessage.includes('permission')) {
+          throw new AuthError(errorMessage, {
+            code: 'APPOINTMENT_UNAUTHORIZED',
+            context: bookingContext,
+            retryable: false
+          });
+        } else {
+          throw new ApiError(errorMessage, {
+            code: 'APPOINTMENT_BOOKING_FAILED',
+            context: bookingContext,
+            retryable: true
+          });
+        }
+      }
+    } catch (error) {
+      // Log the error first
+      logError('Error booking appointment', {
+        doctorId,
+        date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null,
+        time: selectedTimeSlot,
+        error
+      });
+      
+      // If it's already one of our specialized error classes, just rethrow
+      if (error instanceof AppointmentError || 
+          error instanceof ValidationError || 
+          error instanceof SlotUnavailableError || 
+          error instanceof AuthError ||
+          error instanceof ApiError) {
+        throw error;
+      }
+      
+      // Otherwise, wrap it in a standardized AppointmentError
+      throw new AppointmentError(
+        error instanceof Error ? error.message : 'Failed to book appointment',
+        {
+          code: 'APPOINTMENT_BOOKING_ERROR',
+          context: {
+            doctorId,
+            date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null,
+            time: selectedTimeSlot,
+            originalError: error
+          },
+          retryable: true
+        }
       );
     }
   };

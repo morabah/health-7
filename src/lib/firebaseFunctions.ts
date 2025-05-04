@@ -31,7 +31,7 @@ function getCallable<T, R>(name: string): CloudFunction<T, R> {
   return async (data: T): Promise<R> => {
     try {
       logInfo(`Calling Firebase function: ${name}`, { functionName: name });
-      const result = await callable(data);
+      const result = await callable(data as Record<string, unknown>);
       return result.data as R;
     } catch (error) {
       logError(`Error calling Firebase function ${name}:`, error);
@@ -288,6 +288,14 @@ export async function getMyDashboardStats(ctx: AuthContext) {
   return getDashboardStatsFn(prepareApiCall('getMyDashboardStats', ctx));
 }
 
+/**
+ * Admin: Get dashboard data
+ */
+export async function adminGetDashboardData(ctx: AuthContext) {
+  const getAdminDashboardFn = getCallable('adminGetDashboardData');
+  return getAdminDashboardFn(prepareApiCall('adminGetDashboardData', ctx));
+}
+
 // ===== Patient Functions =====
 
 /**
@@ -327,5 +335,6 @@ export const firebaseApi = {
   adminCreateUser,
   sendDirectMessage,
   getMyDashboardStats,
+  adminGetDashboardData,
   getPatientProfile
 }; 

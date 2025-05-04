@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
+import { AuthError } from '@/lib/errors';
 
 /**
  * Hook to fetch patient profile data
@@ -16,7 +17,7 @@ export const usePatientProfile = (patientId?: string) => {
   return useQuery({
     queryKey: ['patientProfile', patientId || user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       if (patientId) {
         // For doctors/admins viewing a patient's profile
@@ -45,7 +46,7 @@ export const useUpdatePatientProfile = () => {
   
   return useMutation({
     mutationFn: async (data: any) => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Add the proper context to the API call
       return callApi('updateMyUserProfile', {
@@ -68,7 +69,7 @@ export const usePatientAppointments = () => {
   return useQuery({
     queryKey: ['patientAppointments', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new Error('User not authenticated');
+      if (!user?.uid) throw new AuthError('User not authenticated');
       return callApi('getMyAppointments', { 
         uid: user.uid, 
         role: UserType.PATIENT 
@@ -88,7 +89,7 @@ export function useAppointmentDetails(appointmentId: string) {
     queryKey: ['appointment', appointmentId],
     queryFn: async () => {
       if (!user) {
-        throw new Error('User not authenticated');
+        throw new AuthError('User not authenticated');
       }
       
       // Create the context object
@@ -114,7 +115,7 @@ export function useCancelAppointment() {
   return useMutation({
     mutationFn: async ({ appointmentId, reason }: { appointmentId: string; reason?: string }) => {
       if (!user) {
-        throw new Error('User not authenticated');
+        throw new AuthError('User not authenticated');
       }
       
       // Create the context object separate from the data payload

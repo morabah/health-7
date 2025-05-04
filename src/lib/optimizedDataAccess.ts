@@ -8,8 +8,12 @@ import {
 } from './localDb';
 import { localApi } from './localApiFunctions';
 import { cacheKeys, cacheManager } from './queryClient';
-import { logInfo, logError } from './logger';
+import { logInfo, logError, logWarn } from './logger';
 import { UserType } from '@/types/enums';
+import { 
+  CacheError as AppCacheError,
+  DataError
+} from './errors';
 
 // Type for filtered data request options
 interface FilterOptions {
@@ -154,6 +158,34 @@ const notificationRequestTracker = {
   backoffInterval: 0, // Increases on failed or too frequent requests
   inMemoryCache: new Map<string, { data: Notification[], timestamp: number }>()
 };
+
+// Error types for better handling
+interface DataAccessError extends Error {
+  code: string;
+  context?: Record<string, unknown>;
+  retryable: boolean;
+}
+
+// Use standardized error classes from errors.ts
+class CacheError extends AppCacheError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, {
+      code: 'CACHE_ERROR',
+      context,
+      retryable: true
+    });
+  }
+}
+
+class DataFetchError extends DataError {
+  constructor(message: string, code = 'DATA_FETCH_ERROR', context?: Record<string, unknown>, retryable = true) {
+    super(message, {
+      code,
+      context,
+      retryable
+    });
+  }
+}
 
 /**
  * Estimate size of object in bytes (rough approximation)
@@ -350,6 +382,15 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     logInfo('Fetching fresh users data');
     const users = await getUsers();
     
+    if (!users || !Array.isArray(users)) {
+      throw new DataFetchError(
+        'Invalid response from users data source',
+        'INVALID_USER_DATA',
+        { dataType: typeof users, cacheKey },
+        false
+      );
+    }
+    
     // Set in both caches
     cacheManager.setQueryData(cacheKeys.users(options.filters), { success: true, users });
     
@@ -358,8 +399,26 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     setMemoryCacheData(cacheKey, processedData);
     return processedData;
   } catch (error) {
-    logError('Error in getOptimizedUsers', error);
-    return [];
+    // Enhanced error logging with context
+    const errorContext = {
+      operation: 'getOptimizedUsers',
+      cacheKey,
+      filterOptions: options,
+      errorType: error instanceof Error ? error.name : typeof error
+    };
+    
+    logError('Error in getOptimizedUsers', { error, ...errorContext });
+    
+    // Determine if we have a fallback strategy
+    const shouldAttemptFallback = !(error instanceof DataFetchError && !error.retryable);
+    
+    if (shouldAttemptFallback) {
+      logWarn('Attempting to recover with empty result in getOptimizedUsers');
+      return [];
+    }
+    
+    // Re-throw critical errors that shouldn't be handled here
+    throw error;
   }
 }
 
@@ -635,6 +694,8 @@ export async function getOptimizedNotifications(
     ...cacheOptions 
   };
   
+  let recoveryAttempted = false;
+  
   try {
     const now = Date.now();
     
@@ -752,7 +813,7 @@ export async function getOptimizedNotifications(
       role: userRole
     });
     
-    if (result.success && result.notifications) {
+    if (result.success && 'notifications' in result && Array.isArray(result.notifications)) {
       // Set in both caches
       cacheManager.setQueryData(cacheKeys.notifications(userId), result);
       
@@ -769,17 +830,32 @@ export async function getOptimizedNotifications(
         timestamp: now
       });
       
-      // Reset backoff on success
-      notificationRequestTracker.backoffInterval = 0;
-      
       return processedData;
     }
     
-    // Fallback to direct database access
+    // API notification fetch failed, attempting database fallback
+    logWarn('API notification fetch failed, attempting database fallback', {
+      userId,
+      apiSuccess: result.success,
+      hasNotifications: 'notifications' in result ? !!result.notifications : false
+    });
+    
+    recoveryAttempted = true;
     const notifications = await getNotifications();
     
+    if (!notifications || !Array.isArray(notifications)) {
+      throw new DataFetchError(
+        'Invalid response from notifications data source',
+        'INVALID_NOTIFICATION_DATA',
+        { dataType: typeof notifications, userId, cacheKey },
+        false
+      );
+    }
+    
     // Filter notifications for this user
-    const userNotifications = notifications.filter(notif => notif.userId === userId);
+    const userNotifications = notifications.filter(notif => 
+      typeof notif === 'object' && notif !== null && 'userId' in notif && notif.userId === userId
+    );
     
     // Set in both caches
     cacheManager.setQueryData(cacheKeys.notifications(userId), { 
@@ -802,13 +878,39 @@ export async function getOptimizedNotifications(
     
     return processedData;
   } catch (error) {
+    // Enhanced error handling with context
+    const errorContext = {
+      operation: 'getOptimizedNotifications',
+      userId,
+      cacheKey,
+      filterOptions: options,
+      recoveryAttempted,
+      backoffInterval: notificationRequestTracker.backoffInterval,
+      errorType: error instanceof Error ? error.name : typeof error
+    };
+    
     // Set backoff on error to prevent rapid retries
     notificationRequestTracker.backoffInterval = Math.min(
       (notificationRequestTracker.backoffInterval || 1000) * 2, // Exponential backoff
       30000 // Max 30-second backoff
     );
     
-    logError('Error in getOptimizedNotifications', error);
+    logError('Error in getOptimizedNotifications', { error, ...errorContext });
+    
+    // Try to serve stale data on error as a last resort
+    try {
+      const staleData = notificationRequestTracker.inMemoryCache.get(cacheKey);
+      if (staleData) {
+        logWarn('Serving stale notification data due to error', { 
+          age: Date.now() - staleData.timestamp,
+          userId
+        });
+        return staleData.data;
+      }
+    } catch (fallbackError) {
+      // Just swallow this error - we'll return empty array below
+    }
+    
     return [];
   }
 }

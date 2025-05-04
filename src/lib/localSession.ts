@@ -5,6 +5,7 @@
  */
 
 import type { UserType } from '@/types/enums';
+import { logError } from './logger';
 
 // Storage keys for the session
 const SESSION_KEY = 'health-session';
@@ -46,7 +47,7 @@ export const getActiveSessions = (): string[] => {
     
     return parsed;
   } catch (error) {
-    console.error('Error loading active sessions:', error);
+    logError('Error loading active sessions', error);
     return [];
   }
 };
@@ -68,7 +69,7 @@ const addActiveSession = (sessionId: string): void => {
       localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(activeSessions));
     }
   } catch (error) {
-    console.error('Error adding active session:', error);
+    logError('Error adding active session', error);
   }
 };
 
@@ -85,7 +86,7 @@ const removeActiveSession = (sessionId: string): void => {
     const updatedSessions = activeSessions.filter(id => id !== sessionId);
     localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(updatedSessions));
   } catch (error) {
-    console.error('Error removing active session:', error);
+    logError('Error removing active session', error);
   }
 };
 
@@ -115,7 +116,7 @@ export const loadSession = (): SessionData | null => {
     
     return parsed as SessionData;
   } catch (error) {
-    console.error('Error loading session:', error);
+    logError('Error loading session', error);
     return null;
   }
 };
@@ -141,7 +142,7 @@ export const loadSessionById = (sessionId: string): SessionData | null => {
     
     return parsed as SessionData;
   } catch (error) {
-    console.error('Error loading session by ID:', error);
+    logError('Error loading session by ID', error);
     return null;
   }
 };
@@ -196,7 +197,7 @@ export const saveSession = (
       return sessionId;
     }
   } catch (error) {
-    console.error('Error saving session:', error);
+    logError('Error saving session', error);
     return null;
   }
 };
@@ -209,45 +210,42 @@ export const switchSession = (sessionId: string): boolean => {
     return false;
   }
   
+  // Validate session ID format
   if (!sessionId || typeof sessionId !== 'string') {
-    console.error('Invalid session ID provided:', sessionId);
+    logError('Invalid session ID provided', { sessionId });
+    return false;
+  }
+  
+  // Check if the session exists in active sessions
+  const activeSessions = getActiveSessions();
+  if (!activeSessions.includes(sessionId)) {
+    logError('Session not found in active sessions', { sessionId });
+    return false;
+  }
+  
+  // Load the session data
+  const sessionData = loadSessionById(sessionId);
+  if (!sessionData) {
+    logError('Session data not found for ID', { sessionId });
     return false;
   }
   
   try {
-    // Check if the sessionId exists in active sessions
-    const activeSessions = getActiveSessions();
-    if (!activeSessions.includes(sessionId)) {
-      console.error('Session not found in active sessions:', sessionId);
-      return false;
-    }
+    // Set this as the current session
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      ...sessionData,
+      lastActive: Date.now()
+    }));
     
-    // Load the session data from storage
-    const session = loadSessionById(sessionId);
-    if (!session) {
-      console.error('Session data not found for ID:', sessionId);
-      return false;
-    }
-    
-    // Update session's last active time
-    session.lastActive = Date.now();
-    
-    // Set as current session
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    
-    // Update in session-specific storage
-    localStorage.setItem(`${SESSION_KEY}-${sessionId}`, JSON.stringify(session));
-    
-    console.log('Session switched successfully:', sessionId);
     return true;
   } catch (error) {
-    console.error('Error switching session:', error);
+    logError('Error switching session', error);
     return false;
   }
 };
 
 /**
- * Get detailed information for all active sessions
+ * Get detailed information about all active sessions
  */
 export const getDetailedActiveSessions = (): SessionData[] => {
   if (typeof window === 'undefined') {
@@ -258,27 +256,22 @@ export const getDetailedActiveSessions = (): SessionData[] => {
     const sessionIds = getActiveSessions();
     const sessions: SessionData[] = [];
     
-    for (const sessionId of sessionIds) {
-      const session = loadSessionById(sessionId);
-      if (session) {
-        sessions.push(session);
-      } else {
-        // Clean up session IDs that don't have corresponding data
-        removeActiveSession(sessionId);
+    sessionIds.forEach(sessionId => {
+      const sessionData = loadSessionById(sessionId);
+      if (sessionData) {
+        sessions.push(sessionData);
       }
-    }
+    });
     
-    // Sort by most recently active
-    sessions.sort((a, b) => b.lastActive - a.lastActive);
     return sessions;
   } catch (error) {
-    console.error('Error getting detailed active sessions:', error);
+    logError('Error getting detailed active sessions', error);
     return [];
   }
 };
 
 /**
- * Clear all sessions from localStorage
+ * Clear all sessions for this application
  */
 export const clearAllSessions = (): void => {
   if (typeof window === 'undefined') {
@@ -286,21 +279,19 @@ export const clearAllSessions = (): void => {
   }
   
   try {
-    // Clear active sessions first
-    const activeSessions = getActiveSessions();
+    // Get all session IDs
+    const sessionIds = getActiveSessions();
     
-    // Remove each session-specific entry
-    activeSessions.forEach(sessionId => {
-      localStorage.removeItem(`${SESSION_KEY}-${sessionId}`);
+    // Remove each session
+    sessionIds.forEach(id => {
+      localStorage.removeItem(`${SESSION_KEY}-${id}`);
     });
     
-    // Clear active sessions list
-    localStorage.removeItem(ACTIVE_SESSIONS_KEY);
-    
-    // Clear current session
+    // Clear the main session and active sessions list
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(ACTIVE_SESSIONS_KEY);
   } catch (error) {
-    console.error('Error clearing all sessions:', error);
+    logError('Error clearing all sessions', error);
   }
 };
 
