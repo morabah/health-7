@@ -125,49 +125,49 @@ export default function DoctorVerificationDetailPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">Full Name</label>
-                  <p className="mt-1">Dr. {doctor.firstName} {doctor.lastName}</p>
+                  <label id="fullName-label" className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <p aria-labelledby="fullName-label" className="mt-1">Dr. {doctor.firstName} {doctor.lastName}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">Specialty</label>
-                  <p className="mt-1">{doctor.specialty}</p>
+                  <label id="specialty-label" className="block text-sm font-medium text-gray-700">Specialty</label>
+                  <p aria-labelledby="specialty-label" className="mt-1">{doctor.specialty}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">License Number</label>
-                  <p className="mt-1">{doctor.licenseNumber}</p>
+                  <label id="licenseNumber-label" className="block text-sm font-medium text-gray-700">License Number</label>
+                  <p aria-labelledby="licenseNumber-label" className="mt-1">{doctor.licenseNumber}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="yearsOfExperience" className="block text-sm font-medium text-gray-700">Years of Experience</label>
-                  <p className="mt-1">{doctor.yearsOfExperience}</p>
+                  <label id="yearsOfExperience-label" className="block text-sm font-medium text-gray-700">Years of Experience</label>
+                  <p aria-labelledby="yearsOfExperience-label" className="mt-1">{doctor.yearsOfExperience}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                  <p className="mt-1">{doctor.email}</p>
+                  <label id="email-label" className="block text-sm font-medium text-gray-700">Email</label>
+                  <p aria-labelledby="email-label" className="mt-1">{doctor.email}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
-                  <p className="mt-1">{doctor.phone}</p>
+                  <label id="phone-label" className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p aria-labelledby="phone-label" className="mt-1">{doctor.phone}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="languages" className="block text-sm font-medium text-gray-700">Languages</label>
-                  <p className="mt-1">{doctor.languages.join(', ')}</p>
+                  <label id="languages-label" className="block text-sm font-medium text-gray-700">Languages</label>
+                  <p aria-labelledby="languages-label" className="mt-1">{doctor.languages.join(', ')}</p>
                 </div>
                 
                 <div>
-                  <label htmlFor="submittedDate" className="block text-sm font-medium text-gray-700">Submitted</label>
-                  <p className="mt-1">{formatDate(doctor.submittedDate)}</p>
+                  <label id="submittedDate-label" className="block text-sm font-medium text-gray-700">Submitted</label>
+                  <p aria-labelledby="submittedDate-label" className="mt-1">{formatDate(doctor.submittedDate)}</p>
                 </div>
               </div>
               
               <div className="mt-6">
-                <label htmlFor="education" className="block text-sm font-medium text-gray-700 mb-2">Education</label>
-                <ul className="divide-y divide-gray-200 border rounded">
+                <label id="education-label" className="block text-sm font-medium text-gray-700 mb-2">Education</label>
+                <ul aria-labelledby="education-label" className="divide-y divide-gray-200 border rounded">
                   {doctor.education.map((edu, index) => (
                     <li key={index} className="p-3">
                       <p className="font-medium">{edu.institution}</p>
@@ -184,7 +184,7 @@ export default function DoctorVerificationDetailPage() {
               <h2 className="font-semibold">Verification Documents</h2>
             </div>
             <div className="p-6">
-              <ul className="divide-y divide-gray-200 border rounded">
+              <ul aria-label="Verification documents" className="divide-y divide-gray-200 border rounded">
                 {doctor.documents.map((doc, index) => (
                   <li key={index} className="p-3 flex justify-between items-center">
                     <div>
@@ -212,11 +212,11 @@ export default function DoctorVerificationDetailPage() {
           </div>
           <div className="p-6">
             <div className="mb-4">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="verification-notes" className="block text-sm font-medium text-gray-700 mb-1">
                 Notes (required for rejection)
               </label>
               <textarea
-                id="notes"
+                id="verification-notes"
                 rows={5}
                 className="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter verification notes or rejection reason..."

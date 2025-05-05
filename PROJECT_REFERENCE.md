@@ -23,6 +23,9 @@ This reference document compiles all key learnings, implementation details, and 
 17. [Error Handling Checklist](#error-handling-checklist)
 18. [Test Fixes & Testing Reference](#test-fixes--testing-reference)
 19. [Cache System Enhancements](#cache-system-enhancements)
+20. [Linting and TypeScript Fixes](#linting-and-typescript-fixes)
+21. [Outstanding Issues](#outstanding-issues)
+22. [Current Project State](#current-project-state)
 
 ---
 
@@ -588,3 +591,51 @@ This enhancement significantly improves the application's performance by:
 - Reducing unnecessary API calls through efficient caching
 - Improving user experience with faster data access
 - Providing better stability under high load
+
+## Linting and TypeScript Fixes
+
+We've fixed several issues with TypeScript typings and linter errors:
+
+1. **Fixed Error Boundary Import Issues**:
+   - Changed imports from named to default imports for all error boundary components
+   - Affected files included patient/profile, admin/dashboard, auth, and appointments pages
+
+2. **Fixed API Error in optimizedDataAccess.ts**:
+   - Changed `getAllAppointments` to `adminGetAllAppointments` in the API client call 
+
+3. **Fixed TypeScript Type Issues**:
+   - Added proper type declarations for API responses in AuthContext.tsx
+   - Fixed catch block error variable handling in NotificationList.tsx
+   - Removed unused imports and variables from various components
+   - Improved error handling in various parts of the code
+
+4. **Fixed Accessibility Issues**:
+   - Added proper ARIA attributes to improve form accessibility
+   - Associated labels with form controls in doctor verification page
+   - Added proper aria-labelledby attributes to form elements
+
+## Outstanding Issues
+
+These issues still need attention:
+
+1. **TypeScript 'any' Type Usage**: 
+   - Several components still use `any` types that should be properly typed
+   - Files include register pages, API test components, and error utils
+
+2. **Unused Variables**: 
+   - Multiple components have unused variables that should be removed
+   - Particularly in CMS pages, auth components, and utility files
+
+3. **Form Accessibility Issues**:
+   - Some form controls still have unassociated labels 
+   - Patient and doctor registration forms need accessibility improvements
+
+4. **Image Usage**:
+   - Some components use `<img>` tags instead of Next.js optimized `<Image>` components
+
+5. **Default Exports**:
+   - Some modules use anonymous default exports that should be named before exporting
+
+## Current Project State
+
+The application is stable and running, but would benefit from addressing the above issues to improve code quality, accessibility, and maintainability.

@@ -11,8 +11,8 @@ import {
   loadSessionById, 
   switchSession, 
   clearAllSessions,
-  type SessionData,
-  getDetailedActiveSessions
+  getDetailedActiveSessions,
+  type SessionData
 } from '@/lib/localSession';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router, loadActiveSessions]);
 
-  // Define refreshProfile with race condition guard - now we can use logout safely
+  // Define the refreshProfile with race condition guard - now we can use logout safely
   const refreshProfile = useCallback(async () => {
     // Check global flag to prevent duplicate requests
     if (isAuthFetchInFlight()) {
@@ -328,7 +328,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setAuthFetchInFlight(true);
       
-      const result = await callApi('getMyUserProfile', {
+      interface ProfileResponse {
+        success: boolean;
+        error?: string;
+        userProfile: UserProfile & { id: string };
+        roleProfile?: PatientProfile & { id: string } | DoctorProfile & { id: string };
+      }
+      
+      const result = await callApi<ProfileResponse>('getMyUserProfile', {
         uid: user.uid,
         role: user.role
       });
@@ -492,8 +499,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       logInfo('auth-event', { action: 'login-attempt', email, timestamp: new Date().toISOString() });
       
+      // Define the expected response type for login API
+      interface LoginResponse {
+        success: boolean;
+        error?: string;
+        user: { id: string; email: string | null };
+        userProfile: UserProfile & { id: string };
+        roleProfile: PatientProfile | DoctorProfile;
+      }
+      
       // We'll use the 'login' method which our apiClient will map to signIn
-      const result = await callApi('login', { email, password });
+      const result = await callApi<LoginResponse>('login', { email, password });
       
       if (!result.success) {
         setError(result.error || 'Login failed');
@@ -568,7 +584,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError('');
     
     try {
-      const result = await callApi('registerPatient', {
+      interface RegistrationResponse {
+        success: boolean;
+        error?: string;
+      }
+      
+      const result = await callApi<RegistrationResponse>('registerPatient', {
         ...payload,
       });
       
@@ -596,7 +617,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError('');
     
     try {
-      const result = await callApi('registerDoctor', {
+      interface RegistrationResponse {
+        success: boolean;
+        error?: string;
+      }
+      
+      const result = await callApi<RegistrationResponse>('registerDoctor', {
         ...payload,
       });
       

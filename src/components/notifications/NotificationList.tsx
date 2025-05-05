@@ -223,8 +223,11 @@ export default function NotificationList({
         if (timeSinceLastRefresh > 15000 || isVisible) {
           try {
             await loadOptimizedNotifications();
-          } catch (err) {
+          } catch (error) {
             // Ignore errors in the polling mechanism
+            // Just log the error type to help with debugging if needed
+            const errorType = error instanceof Error ? error.name : typeof error;
+            logInfo('Notification polling error ignored', { errorType });
           } finally {
             // Only set up next poll if still mounted
             if (isMountedRef.current) {
@@ -303,14 +306,14 @@ export default function NotificationList({
       
       logInfo('notifications', { action: 'mark-all-read', userId: user.uid });
       logValidation('4.10', 'success', 'Notification system fully functional with real data');
-    } catch (err) {
+    } catch (error) {
       // Only proceed if component is still mounted
       if (!isMountedRef.current) return;
       
       // Revert optimistic update on error
       loadOptimizedNotifications(true);
       setError2('Failed to mark all notifications as read');
-      logError('Error marking all notifications as read', err);
+      logError('Error marking all notifications as read', error);
     } finally {
       if (isMountedRef.current) {
         setIsMarkingAllRead(false);
@@ -351,14 +354,14 @@ export default function NotificationList({
       if (!isMountedRef.current) return;
       
       logInfo('notifications', { action: 'mark-read', notificationId: id, userId: user.uid });
-    } catch (err) {
+    } catch (error) {
       // Only proceed if component is still mounted
       if (!isMountedRef.current) return;
       
       // Revert optimistic update on error
       loadOptimizedNotifications(true);
       setError2('Failed to mark notification as read');
-      logError('Error marking notification as read', { notificationId: id, error: err });
+      logError('Error marking notification as read', { notificationId: id, error });
     } finally {
       if (isMountedRef.current) {
         setIsMarkingRead(false);
