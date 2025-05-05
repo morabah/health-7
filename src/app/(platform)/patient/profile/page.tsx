@@ -9,7 +9,7 @@ import Alert from '@/components/ui/Alert';
 import { User, Save } from 'lucide-react';
 import { usePatientProfile, useUpdatePatientProfile } from '@/data/patientLoaders';
 import { Gender, BloodType } from '@/types/enums';
-import { DataLoadingErrorBoundary } from '@/components/error-boundaries';
+import DataLoadingErrorBoundary from '@/components/error-boundaries/DataLoadingErrorBoundary';
 import { formatDateForInput, formatDateForApi } from '@/lib/dateUtils';
 
 /**

@@ -664,7 +664,10 @@ export async function getOptimizedAppointments(options: FilterOptions = {}): Pro
     
     // Fetch appointments - no advanced caching as they change frequently
     logInfo('Fetching fresh appointments data');
-    const response = await callApi<{ success: boolean; appointments: Appointment[] }>('getAllAppointments');
+    const response = await callApi<{ success: boolean; appointments: Appointment[] }>('adminGetAllAppointments', {
+      uid: options.filters?.uid as string || '',
+      role: UserRole.ADMIN
+    });
     
     if (!response.success || !response.appointments) {
       throw new DataFetchError('Failed to fetch appointments', 'APPOINTMENT_FETCH_ERROR');

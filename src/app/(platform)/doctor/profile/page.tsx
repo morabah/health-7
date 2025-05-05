@@ -11,7 +11,7 @@ import { User, Save, GraduationCap, Stethoscope } from 'lucide-react';
 import { useDoctorProfile, useUpdateDoctorProfile } from '@/data/doctorLoaders';
 import { VerificationStatus } from '@/types/enums';
 import { logValidation } from '@/lib/logger';
-import { DoctorProfileErrorBoundary } from '@/components/error-boundaries';
+import DoctorProfileErrorBoundary from '@/components/error-boundaries/DoctorProfileErrorBoundary';
 
 /**
  * Doctor Profile Page

@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import { logInfo, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
-import { AuthErrorBoundary } from '@/components/error-boundaries';
+import AuthErrorBoundary from '@/components/error-boundaries/AuthErrorBoundary';
 import { ValidationError } from '@/lib/errors';
 
 /**

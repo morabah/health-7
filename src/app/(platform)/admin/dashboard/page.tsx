@@ -33,7 +33,7 @@ import { logInfo, logValidation } from '@/lib/logger';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { formatDistanceToNow } from 'date-fns';
 import Badge from '@/components/ui/Badge';
-import { AdminDashboardErrorBoundary } from '@/components/error-boundaries';
+import AdminDashboardErrorBoundary from '@/components/error-boundaries/AdminDashboardErrorBoundary';
 
 // Stat component for dashboard statistics with trend indicator
 function Stat({

@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import type { Appointment } from '@/types/schemas';
 import Link from 'next/link';
 import CancelAppointmentModal from '@/components/patient/CancelAppointmentModal';
-import { AppointmentErrorBoundary } from '@/components/error-boundaries';
+import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
 
 const tabs = ['Upcoming', 'Past', 'Cancelled'] as const;
 const statusMap = {
@@ -139,24 +139,33 @@ function PatientAppointmentsContent() {
     }
   }, [searchParams, router]);
 
+  // Add proper typing for API response
+  interface AppointmentsResponse {
+    success: boolean;
+    appointments: Appointment[];
+    error?: string;
+  }
+  
   // Filter appointments based on tab
-  const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
+  const appointments = (appointmentsData as AppointmentsResponse)?.success 
+    ? (appointmentsData as AppointmentsResponse).appointments || [] 
+    : [];
   
   const filteredAppointments = {
     Upcoming: appointments.filter((a: Appointment) => 
-      (a.status === AppointmentStatus.PENDING || 
-       a.status === AppointmentStatus.CONFIRMED || 
-       a.status === AppointmentStatus.RESCHEDULED) && 
+       (a.status === AppointmentStatus.PENDING || 
+        a.status === AppointmentStatus.CONFIRMED || 
+        a.status === AppointmentStatus.RESCHEDULED) && 
       new Date(a.appointmentDate) >= new Date()
     ),
     Past: appointments.filter((a: Appointment) => 
-      a.status === AppointmentStatus.COMPLETED || 
+       a.status === AppointmentStatus.COMPLETED || 
       (a.status !== AppointmentStatus.CANCELED && new Date(a.appointmentDate) < new Date())
     ),
-    Cancelled: appointments.filter((a: Appointment) => 
-      a.status === AppointmentStatus.CANCELED
+     Cancelled: appointments.filter((a: Appointment) => 
+       a.status === AppointmentStatus.CANCELED
     )
-  };
+   };
 
   // Handle opening cancel modal
   const handleOpenCancelModal = (appointment: Appointment) => {
@@ -167,14 +176,21 @@ function PatientAppointmentsContent() {
   // Handle appointment cancellation
   const handleCancelAppointment = async (appointmentId: string, reason: string) => {
       try {
-        const result = await cancelMutation.mutateAsync({ 
-          appointmentId, 
-        reason 
-        });
-        
-        if (!result.success) {
-        throw new Error(result.error);
-        }
+         // Define type for the returned result
+         interface CancelResult {
+           success: boolean;
+           error?: string;
+           appointment?: Appointment;
+         }
+         
+         const result = await cancelMutation.mutateAsync({ 
+           appointmentId, 
+         reason 
+         }) as CancelResult;
+         
+         if (!result.success) {
+         throw new Error(result.error || 'Unknown error occurred');
+         }
       
       setShowCancelModal(false);
       refetch(); // Explicitly refetch after cancellation

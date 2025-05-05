@@ -11,7 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
 import { NetworkError } from '@/lib/errors';
-import { AuthErrorBoundary } from '@/components/error-boundaries';
+import AuthErrorBoundary from '@/components/error-boundaries/AuthErrorBoundary';
 
 /**
  * Pending verification page shown to users after they register

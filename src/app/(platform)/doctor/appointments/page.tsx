@@ -25,7 +25,7 @@ import { AppointmentStatus } from '@/types/enums';
 import { format } from 'date-fns';
 import { logValidation } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
-import { AppointmentErrorBoundary } from '@/components/error-boundaries';
+import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
 
 /**
  * Doctor Appointments Page
