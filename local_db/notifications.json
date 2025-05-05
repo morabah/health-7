@@ -995,5 +995,145 @@
     "isRead": false,
     "createdAt": "2025-05-04T14:53:43.687Z",
     "relatedId": "0zjcj39cu5sfd29bn04f"
+  },
+  {
+    "id": "notif-8jzplzp3uqt19wzn3mj7bf",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:16:16.244Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-glh66gyc7qffmk1zc6geut",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:19:29.307Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-ce5qc8epupkszwe84qdx1",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3 has booked an appointment on 2025-05-14 at 18:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:40.341Z",
+    "relatedId": "jpsteru8dmc7izshmp5s0h"
+  },
+  {
+    "id": "notif-byd7fjnkk9dqfbolqh4z5k",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-14 at 18:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:40.341Z",
+    "relatedId": "jpsteru8dmc7izshmp5s0h"
+  },
+  {
+    "id": "notif-cfndvulqsa9wodb54d9hgb",
+    "userId": "u-000",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3 has canceled the appointment scheduled for 2025-05-07T00:34:41.458Z at 10:00 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:48.011Z",
+    "relatedId": "hwfl2xxm4fue0a2sdwpjic"
+  },
+  {
+    "id": "notif-do1q7c5ha2f3oaz3x3379i",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3 has canceled the appointment scheduled for 2025-05-07T21:22:33.507Z at 14:30 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:51.973Z",
+    "relatedId": "4qbc6m2vnyqoatc2g14cqr"
+  },
+  {
+    "id": "notif-ygsw86qzb69y3xbbed1t6",
+    "userId": "u-001",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3 has canceled the appointment scheduled for 2025-05-07T22:18:40.682Z at 16:30 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:53.941Z",
+    "relatedId": "udue16mgu9phgh62p3sn"
+  },
+  {
+    "id": "notif-clnpss1b9ogv14rfr0paz",
+    "userId": "u-005",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3 has canceled the appointment scheduled for 2025-05-10T02:20:07.895Z at 10:30 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:56.116Z",
+    "relatedId": "0vb5nafbxh7j08lk6ssrytt8"
+  },
+  {
+    "id": "notif-aylrd0ccbje0ta4img8vljl",
+    "userId": "u-000",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3 has canceled the appointment scheduled for 2025-05-11T22:33:33.680Z at 15:30 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:21:58.986Z",
+    "relatedId": "kh3q8qk59p9mv8jlpxroa"
+  },
+  {
+    "id": "notif-jtlmf47t94revm3g43pk7",
+    "userId": "u-000",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3f has canceled the appointment scheduled for 2025-05-12 at 12:30 - Reason: df.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:23:13.141Z",
+    "relatedId": "0zjcj39cu5sfd29bn04f"
+  },
+  {
+    "id": "notif-h4oufgu09b5eqmu0bz5os",
+    "userId": "stbgu09d7t05vtu0r67tp",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. df",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:24:15.726Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-59rch113542reg42ike4o8",
+    "userId": "stbgu09d7t05vtu0r67tp",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:25:00.753Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-583upoj2scp088505ll3mm",
+    "userId": "stbgu09d7t05vtu0r67tp",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:25:10.264Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-f94rqmcw2jy53nxqttzn",
+    "userId": "stbgu09d7t05vtu0r67tp",
+    "title": "Profile Updated",
+    "message": "Your profile information has been updated by an administrator.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T17:25:19.173Z",
+    "relatedId": null
   }
 ]
