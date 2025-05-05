@@ -6,6 +6,7 @@
  */
 
 import { logInfo } from './logger';
+import { useRef, useEffect } from 'react';
 
 /** Interface for a basic performance tracker */
 export interface PerformanceTracker {
@@ -71,4 +72,34 @@ export async function measureAsync<T>(label: string, fn: () => Promise<T>): Prom
   } finally {
     perf.stop();
   }
+}
+
+/**
+ * Hook to track component render time
+ * 
+ * @param componentName The name of the component being tracked
+ * @param threshold Optional threshold in ms to only log renders longer than this value
+ * 
+ * @example
+ * function MyComponent() {
+ *   useRenderPerformance('MyComponent', 50); // Only log renders > 50ms
+ *   // Component logic...
+ * }
+ */
+export function useRenderPerformance(componentName: string, threshold: number = 0) {
+  const renderStartTime = useRef(performance.now());
+
+  useEffect(() => {
+    const renderTime = performance.now() - renderStartTime.current;
+    
+    // Only log if render time exceeds threshold
+    if (renderTime > threshold) {
+      logInfo(`Render time for ${componentName}: ${Math.round(renderTime)}ms`);
+    }
+    
+    // Update for next render
+    return () => {
+      renderStartTime.current = performance.now();
+    };
+  });
 }

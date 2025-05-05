@@ -18,6 +18,7 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
 import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
@@ -26,6 +27,20 @@ import { format } from 'date-fns';
 import { logValidation } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
 import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
+import { useAuth } from '@/context/AuthContext';
+import { useRenderPerformance } from '@/lib/performance';
+
+// Define interfaces for API responses
+interface AppointmentsResponse {
+  success: boolean;
+  error?: string;
+  appointments?: Appointment[];
+}
+
+interface AppointmentActionResponse {
+  success: boolean;
+  error?: string;
+}
 
 /**
  * Doctor Appointments Page
@@ -44,11 +59,15 @@ export default function DoctorAppointmentsPage() {
  * Separated to allow error boundary to work properly
  */
 function DoctorAppointmentsContent() {
+  // Track component rendering performance with 50ms threshold
+  useRenderPerformance('DoctorAppointmentsContent', 50);
+  
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedAppointment, setSelectedAppointment] = useState<null | Appointment>(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const { user } = useAuth();
   
   // Get appointments data from API
   const { 
@@ -62,9 +81,16 @@ function DoctorAppointmentsContent() {
   const cancelMutation = useDoctorCancelAppointment();
 
   // Filter appointments based on selected filters
-  const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
+  const appointments = (appointmentsData as AppointmentsResponse)?.success 
+    ? (appointmentsData as AppointmentsResponse).appointments || [] 
+    : [];
   
-  const filteredAppointments = appointments.filter((appointment: Appointment) => {
+  // First filter to only show this doctor's appointments
+  const myAppointments = appointments.filter((appointment: Appointment) => {
+    return appointment.doctorId === user?.uid;
+  });
+  
+  const filteredAppointments = myAppointments.filter((appointment: Appointment) => {
     // Date filtering
     const appointmentDate = new Date(appointment.appointmentDate);
     const today = new Date();
@@ -111,7 +137,7 @@ function DoctorAppointmentsContent() {
       const result = await completeMutation.mutateAsync({
         appointmentId: id,
         notes
-      });
+      }) as AppointmentActionResponse;
       
       if (!result.success) {
         throw new Error(result.error);
@@ -134,10 +160,17 @@ function DoctorAppointmentsContent() {
         const result = await cancelMutation.mutateAsync({
           appointmentId: id,
           reason: 'Cancelled by doctor'
-        });
+        }) as AppointmentActionResponse;
         
         if (!result.success) {
-          throw new Error(result.error);
+          const errorMessage = result.error || 'Failed to cancel appointment';
+          
+          if (errorMessage.includes('not authorized')) {
+            alert('You are not authorized to cancel this appointment. Only the doctor assigned to this appointment can cancel it.');
+          } else {
+            alert(errorMessage);
+          }
+          return;
         }
         
         // Explicitly refetch to ensure we have the latest data
@@ -250,17 +283,21 @@ function DoctorAppointmentsContent() {
         <Card className="p-8 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-400" />
           <p className="text-slate-500 dark:text-slate-400">No appointments found matching your filters.</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-4"
-            onClick={() => {
-              setDateFilter('all');
-              setStatusFilter('all');
-            }}
-          >
-            Clear Filters
-          </Button>
+          {myAppointments.length === 0 ? (
+            <p className="text-slate-500 dark:text-slate-400 mt-2">You don't have any appointments assigned to you yet.</p>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4"
+              onClick={() => {
+                setDateFilter('all');
+                setStatusFilter('all');
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </Card>
       )}
 

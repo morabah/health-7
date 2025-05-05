@@ -7,7 +7,7 @@
  * with configurable size limits, TTL, and priorities.
  */
 
-import { logInfo, logError } from './logger';
+import { logInfo } from './logger';
 
 // Type Definitions
 export interface CacheOptions {
@@ -115,7 +115,7 @@ const DEFAULT_PRIORITY = 'normal';
 /**
  * LRU Cache implementation with size and count limits
  */
-export class LRUCache<T = any> {
+export class LRUCache<T = unknown> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private lruOrder: string[] = [];
   private maxSize: number;
@@ -312,7 +312,7 @@ export class LRUCache<T = any> {
     const priorityOrder = { low: 0, normal: 1, high: 2 };
     
     // Start with low priority items
-    for (let priority of ['low', 'normal', 'high']) {
+    for (const priority of ['low', 'normal', 'high']) {
       // If we've freed enough space and entries, stop
       if (bytesFreed >= sizeToFreeKB * 1024 && entriesEvicted >= minEntries) {
         break;
@@ -395,7 +395,7 @@ export class LRUCache<T = any> {
         // Use JSON stringification as a rough estimate
         const jsonString = JSON.stringify(value);
         return jsonString.length * 2;
-      } catch (e) {
+      } catch (_) {
         // Fallback for objects that can't be stringified
         return 1024; // arbitrary fallback
       }

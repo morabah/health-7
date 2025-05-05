@@ -1,7 +1,8 @@
 'use client';
 
 import { logInfo } from './logger';
-import React, { useRef, useEffect, ComponentType, PropsWithChildren } from 'react';
+import type { ComponentType} from 'react';
+import React, { useRef, useEffect } from 'react';
 
 /**
  * Performance metrics tracking utility

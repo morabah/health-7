@@ -105,13 +105,13 @@ export const useDoctorCancelAppointment = () => {
     mutationFn: async (params: { appointmentId: string; reason: string }) => {
       if (!user?.uid) throw new AuthError('User not authenticated');
       
-      // Fix: Create proper context and payload objects
+      // Create proper context object
       const context = { 
         uid: user.uid, 
         role: UserType.DOCTOR 
       };
       
-      // Pass context as first argument and properly structured payload as second
+      // Pass context as first argument and appointment params as second
       return callApi('cancelAppointment', context, { 
         appointmentId: params.appointmentId,
         reason: params.reason

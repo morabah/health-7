@@ -46,7 +46,7 @@ export interface ValidationSummary {
   validDocuments: number;
   invalidDocuments: number;
   errorDocuments: number;
-  commonErrors: { [field: string]: number };
+  commonErrors: Record<string, number>;
 }
 
 /**
@@ -200,8 +200,8 @@ export function generateValidationSummary(
 export async function validateMultipleCollections(
   collections: string[],
   verbose: boolean = false
-): Promise<{ [collection: string]: CollectionValidationResult }> {
-  const results: { [collection: string]: CollectionValidationResult } = {};
+): Promise<Record<string, CollectionValidationResult>> {
+  const results: Record<string, CollectionValidationResult> = {};
 
   for (const collection of collections) {
     const schema = getSchemaForCollection(collection);

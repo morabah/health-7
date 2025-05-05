@@ -799,58 +799,46 @@ function BookAppointmentPageContent() {
                 </TimeSlotSelectionErrorBoundary>
               )}
 
-              {/* Appointment Type & Reason */}
-              {selectedDate && selectedTimeSlot && (
-                <Card className="p-6 mb-6">
-                  <h2 className="text-lg font-semibold mb-4">3. Appointment Details</h2>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label
-                        className="block text-sm font-medium mb-2"
-                        htmlFor="appointment-type-inperson"
-                      >
-                        Appointment Type
-                      </label>
-                      <div className="flex space-x-4">
-                        <label className="flex items-center" htmlFor="appointment-type-inperson">
-                          <input
-                            id="appointment-type-inperson"
-                            type="radio"
-                            className="h-4 w-4 text-primary border-slate-300"
-                            checked={appointmentType === AppointmentType.IN_PERSON}
-                            onChange={() => setAppointmentType(AppointmentType.IN_PERSON)}
-                          />
-                          <span className="ml-2 text-sm">In-person Visit</span>
-                        </label>
-                        <label className="flex items-center" htmlFor="appointment-type-video">
-                          <input
-                            id="appointment-type-video"
-                            type="radio"
-                            className="h-4 w-4 text-primary border-slate-300"
-                            checked={appointmentType === AppointmentType.VIDEO}
-                            onChange={() => setAppointmentType(AppointmentType.VIDEO)}
-                          />
-                          <span className="ml-2 text-sm">Video Consultation</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2" htmlFor="reason">
-                        Reason for Visit (Optional)
-                      </label>
-                      <Textarea
-                        id="reason"
-                        rows={3}
-                        placeholder="Describe your symptoms or reason for the appointment"
-                        value={reason}
-                        onChange={e => setReason(e.target.value)}
-                      />
-                    </div>
+              {/* Details Form */}
+              <div className="mt-4 bg-white dark:bg-slate-800 rounded-md shadow p-4">
+                <h3 className="font-semibold text-lg mb-4">Appointment Details</h3>
+                
+                <div className="space-y-4">
+                  {/* Appointment Type */}
+                  <div>
+                    <label htmlFor="appointment-type" className="block text-sm font-medium mb-1">
+                      Appointment Type
+                    </label>
+                    <select
+                      id="appointment-type"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+                      value={appointmentType}
+                      onChange={(e) => setAppointmentType(e.target.value as AppointmentType)}
+                    >
+                      {Object.values(AppointmentType).map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </Card>
-              )}
+                  
+                  {/* Reason for Visit */}
+                  <div>
+                    <label htmlFor="appointment-reason" className="block text-sm font-medium mb-1">
+                      Reason for Visit (Optional)
+                    </label>
+                    <textarea
+                      id="appointment-reason"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+                      placeholder="Please describe your symptoms or reason for this appointment"
+                      rows={3}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Submit Button */}
               <div className="flex justify-end">

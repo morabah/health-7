@@ -56,8 +56,8 @@ export default function CancelAppointmentModal({
     try {
       await onConfirm(appt.id, reason.trim());
       // Success is handled in the parent component
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel appointment');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to cancel appointment');
       setLoading(false);
     }
   };

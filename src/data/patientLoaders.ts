@@ -5,6 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
 import { AuthError } from '@/lib/errors';
+import type { z } from 'zod';
+import type { UpdateProfileSchema } from '@/types/schemas';
 
 /**
  * Hook to fetch patient profile data
@@ -45,7 +47,7 @@ export const useUpdatePatientProfile = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: z.infer<typeof UpdateProfileSchema>) => {
       if (!user?.uid) throw new AuthError('User not authenticated');
       
       // Add the proper context to the API call

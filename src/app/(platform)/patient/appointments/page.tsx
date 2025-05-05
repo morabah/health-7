@@ -17,6 +17,20 @@ import type { Appointment } from '@/types/schemas';
 import Link from 'next/link';
 import CancelAppointmentModal from '@/components/patient/CancelAppointmentModal';
 import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
+import { useRenderPerformance } from '@/lib/performance';
+
+// Define interfaces for API responses
+interface AppointmentsResponse {
+  success: boolean;
+  error?: string;
+  appointments?: Appointment[];
+}
+
+interface CancelAppointmentResponse {
+  success: boolean;
+  error?: string;
+  appointment?: Appointment;
+}
 
 const tabs = ['Upcoming', 'Past', 'Cancelled'] as const;
 const statusMap = {
@@ -111,6 +125,9 @@ export default function PatientAppointments() {
  * Separated to allow error boundary to work properly
  */
 function PatientAppointmentsContent() {
+  // Track component rendering performance with 50ms threshold
+  useRenderPerformance('PatientAppointmentsContent', 50);
+  
   const [index, setIndex] = useState(0);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -139,13 +156,6 @@ function PatientAppointmentsContent() {
     }
   }, [searchParams, router]);
 
-  // Add proper typing for API response
-  interface AppointmentsResponse {
-    success: boolean;
-    appointments: Appointment[];
-    error?: string;
-  }
-  
   // Filter appointments based on tab
   const appointments = (appointmentsData as AppointmentsResponse)?.success 
     ? (appointmentsData as AppointmentsResponse).appointments || [] 
@@ -175,27 +185,21 @@ function PatientAppointmentsContent() {
 
   // Handle appointment cancellation
   const handleCancelAppointment = async (appointmentId: string, reason: string) => {
-      try {
-         // Define type for the returned result
-         interface CancelResult {
-           success: boolean;
-           error?: string;
-           appointment?: Appointment;
-         }
-         
-         const result = await cancelMutation.mutateAsync({ 
-           appointmentId, 
-         reason 
-         }) as CancelResult;
-         
-         if (!result.success) {
-         throw new Error(result.error || 'Unknown error occurred');
-         }
+    try {
+      const result = await cancelMutation.mutateAsync({ 
+        appointmentId, 
+        reason 
+      }) as CancelAppointmentResponse;
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cancel appointment');
+      }
       
       setShowCancelModal(false);
       refetch(); // Explicitly refetch after cancellation
-      } catch (err) {
-      throw err; // Let the modal handle the error
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to cancel appointment';
+      throw new Error(errorMessage); // Let the modal handle the error
     }
   };
 

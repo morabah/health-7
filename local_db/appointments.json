@@ -171,13 +171,13 @@
     "appointmentDate": "2025-05-03T11:44:36.251Z",
     "startTime": "10:30",
     "endTime": "11:00",
-    "status": "pending",
+    "status": "canceled",
     "reason": "",
-    "notes": null,
+    "notes": "Canceled - Cancelled by doctor",
     "appointmentType": "IN_PERSON",
     "videoCallUrl": null,
     "createdAt": "2025-04-30T11:44:44.294Z",
-    "updatedAt": "2025-04-30T11:44:44.294Z"
+    "updatedAt": "2025-05-05T18:03:55.385Z"
   },
   {
     "id": "yfbs96tfahr6z4y9vra6",

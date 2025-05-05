@@ -25,13 +25,14 @@ import {
 } from 'lucide-react';
 import { useAppointmentDetails, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
 import { AppointmentStatus, AppointmentType } from '@/types/enums';
-import { logInfo, logValidation } from '@/lib/logger';
+import { logInfo, logValidation, logError } from '@/lib/logger';
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
 import CancelAppointmentModal from '@/components/doctor/CancelAppointmentModal';
 import type { Appointment } from '@/types/schemas';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppointmentErrorBoundary } from "@/components/error-boundaries";
 import { ApiError, AppointmentError, SlotUnavailableError } from "@/lib/errors";
+import { useAuth } from '@/context/AuthContext';
 
 // Define response types
 interface AppointmentDetailResponse {
@@ -49,6 +50,7 @@ export default function AppointmentDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -118,11 +120,14 @@ export default function AppointmentDetailsPage() {
       }) as AppointmentActionResponse;
       
       if (!result.success) {
-        throw new ApiError(result.error || 'Failed to cancel appointment', {
-          code: 'APPOINTMENT_CANCELLATION_FAILED',
-          status: 400,
-          context: { appointmentId: id, reason }
-        });
+        const errorMessage = result.error || 'Failed to cancel appointment';
+        setCancelError(errorMessage);
+        
+        // Show appropriate error message for auth errors
+        if (errorMessage.includes('not authorized')) {
+          setCancelError('You are not authorized to cancel this appointment. Only the doctor assigned to this appointment can cancel it.');
+        }
+        return;
       }
       
       setConfirmCancelOpen(false);
@@ -136,14 +141,13 @@ export default function AppointmentDetailsPage() {
         description: "The appointment has been cancelled successfully.",
       });
     } catch (err) {
-      throw new AppointmentError(
-        err instanceof Error ? err.message : 'An error occurred while cancelling the appointment',
-        {
-          appointmentId: id,
-          code: 'APPOINTMENT_CANCELLATION_ERROR',
-          context: { reason, error: err }
-        }
-      );
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while cancelling the appointment';
+      setCancelError(errorMessage);
+      logError('Error cancelling appointment', {
+        appointmentId: id,
+        code: 'APPOINTMENT_CANCELLATION_ERROR',
+        context: { reason, error: err }
+      });
     }
   };
 
@@ -180,6 +184,7 @@ export default function AppointmentDetailsPage() {
   const isCompletable = appointment.status === AppointmentStatus.CONFIRMED;
   const isCancellable = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
   const isPastAppointment = new Date(appointment.appointmentDate) < new Date();
+  const isCurrentDoctor = appointment.doctorId === user?.uid;
 
   // Map for status display
   const statusMap: Record<string, string> = {
@@ -231,6 +236,15 @@ export default function AppointmentDetailsPage() {
         </Alert>
       )}
 
+      {!isCurrentDoctor && (
+        <Alert variant="warning" className="my-4">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            <span>This appointment is assigned to a different doctor. You can view details but cannot modify it.</span>
+          </div>
+        </Alert>
+      )}
+
       {/* Status Card */}
       <Card className="p-4 flex items-center justify-between">
         <div className="flex items-center">
@@ -246,13 +260,13 @@ export default function AppointmentDetailsPage() {
         </div>
         
         <div className="flex space-x-2">
-          {isCompletable && !isPastAppointment && (
+          {isCompletable && !isPastAppointment && isCurrentDoctor && (
             <Button size="sm" variant="primary" onClick={() => setConfirmCompleteOpen(true)}>
               <CheckCircle className="h-4 w-4 mr-1" />
               Complete
             </Button>
           )}
-          {isCancellable && (
+          {isCancellable && isCurrentDoctor && (
             <Button size="sm" variant="danger" onClick={() => setConfirmCancelOpen(true)}>
               <XCircle className="h-4 w-4 mr-1" />
               Cancel

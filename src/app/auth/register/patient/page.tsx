@@ -12,9 +12,6 @@ import Alert from '@/components/ui/Alert';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
-import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
-import type { z } from 'zod';
-import { formatDateForApi } from '@/lib/dateUtils';
 
 /**
  * Patient registration form component
@@ -37,51 +34,7 @@ export default function PatientRegisterPage() {
   // Form submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
-  
-  /**
-   * Validate form data using Zod schema
-   */
-  const validateForm = (): boolean => {
-    const errors: {[key: string]: string} = {};
-    
-    // Basic confirmation password check
-    if (password !== confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-
-    // Create the registration payload
-    const registrationData: Partial<PatientRegistrationPayload> = {
-      email,
-      password,
-      userType: UserType.PATIENT,
-      firstName,
-      lastName,
-      dateOfBirth,
-      // Convert the gender string to the correct type
-      gender: gender as any, // Using any as a temporary workaround
-    };
-    
-    // Validate using Zod schema
-    const result = PatientRegistrationSchema.safeParse(registrationData);
-    
-    if (!result.success) {
-      // Extract and format Zod validation errors
-      const formattedErrors = result.error.format();
-      
-      // Convert Zod errors to our format
-      Object.entries(formattedErrors).forEach(([key, value]) => {
-        // Safely access _errors with proper type checking
-        const fieldErrors = value as z.ZodFormattedError<any>;
-        if (key !== '_errors' && fieldErrors._errors.length > 0) {
-          errors[key] = fieldErrors._errors[0];
-        }
-      });
-    }
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  const [validationErrors] = useState<{[key: string]: string}>({});
   
   /**
    * Handle form submission
@@ -105,14 +58,8 @@ export default function PatientRegisterPage() {
         phone,
       };
       
-      // Format allergies into an array
-      const allergies = allergiesText ? allergiesText.split(',').map(item => item.trim()) : [];
-      
       try {
         logInfo('patient_registration', { email });
-        
-        // Format the date properly for API
-        const formattedDateOfBirth = formatDateForApi(dateOfBirth);
         
         // Right before calling registerPatient
         if (dateOfBirth && !dateOfBirth.includes('T')) {

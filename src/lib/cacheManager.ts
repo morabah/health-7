@@ -7,7 +7,8 @@
  * Acts as a bridge between the application and different caching mechanisms.
  */
 
-import { LRUCache, CacheOptions } from './lruCache';
+import type { CacheOptions } from './lruCache';
+import { LRUCache } from './lruCache';
 import { logInfo, logError } from './logger';
 import { cacheManager as reactQueryCache } from './queryClient';
 

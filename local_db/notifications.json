@@ -1135,5 +1135,15 @@
     "isRead": false,
     "createdAt": "2025-05-05T17:25:19.173Z",
     "relatedId": null
+  },
+  {
+    "id": "notif-vu408p2zp9pytey7j8gh9f",
+    "userId": "u-007",
+    "title": "Appointment Canceled by Doctor",
+    "message": "Dr. mohamed rabah has canceled your appointment scheduled for 2025-05-03T11:44:36.251Z at 10:30 - Reason: Cancelled by doctor.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-05T18:03:55.413Z",
+    "relatedId": "r635548vybqcnatf355xq"
   }
 ]

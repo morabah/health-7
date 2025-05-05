@@ -639,3 +639,44 @@ These issues still need attention:
 ## Current Project State
 
 The application is stable and running, but would benefit from addressing the above issues to improve code quality, accessibility, and maintainability.
+
+### Doctor Appointment Authorization Fix
+
+- **Issue**: Doctors were encountering "You are not authorized to cancel this appointment" errors when trying to cancel appointments that weren't assigned to them (e.g., doctor with ID 'u-005' trying to cancel appointment assigned to doctor with ID 'u-002').
+- **Fix**: 
+  - Added a check to verify if the current doctor is the one assigned to the appointment
+  - Added a warning alert when viewing appointments assigned to other doctors
+  - Disabled cancel/complete buttons for appointments that don't belong to the current doctor
+  - Improved error message display when authorization errors occur
+  - Added a visual indicator in the appointments list to clearly show which appointments don't belong to the current doctor
+  - Added better error handling when attempting to cancel appointments you don't own
+  - Files affected:
+    - `src/app/(platform)/doctor/appointments/[appointmentId]/page.tsx`
+    - `src/app/(platform)/doctor/appointments/page.tsx`
+    - `src/data/doctorLoaders.ts`
+
+### Doctor Appointments Filtering
+
+- **Issue**: The doctor appointments page was showing all appointments in the system instead of only those assigned to the logged-in doctor.
+- **Fix**:
+  - Updated the filtering logic to first filter by the current doctor's ID
+  - Removed the "Not your appointment" badges since they're no longer needed
+  - Updated the empty state to differentiate between "no appointments at all" vs "no appointments matching filters"
+  - Files affected:
+    - `src/app/(platform)/doctor/appointments/page.tsx`
+
+### Code Quality and Performance Improvements
+
+- **Issue**: Various code quality issues and missing performance monitoring.
+- **Fixes**:
+  - Added proper TypeScript typings to patient data loaders, removing `any` types
+  - Added consistent API response type interfaces to appointments pages
+  - Enhanced error handling in the `useCancelAppointment` hook for patients
+  - Added a performance monitoring hook (`useRenderPerformance`) to track component rendering times
+  - Applied performance monitoring to key appointment components
+  - Improved error messages and error handling consistency
+  - Files affected:
+    - `src/data/patientLoaders.ts`
+    - `src/app/(platform)/patient/appointments/page.tsx`
+    - `src/app/(platform)/doctor/appointments/page.tsx`
+    - `src/lib/performance.ts`
