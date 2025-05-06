@@ -5,7 +5,18 @@ const nextConfig = {
     // serverActions option removed as it's now available by default
   },
   images: {
-    domains: ['example.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'example.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn-icons-png.flaticon.com',
+        pathname: '/**',
+      }
+    ],
   },
   async redirects() {
     return [
