@@ -640,6 +640,38 @@ These issues still need attention:
 
 The application is stable and running, but would benefit from addressing the above issues to improve code quality, accessibility, and maintainability.
 
+### User Management Interface Improvements
+
+- **Issue**: The User Management page in the admin section had several issues:
+  - Missing link to the create-user page causing 404 errors
+  - User status display not mapping correctly from the backend's isActive boolean to the AccountStatus enum
+  - No functional create-user page to add new users to the system
+  - Action dropdown menu buttons not working properly due to event propagation issues
+  - Status change API calls failing due to incorrect data format (enum vs string)
+
+- **Fixes**:
+  - Added a proper data transformation to map between backend isActive boolean and frontend AccountStatus enum
+  - Updated the "Create User" link to point to the correct path (/admin/users/create)
+  - Implemented a new create-user page with full form validation for different user types
+  - Added TypeScript interfaces for API responses to improve type safety
+  - Fixed display of suspended and deactivated users in status counters
+  - Completely revamped the dropdown menu with a proper handleDropdownAction function
+  - Fixed the API calls for status changes to ensure they use the string format expected by the backend
+  - Enhanced user feedback with toast notifications for actions
+  - Files affected:
+    - `src/app/(platform)/admin/users/page.tsx`
+    - `src/app/(platform)/admin/users/create/page.tsx` (new file)
+  
+- **Implementation Details**:
+  - Used a useMemo hook to transform user data and add accountStatus field based on isActive boolean
+  - Added proper type interfaces for all API calls to improve type safety
+  - Created a comprehensive user creation form with role-specific fields for patients and doctors
+  - Added client-side validation before form submission
+  - Implemented proper error handling and success messaging
+  - Created a centralized handleDropdownAction function to properly capture events and prevent propagation
+  - Fixed the status update API call to ensure the AccountStatus enum is correctly handled
+  - Improved the user experience with immediate visual feedback when actions are performed
+
 ### Doctor Appointment Authorization Fix
 
 - **Issue**: Doctors were encountering "You are not authorized to cancel this appointment" errors when trying to cancel appointments that weren't assigned to them (e.g., doctor with ID 'u-005' trying to cancel appointment assigned to doctor with ID 'u-002').
