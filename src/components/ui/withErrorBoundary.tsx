@@ -2,7 +2,7 @@
 
 import React, { FC, ComponentType } from 'react';
 import ErrorBoundary from './ErrorBoundary';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 
 interface WithErrorBoundaryOptions {
   /**
@@ -64,7 +64,7 @@ export default function withErrorBoundary<P extends React.JSX.IntrinsicAttribute
     const handleError = (error: Error) => {
       // Log error
       if (captureErrors) {
-        errorMonitor.captureException(error, {
+        ErrorMonitor.getInstance().reportError(error, {
           component: componentName,
           ...errorContext,
         });

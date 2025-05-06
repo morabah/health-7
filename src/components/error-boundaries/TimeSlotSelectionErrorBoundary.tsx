@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { Clock, RefreshCw, Calendar, HelpCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 
@@ -30,7 +30,7 @@ const TimeSlotSelectionErrorFallback: React.FC<{
   // Report error to monitoring service
   useEffect(() => {
     if (error) {
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'TimeSlotSelection',
         severity: 'warning',
         category: 'appointment' as ErrorCategory,

@@ -4,7 +4,7 @@ import React from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { ShieldAlert, RefreshCw, Home, Settings } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 /**
@@ -18,7 +18,7 @@ const AdminDashboardErrorFallback: React.FC<{
   // Report error to monitoring service
   React.useEffect(() => {
     if (error) {
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'AdminDashboard',
         severity: 'error',
         category: 'api' as ErrorCategory,

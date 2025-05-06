@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { CalendarPlus, RefreshCw, ArrowLeft, PhoneOutgoing, HelpCircle, AlertCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import Alert from '@/components/ui/Alert';
@@ -28,7 +28,7 @@ const BookingWorkflowErrorFallback: React.FC<{
   useEffect(() => {
     if (error) {
       // Provide enhanced context for booking-specific errors
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'BookingWorkflow',
         severity: error.code === 'SLOT_UNAVAILABLE' ? 'warning' : 'error',
         category: 'appointment' as ErrorCategory,

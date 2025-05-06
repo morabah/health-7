@@ -4,7 +4,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 import { logError } from '@/lib/logger';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import { RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
 
@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     logError('ErrorBoundary caught an error', { error, errorInfo });
     
     // Report to the error monitoring service with component context
-    errorMonitor.captureException(error, {
+    ErrorMonitor.getInstance().reportError(error, {
       component: this.props.componentName || 'ErrorBoundary',
       userId: this.props.userId,
       errorInfo: {

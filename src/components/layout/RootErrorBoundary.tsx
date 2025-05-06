@@ -5,7 +5,7 @@ import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { RefreshCw, Home } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Link from 'next/link';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 
 /**
  * Root Error Boundary Fallback UI
@@ -15,7 +15,7 @@ const RootErrorFallback = ({ error, resetError }: { error: Error | null; resetEr
   // Report error to monitoring service if it's a new error
   React.useEffect(() => {
     if (error) {
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'RootApplication',
         severity: 'fatal',
         category: 'unknown',

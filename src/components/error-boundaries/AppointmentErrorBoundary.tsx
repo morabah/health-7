@@ -4,7 +4,7 @@ import React from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { Calendar, RefreshCw } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 
 /**
  * Appointment Error Fallback UI
@@ -17,7 +17,7 @@ const AppointmentErrorFallback: React.FC<{
   // Report error to monitoring service
   React.useEffect(() => {
     if (error) {
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'AppointmentView',
         severity: 'error',
         category: 'appointment',

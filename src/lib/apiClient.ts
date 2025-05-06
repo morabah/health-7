@@ -13,9 +13,9 @@ import { isFirebaseEnabled, functions } from './firebaseConfig';
 import { firebaseApi } from './firebaseFunctions';
 import { getCurrentAuthCtx } from './apiAuthCtx';
 import { logInfo, logError, logWarn } from './logger';
-import { callApiWithErrorHandling, ErrorHandlingOptions } from './apiErrorHandling';
+import { callApiWithErrorHandling, ApiErrorHandlingOptions } from './errors/apiErrorHandling';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
-import { createFirebaseError } from './firebaseErrorMapping';
+import { mapFirebaseError } from './errors/firebaseErrorMapping';
 import { ApiError } from './errors/errorClasses';
 import { 
   getOptimizedDoctors, 
@@ -330,16 +330,15 @@ export async function callApiWithOptions<T = unknown>(
       method,
       () => callApiWithErrorHandling<T>(
         executeApiCall,
-        [], // Empty args array since we've already processed args in executeApiCall
         {
-          endpoint: method,
-          errorMessage: options.errorMessage || `Error calling API method: ${method}`,
-          retryable: options.retry ?? false,
+          retry: options.retry ?? false,
           maxRetries: options.maxRetries || 3,
-          errorCategory: options.errorCategory || 'api',
-          errorSeverity: options.errorSeverity || 'error',
+          reportErrors: true,
           errorContext: {
-            ...options.errorContext,
+            endpoint: method,
+            errorMessage: options.errorMessage || `Error calling API method: ${method}`,
+            errorCategory: options.errorCategory || 'api',
+            errorSeverity: options.errorSeverity || 'error',
             method,
             args
           }
@@ -356,16 +355,15 @@ export async function callApiWithOptions<T = unknown>(
   // Fall back to standard implementation with proper error handling
   return callApiWithErrorHandling<T>(
     executeApiCall,
-    [], // Empty args array since we've already processed args in executeApiCall
     {
-      endpoint: method,
-      errorMessage: options.errorMessage || `Error calling API method: ${method}`,
-      retryable: options.retry ?? false,
+      retry: options.retry ?? false,
       maxRetries: options.maxRetries || 3,
-      errorCategory: options.errorCategory || 'api',
-      errorSeverity: options.errorSeverity || 'error',
+      reportErrors: true,
       errorContext: {
-        ...options.errorContext,
+        endpoint: method,
+        errorMessage: options.errorMessage || `Error calling API method: ${method}`,
+        errorCategory: options.errorCategory || 'api',
+        errorSeverity: options.errorSeverity || 'error',
         method,
         args
       }
@@ -440,7 +438,7 @@ async function callFirebaseFunction<T>(method: string, ...args: unknown[]): Prom
         args 
       });
       
-      throw createFirebaseError(firebaseError);
+      throw mapFirebaseError(firebaseError);
     }
     
     // For non-Firebase errors, log and rethrow

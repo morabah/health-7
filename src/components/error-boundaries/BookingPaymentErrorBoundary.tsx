@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { CreditCard, RefreshCw, ArrowLeft, HelpCircle, AlertTriangle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import Alert from '@/components/ui/Alert';
@@ -37,7 +37,7 @@ const BookingPaymentErrorFallback: React.FC<{
       const errorCategory: ErrorCategory = 
         error.code?.includes('PAYMENT') ? 'api' : 'appointment';
         
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'BookingPayment',
         severity: 'error',
         category: errorCategory,

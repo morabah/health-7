@@ -2,7 +2,7 @@
 
 import type { ReactElement } from 'react';
 import { useState, useCallback, useEffect } from 'react';
-import { reportError, errorMonitor } from '@/lib/errorMonitoring';
+import { reportError, addBreadcrumb } from '@/lib/errors/errorMonitoring';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
@@ -323,21 +323,18 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
   }, [error, isErrorVisible, defaultCategory, defaultSeverity, clearError]);
   
   /**
-   * Start a performance/error span for tracking
+   * Start a performance monitoring span
    */
   const startSpan = useCallback((name: string, metadata?: Record<string, unknown>) => {
-    const span = errorMonitor.startSpan(name, metadata || {});
+    // Add breadcrumb for error context instead of using the removed span functionality
+    addBreadcrumb(`Span started: ${name}`, 'performance', metadata || {});
     
     return {
       finish: () => {
-        if (span && typeof span.finish === 'function') {
-          span.finish();
-        }
+        addBreadcrumb(`Span finished: ${name}`, 'performance', metadata || {});
       },
       addMetadata: (key: string, value: unknown) => {
-        if (span && typeof span.addMetadata === 'function') {
-          span.addMetadata(key, value);
-        }
+        addBreadcrumb(`Span metadata: ${name}`, 'performance', { [key]: value });
       }
     };
   }, []);

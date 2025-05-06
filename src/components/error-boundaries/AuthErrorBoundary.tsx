@@ -4,7 +4,7 @@ import React from 'react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { Lock, RefreshCw, Home, HelpCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { errorMonitor } from '@/lib/errorMonitoring';
+import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
 import { APP_ROUTES } from '@/lib/router';
 
 /**
@@ -18,7 +18,7 @@ const AuthErrorFallback: React.FC<{
   // Report error to monitoring service
   React.useEffect(() => {
     if (error) {
-      errorMonitor.captureException(error, {
+      ErrorMonitor.getInstance().reportError(error, {
         component: 'Authentication',
         severity: 'error',
         category: 'auth',
