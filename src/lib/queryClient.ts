@@ -3,8 +3,9 @@
 import { QueryClient, QueryClientProvider, dehydrate, hydrate } from '@tanstack/react-query';
 import type { ReactNode} from 'react';
 import { createElement, useRef, useEffect } from 'react';
-import { enhancedCache, CacheCategory } from './cacheManager';
+import { enhancedCache } from './cacheManager';
 import { logInfo } from './logger';
+import { browserCache, CacheCategory } from './browserCacheManager';
 
 // Create a client with enhanced caching options
 const queryClient = new QueryClient({
@@ -74,6 +75,16 @@ export const cacheManager = {
     else if (keyStr.includes('notification')) category = CacheCategory.NOTIFICATIONS;
     
     enhancedCache.set(category, cacheKey, data, { ttl: 3 * 60 * 1000 });
+  },
+  
+  // Utility to set doctor data specifically
+  setDoctorData: (doctorId: string, data: unknown) => {
+    const key = cacheKeys.doctor(doctorId);
+    queryClient.setQueryData(key, { success: true, doctor: data });
+    
+    // Also cache in enhanced cache
+    const cacheKey = enhancedCache.createKey('doctor', doctorId);
+    enhancedCache.set(CacheCategory.DOCTORS, cacheKey, data);
   },
   
   // Get data from cache without fetching
@@ -166,11 +177,25 @@ export { queryClient };
 export function QueryProvider({ children }: { children: ReactNode }) {
   // Only sync with enhanced cache once on mount
   useEffect(() => {
+    // Initialize browser cache
+    if (typeof window !== 'undefined') {
+      // Initialize browser cache
+      browserCache.init();
+      
+      // Make cache manager accessible to window for debugging/testing
+      (window as any).__REACT_QUERY_CACHE__ = cacheManager;
+    }
+    
     // Periodically sync data between caches
     const syncInterval = setInterval(() => {
       // Check query cache for refreshed data
       const queryCache = queryClient.getQueryCache();
       const queryCacheSize = queryCache.getAll().length;
+      
+      // Prune expired browser cache entries every 10 minutes
+      if (typeof window !== 'undefined') {
+        browserCache.prune();
+      }
       
       // Limit logging to prevent console noise
       logInfo(`Syncing ${queryCacheSize} queries with enhanced cache`);

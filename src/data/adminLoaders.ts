@@ -6,6 +6,10 @@ import { UserType, VerificationStatus as VerificationStatusEnum } from '@/types/
 import type { DoctorProfile } from '@/types/schemas';
 import { logInfo } from '@/lib/logger';
 import { UnauthorizedError, AuthError } from '@/lib/errors/errorClasses';
+import { useMemo } from 'react';
+import { useBatchDoctorData } from '@/data/doctorLoaders';
+import { z } from 'zod';
+import { UserProfileSchema, DoctorProfileSchema } from '@/types/schemas';
 
 /**
  * Hook to fetch all users

@@ -36,6 +36,8 @@ import useBookingError, { BookingError, BookingErrorCode } from '@/hooks/useBook
 import { callApi } from '@/lib/apiClient';
 import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors/errorClasses';
 import { UserType } from '@/types/enums';
+import { BookAppointmentPreloader } from '@/lib/preloadStrategies';
+import { enhancedCache, CacheCategory } from '@/lib/cacheManager';
 
 // Define the merged doctor profile type based on API response
 interface DoctorPublicProfile {
@@ -140,13 +142,28 @@ function BookAppointmentPageContent() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
-  // Set up mount status tracking
+  // Set up mount status tracking and preload data
   useEffect(() => {
     isMountedRef.current = true;
+    
+    // Preload all doctor data in an optimized batch
+    if (doctorId) {
+      const preloader = new BookAppointmentPreloader(
+        doctorId,
+        user?.uid,
+        user?.role as UserType
+      );
+      
+      preloader.preloadAll()
+        .catch(error => {
+          logError('Error preloading doctor data', { error, doctorId });
+        });
+    }
+    
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [doctorId, user]);
 
   // Check if user is a patient at component load
   useEffect(() => {
@@ -269,90 +286,110 @@ function BookAppointmentPageContent() {
     generateDates();
   }, [availabilityDataResponse, generateDates]);
 
-  // Fetch available time slots for the selected date
-  const fetchAvailableSlots = useCallback(async () => {
-    if (!selectedDate || !isMountedRef.current) return;
+  // When fetching available slots for a date, cache adjacent days in advance
+  const fetchSlotsForDate = useCallback(async (date: Date) => {
+    if (!doctor) return;
+    
+    setSlotsLoading(true);
+    setAvailabilityError(null);
+    const formattedDate = format(date, 'yyyy-MM-dd');
     
     try {
-      // Show loading indicator
-      setSlotsLoading(true);
-      setAvailableTimeSlots([]);
+      // Check if we have the slots in the cache first
+      const cacheKey = enhancedCache.createKey('slots', doctorId, formattedDate);
+      const cachedSlots = enhancedCache.get<Array<{ startTime: string; endTime: string }>>(
+        CacheCategory.APPOINTMENTS, 
+        cacheKey
+      );
       
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      if (cachedSlots) {
+        logInfo('Using cached slots for date', { date: formattedDate, count: cachedSlots.length });
+        setAvailableTimeSlots(cachedSlots);
+        setSlotsLoading(false);
+        return;
+      }
       
-      // Create a request cache key for performance monitoring
-      const requestId = `slots_${doctorId}_${formattedDate}_${Date.now()}`;
-      
-      logInfo('Fetching available slots', {
-        doctorId,
-        date: formattedDate,
-        requestId
-      });
-      
+      // Get available slots from the API
       const response = await callApi<AvailableSlotsResponse>(
-        'getAvailableSlots',
+        'getAvailableSlots', 
         { doctorId, date: formattedDate }
       );
       
-      // Check if component is still mounted before updating state
       if (!isMountedRef.current) return;
       
-      if (response.success && response.slots && Array.isArray(response.slots)) {
+      if (response.success && response.slots) {
         setAvailableTimeSlots(response.slots);
         
-        // If no slots are available, provide a user-friendly error
-        if (response.slots.length === 0) {
-          throw new BookingError('No available appointment slots for this date', 'NO_SLOTS_AVAILABLE', { doctorId, date: formattedDate });
-        }
+        // Cache the slots for future use
+        enhancedCache.set(
+          CacheCategory.APPOINTMENTS,
+          cacheKey,
+          response.slots,
+          { ttl: 60000 } // 1 minute TTL
+        );
         
-        logInfo('Successfully fetched slots', {
-          doctorId,
-          date: formattedDate,
-          slotCount: response.slots.length,
-          requestId
-        });
+        // Also preload adjacent dates to improve UX
+        const tomorrow = new Date(date);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const yesterday = new Date(date);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        // Preload tomorrow and yesterday in the background
+        prefetchAdjacentDateSlots(tomorrow);
+        prefetchAdjacentDateSlots(yesterday);
       } else {
-        // Handle the case when API returns success: false
-        logError('Failed to fetch available slots', {
-          doctorId,
-          date: formattedDate,
-          error: response.error || 'Unknown error',
-          requestId
-        });
-        
-        throw new BookingError('Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: formattedDate });
+        setAvailableTimeSlots([]);
+        setAvailabilityError(response.error || 'Failed to load available slots');
       }
     } catch (error) {
-      // Check if component is still mounted before updating state
       if (!isMountedRef.current) return;
-      
-      // Log the error
-      logError('Error fetching available slots', {
-        doctorId,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        error
-      });
-      
-      // If it's already a BookingError (thrown by throwTimeSlotError), just rethrow
-      if (error instanceof BookingError) {
-        throw error;
-      }
-      
-      // Otherwise, create a standardized error
-      throw new BookingError(error instanceof Error ? error.message : 'Failed to load available time slots', 'LOADING_FAILED', { doctorId, date: format(selectedDate, 'yyyy-MM-dd') });
+      logError('Error fetching slots', { error, date: formattedDate });
+      setAvailableTimeSlots([]);
+      setAvailabilityError('Error loading available slots. Please try again.');
     } finally {
       if (isMountedRef.current) {
         setSlotsLoading(false);
       }
     }
-  }, [doctorId, selectedDate, isMountedRef, BookingError]);
+  }, [doctorId, doctor, isMountedRef]);
+  
+  // Prefetch slots for adjacent date
+  const prefetchAdjacentDateSlots = useCallback((date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    
+    // Check if already in cache
+    const cacheKey = enhancedCache.createKey('slots', doctorId, formattedDate);
+    const cachedSlots = enhancedCache.get(CacheCategory.APPOINTMENTS, cacheKey);
+    
+    // If not in cache, fetch in the background
+    if (!cachedSlots) {
+      callApi<AvailableSlotsResponse>(
+        'getAvailableSlots', 
+        { doctorId, date: formattedDate }
+      )
+      .then(response => {
+        if (response.success && response.slots) {
+          // Cache the result
+          enhancedCache.set(
+            CacheCategory.APPOINTMENTS,
+            cacheKey,
+            response.slots,
+            { ttl: 60000 } // 1 minute TTL
+          );
+        }
+      })
+      .catch(() => {
+        // Silently fail for background prefetching
+      });
+    }
+  }, [doctorId]);
 
   // On date selection, fetch available time slots
   useEffect(() => {
     if (selectedDate) {
-      fetchAvailableSlots();
+      fetchSlotsForDate(selectedDate);
     }
-  }, [selectedDate, fetchAvailableSlots]);
+  }, [selectedDate, fetchSlotsForDate]);
 
   // Check if a date is selectable
   const isDateSelectable = (date: Date) => {

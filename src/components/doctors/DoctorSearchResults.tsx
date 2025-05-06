@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,6 +18,8 @@ import {
 import { logInfo } from '@/lib/logger';
 import { useApiQuery, prefetchApiQuery } from '@/lib/enhancedApiClient';
 import { cacheKeys } from '@/lib/queryClient';
+import { useBatchDoctorData } from '@/data/doctorLoaders';
+import { trackPerformance } from '@/lib/performance';
 
 // Define interface for doctor data
 interface Doctor {
@@ -214,8 +216,14 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   searchParams,
   className = '',
 }) => {
+  const perfTracker = trackPerformance('DoctorSearchResults');
+  
   // Use enhanced API client with React Query integration
-  const { data, isLoading, error } = useApiQuery<FindDoctorsResponse, Error>(
+  const { 
+    data: searchData, 
+    isLoading: isSearchLoading, 
+    error: searchError 
+  } = useApiQuery<FindDoctorsResponse, Error>(
     'findDoctors',
     cacheKeys.doctors(searchParams),
     [searchParams],
@@ -226,17 +234,55 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
     }
   );
   
-  const doctors = data?.doctors || [];
+  // Extract doctor IDs for batch loading
+  const doctorIds = useMemo(() => {
+    if (!searchData?.success || !searchData.doctors) return [];
+    return searchData.doctors.map(doctor => doctor.id);
+  }, [searchData]);
+  
+  // Batch load additional doctor details
+  const { 
+    data: batchData,
+    isLoading: isBatchLoading
+  } = useBatchDoctorData(doctorIds, { 
+    enabled: doctorIds.length > 0 
+  });
+  
+  // Create enhanced doctor data by merging search results with batch data
+  const doctors = useMemo(() => {
+    if (!searchData?.success || !searchData.doctors) return [];
+    
+    return searchData.doctors.map(doctor => {
+      // Find additional data from batch results if available
+      const batchDoctor = batchData?.success && batchData.doctors[doctor.id];
+      
+      // Merge the data, preferring search result data when there's a conflict
+      return {
+        ...(batchDoctor || {}),
+        ...doctor // Ensure original doctor data takes precedence
+      };
+    });
+  }, [searchData, batchData]);
+  
+  // Determine overall loading state
+  const isLoading = isSearchLoading || (doctorIds.length > 0 && isBatchLoading && !batchData);
+  const error = searchError;
   
   // Log search performance
   React.useEffect(() => {
     if (doctors.length > 0) {
       logInfo('Doctor search completed', { 
         resultCount: doctors.length,
-        params: searchParams
+        params: searchParams,
+        batchLoaded: !!batchData
       });
     }
-  }, [doctors.length, searchParams]);
+    
+    // Stop performance tracking when component unmounts
+    return () => {
+      perfTracker.stop();
+    };
+  }, [doctors.length, searchParams, batchData]);
 
   return (
     <div className={className}>

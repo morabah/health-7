@@ -11,23 +11,16 @@ import type { CacheOptions } from './lruCache';
 import { LRUCache } from './lruCache';
 import { logInfo, logError } from './logger';
 import { cacheManager as reactQueryCache } from './queryClient';
-
-// Cache categories for different data types
-export enum CacheCategory {
-  USERS = 'users',
-  DOCTORS = 'doctors',
-  APPOINTMENTS = 'appointments',
-  NOTIFICATIONS = 'notifications',
-  OTHER = 'other'
-}
+import { CacheCategory } from './browserCacheManager';
+import { browserCache } from './browserCacheManager';
 
 // TTL settings for different data types (in milliseconds)
 const TTL_CONFIG = {
-  [CacheCategory.USERS]: 60000,         // 1 minute
-  [CacheCategory.DOCTORS]: 120000,      // 2 minutes
-  [CacheCategory.APPOINTMENTS]: 30000,  // 30 seconds
-  [CacheCategory.NOTIFICATIONS]: 15000, // 15 seconds
-  [CacheCategory.OTHER]: 30000          // 30 seconds (default)
+  [CacheCategory.USERS]: 120000,        // 2 minutes (increased from 1 minute)
+  [CacheCategory.DOCTORS]: 300000,      // 5 minutes (increased from 2 minutes)
+  [CacheCategory.APPOINTMENTS]: 60000,  // 1 minute (increased from 30 seconds)
+  [CacheCategory.NOTIFICATIONS]: 10000, // 10 seconds (reduced from 15 seconds)
+  [CacheCategory.OTHER]: 60000          // 1 minute (increased from 30 seconds)
 };
 
 // Create cache instances (one per category for better isolation)
@@ -89,7 +82,23 @@ export function getCacheData<T>(
   options: CacheOptions = {}
 ): T | undefined {
   try {
-    return caches[category].get(key, options) as T | undefined;
+    // Try memory LRU cache first
+    const cached = caches[category].get(key, options) as T | undefined;
+    if (cached) {
+      return cached;
+    }
+    
+    // If not found in memory cache and browser is available, try browser cache
+    if (typeof window !== 'undefined') {
+      const browserCached = browserCache.get<T>(category, key);
+      if (browserCached) {
+        // If found in browser cache, populate memory cache too
+        setCacheData(category, key, browserCached, options);
+        return browserCached;
+      }
+    }
+    
+    return undefined;
   } catch (error) {
     logError('Error getting cache data', { category, key, error });
     return undefined;
@@ -247,6 +256,44 @@ export function migrateReactQueryToLRUCache<T>(
   }
 }
 
+/**
+ * Set doctor data in cache with optimized settings
+ * @param doctorId Doctor ID
+ * @param data Doctor data to cache
+ * @param options Additional cache options
+ */
+export function setDoctorData(doctorId: string, data: unknown, options: CacheOptions = {}): void {
+  try {
+    const key = createCacheKey('doctor', doctorId);
+    
+    // Set in the LRU Cache
+    setCacheData(CacheCategory.DOCTORS, key, data, {
+      ttl: options.ttl || TTL_CONFIG[CacheCategory.DOCTORS],
+      priority: options.priority || 'high', // Doctors data is high priority
+      tag: options.tag || 'doctor'
+    });
+    
+    // Get reference to React Query cache manager
+    const reactQueryCache = typeof window !== 'undefined' 
+      ? (window as any).__REACT_QUERY_CACHE__ 
+      : null;
+    
+    // Also update React Query cache if available
+    if (reactQueryCache && typeof reactQueryCache.setQueryData === 'function') {
+      reactQueryCache.setQueryData(['doctor', doctorId], { success: true, doctor: data });
+    }
+
+    // Also persist to browser localStorage for session persistence
+    if (typeof window !== 'undefined') {
+      browserCache.setDoctor(doctorId, data);
+    }
+    
+    logInfo('Doctor data cached', { doctorId });
+  } catch (error) {
+    logError('Error setting doctor data in cache', { doctorId, error });
+  }
+}
+
 // Export a unified cache interface
 export const enhancedCache = {
   set: setCacheData,
@@ -261,10 +308,14 @@ export const enhancedCache = {
   stopAutoPruning,
   createKey: createCacheKey,
   migrateFromReactQuery: migrateReactQueryToLRUCache,
+  setDoctorData,
   category: CacheCategory
 };
 
 // Auto-start pruning when this module is loaded
 startAutoPruning();
+
+// Re-export CacheCategory for use in other modules
+export { CacheCategory };
 
 export default enhancedCache; 

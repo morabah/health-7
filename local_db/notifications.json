@@ -1375,5 +1375,105 @@
     "isRead": false,
     "createdAt": "2025-05-06T13:16:54.203Z",
     "relatedId": null
+  },
+  {
+    "id": "notif-5l6tefgmeijm5gvm528ik8",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-14 at 15:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T14:20:14.478Z",
+    "relatedId": "mrjo9bj0ax2omgv1d1vui"
+  },
+  {
+    "id": "notif-v7caau3bkf8284fdouvgsr",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-14 at 15:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T14:20:14.478Z",
+    "relatedId": "mrjo9bj0ax2omgv1d1vui"
+  },
+  {
+    "id": "notif-1h4259l6fwfpl3e10qrec",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-15 at 16:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:18:46.016Z",
+    "relatedId": "18pguyjh70ijzw6q21sowk"
+  },
+  {
+    "id": "notif-334gkdqcab8yzzq8i4dud",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-15 at 16:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:18:46.016Z",
+    "relatedId": "18pguyjh70ijzw6q21sowk"
+  },
+  {
+    "id": "notif-mgscpi2y8q9j01pcl3ks",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-08 at 16:30",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:31:07.996Z",
+    "relatedId": "i7929mb3mznh3oo0ejt5ek"
+  },
+  {
+    "id": "notif-fu34ui4l95j9mnxmfas6ku",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-08 at 16:30 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:31:07.996Z",
+    "relatedId": "i7929mb3mznh3oo0ejt5ek"
+  },
+  {
+    "id": "notif-d2d5jtvll2v2nxfxsji5us",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-14 at 15:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:47:11.263Z",
+    "relatedId": "ibuakzyqqyutfdflh8rv9"
+  },
+  {
+    "id": "notif-z5g8w168kvadcrgx6kvei",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-14 at 15:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T15:47:11.263Z",
+    "relatedId": "ibuakzyqqyutfdflh8rv9"
+  },
+  {
+    "id": "notif-bdmvb7zxbe8n8h239p51ma",
+    "userId": "u-001",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3f has canceled the appointment scheduled for 2025-05-08 at 16:30 - Reason: k.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-06T17:48:00.397Z",
+    "relatedId": "i7929mb3mznh3oo0ejt5ek"
+  },
+  {
+    "id": "notif-awc9n1cnuao5j6jier8ehc",
+    "userId": "u-001",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3f has canceled the appointment scheduled for 2025-05-13T07:23:55.193Z at 14:00 - Reason: m.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-06T17:48:06.299Z",
+    "relatedId": "bpo5prhjisbv6v8vm6er9l"
   }
 ]

@@ -282,4 +282,56 @@ export const doctorGetAppointmentById = async (context: { uid: string; role: Use
     persistError(normalizedError);
     throw normalizedError;
   }
+};
+
+/**
+ * Hook to batch fetch multiple doctors data at once
+ * 
+ * @param doctorIds Array of doctor IDs to fetch
+ * @param options Additional query options
+ * @returns Query result with doctors data
+ */
+export const useBatchDoctorData = (doctorIds: string[] = [], options: { enabled?: boolean } = {}) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  return useQuery({
+    queryKey: ['batchDoctors', doctorIds.sort().join(',')],
+    queryFn: async () => {
+      if (!doctorIds.length) {
+        return { success: true, doctors: {} };
+      }
+
+      if (!user?.uid) {
+        // Allow anonymous access with limited data
+        return callApi('batchGetDoctorsData', undefined, doctorIds);
+      }
+      
+      // Execute with auth context when available
+      return callApi('batchGetDoctorsData', 
+        { uid: user.uid, role: user.role },
+        doctorIds
+      );
+    },
+    enabled: options.enabled !== false && doctorIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Keep data for 10 minutes
+    gcTime: 10 * 60 * 1000,
+    // Deduplicate identical requests
+    select: (data: any) => {
+      if (!data.success || !data.doctors) {
+        return { success: false, doctors: {} };
+      }
+      
+      // Cache individual doctors to reduce future fetching
+      Object.entries(data.doctors).forEach(([doctorId, doctorData]) => {
+        queryClient.setQueryData(['doctor', doctorId], { 
+          success: true, 
+          doctor: doctorData 
+        });
+      });
+      
+      return data;
+    }
+  });
 }; 
