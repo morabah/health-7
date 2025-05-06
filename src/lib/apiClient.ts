@@ -59,6 +59,7 @@ const METHOD_MAPPING: Record<string, string> = {
   login: 'signIn',
   registerPatient: 'registerUser',
   registerDoctor: 'registerUser',
+  getAllUsers: 'adminGetAllUsers',  // Map getAllUsers to adminGetAllUsers which exists in the API
 };
 
 // Methods that should use deduplication
@@ -68,8 +69,25 @@ const DEDUPLICATION_ELIGIBLE_METHODS = [
   'getAvailableSlots',
   'findDoctors',
   'getMyUserProfile',
-  'getMyAppointments'
+  'getMyAppointments',
+  'getAllDoctors',
+  'getAllUsers',
+  'getPatientProfile',
+  'getDoctorPublicProfile'
 ];
+
+// Debounce requests mapping by method
+const DEDUPE_DEBOUNCE_MS: Record<string, number> = {
+  'getMyNotifications': 300,  // High frequency, aggressive debounce
+  'findDoctors': 200,         // Search function, moderate debounce
+  'getAllDoctors': 300,       // List view, aggressive debounce
+  'getAllUsers': 300,         // List view, aggressive debounce
+  'getAvailableSlots': 150,   // Time-sensitive data, light debounce
+  'getMyAppointments': 200,   // Moderate debounce
+};
+
+// Track last request timestamp to implement debouncing
+const lastRequestTimestamps: Record<string, number> = {};
 
 /**
  * Options for callApi
@@ -252,43 +270,37 @@ export async function callApiWithOptions<T = unknown>(
     }
   };
 
-  // Try to use optimized data access for performance if not explicitly skipped
-  if (!options.skipOptimized && !isFirebaseEnabled && OPTIMIZED_METHODS[method]) {
+  // Check if we should use optimized data access
+  if (!options.skipOptimized && method in OPTIMIZED_METHODS) {
     try {
       const optimizedFn = OPTIMIZED_METHODS[method];
       
-      // Handle the special case of single doctor fetch
+      // Skip if no optimized implementation available
+      if (!optimizedFn) {
+        return executeApiCall();
+      }
+      
+      // Special handling for getDoctorPublicProfile - direct get by ID
       if (method === 'getDoctorPublicProfile' && args.length > 0) {
-        // Extract doctor ID from args - could be in different formats
-        let doctorId = '';
-        
-        if (typeof args[0] === 'string') {
-          doctorId = args[0];
-        } else if (typeof args[1] === 'string') {
-          doctorId = args[1];
-        } else if (args[0] && typeof args[0] === 'object' && args[0] !== null && 'doctorId' in args[0]) {
-          doctorId = (args[0] as Record<string, string>).doctorId;
-        }
+        const doctorId = typeof args[0] === 'string' 
+          ? args[0] 
+          : (args.length > 1 && typeof args[1] === 'string') 
+            ? args[1] 
+            : undefined;
         
         if (doctorId) {
-          // Try to get from cache first
-          const cacheKey = `doctor-${doctorId}`;
-          const cachedDoctor = getMemoryCacheData<DoctorProfile>(cacheKey);
-          
-          if (cachedDoctor) {
-            return { success: true, doctor: cachedDoctor } as unknown as T;
-          }
-          
-          // Get all doctors then filter
-          const doctors = await getOptimizedDoctors();
+          const doctors = await getOptimizedDoctors({});
           const doctor = doctors.find(d => d.id === doctorId || d.userId === doctorId);
           
           if (doctor) {
-            setMemoryCacheData(cacheKey, doctor);
-            return { success: true, doctor } as unknown as T;
+            return { 
+              success: true, 
+              doctor
+            } as unknown as T;
           }
         }
-      } 
+      }
+      
       // For other methods that have an optimized implementation
       else if (optimizedFn) {
         // Convert args to filters
@@ -326,6 +338,23 @@ export async function callApiWithOptions<T = unknown>(
 
   // Use deduplication for eligible methods if not explicitly skipped
   if (!options.skipDeduplication && DEDUPLICATION_ELIGIBLE_METHODS.includes(method)) {
+    // Apply request debouncing for eligible methods
+    const debounceMs = DEDUPE_DEBOUNCE_MS[method] || 0;
+    if (debounceMs > 0) {
+      const now = Date.now();
+      const lastRequest = lastRequestTimestamps[method] || 0;
+      
+      // If a request was made very recently, use deduplication with the higher TTL
+      if (now - lastRequest < debounceMs) {
+        if (shouldLog) {
+          logInfo(`Debouncing ${method} call (${now - lastRequest}ms < ${debounceMs}ms threshold)`);
+        }
+      }
+      
+      // Update last request timestamp
+      lastRequestTimestamps[method] = now;
+    }
+    
     return deduplicatedApiCall<T>(
       method,
       () => callApiWithErrorHandling<T>(
@@ -347,7 +376,9 @@ export async function callApiWithOptions<T = unknown>(
       args,
       { 
         label: `API:${method}`,
-        verbose: shouldLog
+        verbose: shouldLog,
+        // If debounced, use a longer TTL
+        ttlMs: debounceMs > 0 ? Math.max(debounceMs * 5, 2000) : undefined
       }
     );
   }

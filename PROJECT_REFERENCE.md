@@ -988,6 +988,24 @@ This resolved the "Class extends value undefined is not a constructor or null" e
 
 ### Prompt Task Completion History
 
+#### Fix Book Appointment Page Routing Conflict
+
+- **Date**: [Current Date]
+- **Issues Fixed**:
+  - Resolved routing conflict between `/(platform)/book-appointment/[doctorId]` and `/book-appointment/[doctorId]` 
+  - Removed the redirect component approach that was causing conflicts
+  - Implemented Next.js redirects in `next.config.js` for a cleaner solution
+  - The redirect ensures users are properly sent to the platform-prefixed route
+
+- **Files Modified**:
+  - Modified: `next.config.js` (added redirects configuration)
+  - Deleted: `src/app/book-appointment/[doctorId]/page.tsx` (removed redundant component)
+
+- **Implementation Notes**:
+  - Used Next.js's built-in redirects feature which is more efficient than component-based redirects
+  - The redirect is marked as permanent (301) for better SEO
+  - This approach avoids the "parallel pages that resolve to the same path" error
+
 #### Fix Book Appointment Page Errors
 
 - **Date**: [Current Date]

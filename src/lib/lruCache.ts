@@ -107,9 +107,9 @@ export interface CacheStats {
 }
 
 // Default settings
-const DEFAULT_TTL = 30000; // 30 seconds
-const DEFAULT_MAX_SIZE = 10 * 1024 * 1024; // 10MB
-const DEFAULT_MAX_ENTRIES = 500;
+const DEFAULT_TTL = 20000; // reduced from 30000ms to 20000ms (20 seconds)
+const DEFAULT_MAX_SIZE = 15 * 1024 * 1024; // increased from 10MB to 15MB
+const DEFAULT_MAX_ENTRIES = 750; // increased from 500 to 750
 const DEFAULT_PRIORITY = 'normal';
 
 /**

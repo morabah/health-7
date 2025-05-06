@@ -401,15 +401,25 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     
     // Fetch fresh data
     logInfo('Fetching fresh users data');
-    const response = await callApi<{ success: boolean; users: User[] }>('getAllUsers');
+    
+    // Use callApiWithOptions with skipOptimized to prevent recursion
+    const response = await callApi<{ success: boolean; users: User[] }>(
+      'getAllUsers', 
+      { skipOptimized: true } // Add skipOptimized flag to prevent recursion
+    );
     
     if (!response.success || !response.users || !Array.isArray(response.users)) {
-      throw new DataFetchError(
-        'Invalid response from users data source',
-        'INVALID_USER_DATA',
-        { dataType: typeof response.users, cacheKey },
-        false
-      );
+      // Instead of throwing, return an empty array when API fails
+      logWarn('API request for users failed, returning empty array', {
+        success: response.success,
+        hasUsers: !!response.users,
+        isArray: Array.isArray(response.users)
+      });
+      
+      // Store empty array in cache to prevent repeated failed requests
+      const emptyData: User[] = [];
+      enhancedCache.set(CacheCategory.USERS, cacheKey, emptyData, { ttl: 10000 }); // 10 second TTL for empty results
+      return emptyData;
     }
     
     const users = response.users;
@@ -438,16 +448,8 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     
     logError('Error in getOptimizedUsers', { error, ...errorContext });
     
-    // Determine if we have a fallback strategy
-    const shouldAttemptFallback = !(error instanceof DataFetchError && !error.retryable);
-    
-    if (shouldAttemptFallback) {
-      logWarn('Attempting to recover with empty result in getOptimizedUsers');
-      return [];
-    }
-    
-    // Re-throw critical errors that shouldn't be handled here
-    throw error;
+    // Return empty array instead of retrying to prevent infinite loops
+    return [];
   }
 }
 

@@ -4,7 +4,7 @@ import { callApi } from './apiClient';
 import { cacheKeys, cacheManager } from './queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import type { UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { logInfo, logError } from './logger';
 
 /**
@@ -19,126 +19,195 @@ interface BatchQueueItem<T = unknown> {
   timestamp: number;
 }
 
-// Define type for API request batcher
-interface BatchQueue {
-  [key: string]: BatchQueueItem[];
-}
+// Batch queue for common high-frequency API calls
+const batchQueues: Record<string, BatchQueueItem<unknown>[]> = {
+  notifications: [],
+  doctors: [],
+  appointments: [],
+  users: [],
+};
 
-// Batch API request queue
-const batchQueue: BatchQueue = {};
+// Track timers for each batch type
+const batchTimers: Record<string, NodeJS.Timeout | null> = {
+  notifications: null,
+  doctors: null,
+  appointments: null,
+  users: null,
+};
 
-// Current batch timers
-const batchTimers: Record<string, NodeJS.Timeout> = {};
+// Configure batch timing
+const BATCH_DELAYS: Record<string, number> = {
+  notifications: 100, // 100ms
+  doctors: 150, // 150ms
+  appointments: 150, // 150ms
+  users: 200, // 200ms
+};
 
-// Default batch window (ms)
-const DEFAULT_BATCH_WINDOW = 50;
+// Map API methods to batch queues
+const METHOD_TO_BATCH: Record<string, string> = {
+  'getMyNotifications': 'notifications',
+  'getAllNotifications': 'notifications',
+  'findDoctors': 'doctors',
+  'getAllDoctors': 'doctors',
+  'getDoctorPublicProfile': 'doctors',
+  'getMyAppointments': 'appointments',
+  'getPatientAppointments': 'appointments',
+  'getDoctorAppointments': 'appointments',
+  'getAvailableSlots': 'appointments',
+  'getAllUsers': 'users',
+  'getMyUserProfile': 'users',
+  'getUserProfile': 'users',
+};
 
 /**
- * Batch API requests for the same method call
- * @param method API method to batch
- * @param params Parameters for this specific call
- * @param batchWindow Time window to collect batches
+ * Process a batch of queued API calls
  */
-function batchApiCall<T>(
-  method: string, 
-  params: unknown[],
-  batchWindow = DEFAULT_BATCH_WINDOW
-): Promise<T> {
-  // Create a new promise that will be resolved when the batch is processed
-  return new Promise<T>((resolve, reject) => {
-    // Initialize the batch queue for this method if it doesn't exist
-    if (!batchQueue[method]) {
-      batchQueue[method] = [];
+function processBatch(batchType: string) {
+  const queue = batchQueues[batchType];
+  if (!queue || queue.length === 0) return;
+  
+  // Clear the timer
+  if (batchTimers[batchType]) {
+    clearTimeout(batchTimers[batchType]!);
+    batchTimers[batchType] = null;
+  }
+  
+  // Create a copy of the queue and clear the original
+  const batchToProcess = [...queue];
+  batchQueues[batchType] = [];
+  
+  // Group by method name to process each method separately
+  const batchesByMethod: Record<string, BatchQueueItem<unknown>[]> = {};
+  
+  for (const item of batchToProcess) {
+    const methodName = item.params[0] as string;
+    if (!batchesByMethod[methodName]) {
+      batchesByMethod[methodName] = [];
+    }
+    batchesByMethod[methodName].push(item);
+  }
+  
+  // Process each method batch
+  for (const [method, items] of Object.entries(batchesByMethod)) {
+    processBatchForMethod(method, items);
+  }
+}
+
+/**
+ * Process a batch of queued API calls for a specific method
+ */
+async function processBatchForMethod(method: string, batch: BatchQueueItem<unknown>[]) {
+  if (batch.length === 0) return;
+  
+  try {
+    // For single item batches, just process normally
+    if (batch.length === 1) {
+      const item = batch[0];
+      const result = await callApi(method, ...item.params.slice(1));
+      item.resolve(result);
+      return;
     }
     
-    // Add this request to the queue
-    batchQueue[method].push({
-      params,
+    // For multiple items, process according to method
+    if (method === 'getMyNotifications' || method === 'getAllNotifications') {
+      // Special case for notifications - we can make a single call
+      // and distribute results to all requesters
+      const firstItem = batch[0];
+      const result = await callApi(method, ...firstItem.params.slice(1));
+      
+      // Resolve all promises with the same result
+      for (const item of batch) {
+        item.resolve(result);
+      }
+    } else {
+      // For other methods, process each item individually
+      // but avoid thundering herd by adding small delays
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        try {
+          const result = await callApi(method, ...item.params.slice(1));
+          item.resolve(result);
+        } catch (error) {
+          item.reject(error);
+        }
+        
+        // Add a small delay between calls except for the last one
+        if (i < batch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+    }
+  } catch (error) {
+    // If batch processing fails, reject all promises
+    logError('Batch processing failed', { method, error, batchSize: batch.length });
+    for (const item of batch) {
+      item.reject(error);
+    }
+  }
+}
+
+/**
+ * Queue an API call for batching
+ */
+function queueBatchedCall<T>(method: string, params: unknown[]): Promise<T> {
+  const batchType = METHOD_TO_BATCH[method];
+  
+  // If method isn't configured for batching, execute directly
+  if (!batchType || !batchQueues[batchType]) {
+    return callApi<T>(method, ...params);
+  }
+  
+  return new Promise<T>((resolve, reject) => {
+    // Add to queue
+    batchQueues[batchType].push({
+      params: [method, ...params],
       resolve: resolve as (value: unknown) => void,
       reject,
       timestamp: Date.now()
     });
     
-    // Clear any existing batch timer for this method
-    if (batchTimers[method]) {
-      clearTimeout(batchTimers[method]);
+    // Set a timer to process the batch if not already set
+    if (!batchTimers[batchType]) {
+      batchTimers[batchType] = setTimeout(() => {
+        processBatch(batchType);
+      }, BATCH_DELAYS[batchType] || 150);
     }
-    
-    // Set a new timer to process the batch
-    batchTimers[method] = setTimeout(() => {
-      processBatch(method);
-    }, batchWindow);
   });
-}
-
-// Define type for batch result
-interface BatchResult {
-  index: number;
-  result: unknown | null;
-  error: unknown | null;
 }
 
 /**
- * Process a batch of API calls for the same method
- * @param method API method to process batch for
+ * Enhanced API client that automatically handles batching and caching
+ * for high-frequency API calls
  */
-async function processBatch(method: string): Promise<void> {
-  // Get and clear the queue for this method
-  const queue = batchQueue[method] || [];
-  batchQueue[method] = [];
-  delete batchTimers[method];
-  
-  if (queue.length === 0) return;
-  
-  if (queue.length === 1) {
-    // If only one request, just make a normal API call
-    try {
-      const result = await callApi(method, ...queue[0].params);
-      queue[0].resolve(result);
-    } catch (error) {
-      queue[0].reject(error);
+export function useEnhancedApi() {
+  /**
+   * Call API with automatic batching for supported methods
+   */
+  const callEnhancedApi = useCallback(<T>(method: string, ...params: unknown[]): Promise<T> => {
+    // Check if this method should be batched
+    if (METHOD_TO_BATCH[method]) {
+      return queueBatchedCall<T>(method, params);
     }
-    return;
+    
+    // Default to regular API call
+    return callApi<T>(method, ...params);
+  }, []);
+  
+  return {
+    callApi: callEnhancedApi
+  };
+}
+
+// Also export a non-hook version for server components
+export const enhancedApiCall = <T>(method: string, ...params: unknown[]): Promise<T> => {
+  // Check if this method should be batched
+  if (METHOD_TO_BATCH[method]) {
+    return queueBatchedCall<T>(method, params);
   }
   
-  // TODO: Implement actual batching here, depending on your backend API support
-  // For now, we'll just make individual calls in parallel
-  
-  const batchStart = Date.now();
-  logInfo(`Processing batch of ${queue.length} calls for ${method}`);
-  
-  // Make all the API calls in parallel
-  const promises = queue.map(async (request, index) => {
-    try {
-      return {
-        index,
-        result: await callApi(method, ...request.params),
-        error: null
-      } as BatchResult;
-    } catch (error) {
-      return {
-        index,
-        result: null,
-        error
-      } as BatchResult;
-    }
-  });
-  
-  // Wait for all calls to complete
-  const results = await Promise.all(promises);
-  
-  // Process the results and resolve/reject the promises
-  results.forEach(({ index, result, error }) => {
-    if (error) {
-      queue[index].reject(error);
-    } else {
-      queue[index].resolve(result);
-    }
-  });
-  
-  const batchEnd = Date.now();
-  logInfo(`Completed batch of ${queue.length} calls for ${method} in ${batchEnd - batchStart}ms`);
-}
+  // Default to regular API call
+  return callApi<T>(method, ...params);
+};
 
 /**
  * Get data with advanced caching via React Query
@@ -183,7 +252,7 @@ export function useApiQuery<TData, TError = Error>(
         const canBatch = ['getUsers', 'getDoctors', 'getNotifications'].includes(method);
         
         const result = canBatch
-          ? await batchApiCall<TData>(method, args)
+          ? await queueBatchedCall<TData>(method, args)
           : await callApi<TData>(method, ...args);
           
         return result;

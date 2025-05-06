@@ -57,14 +57,19 @@ const pendingRequests = new Map<RequestKey, PendingRequest<unknown>>();
 // Configure which methods to deduplicate and their TTLs
 const DEDUPLICATION_CONFIG: Record<string, MethodConfig> = {
   // High-frequency methods with deduplication enabled
-  'getMyNotifications': { enabled: true, ttlMs: 3000 },  // 3 seconds
-  'getMyDashboardStats': { enabled: true, ttlMs: 3000 }, // 3 seconds
-  'getAvailableSlots': { enabled: true, ttlMs: 2000 },   // 2 seconds
-  'findDoctors': { enabled: true, ttlMs: 2000 },         // 2 seconds
+  'getMyNotifications': { enabled: true, ttlMs: 1500 },  // reduced from 3000ms
+  'getMyDashboardStats': { enabled: true, ttlMs: 1500 }, // reduced from 3000ms
+  'getAvailableSlots': { enabled: true, ttlMs: 1000 },   // reduced from 2000ms
+  'findDoctors': { enabled: true, ttlMs: 1000 },         // reduced from 2000ms
+  'getAllDoctors': { enabled: true, ttlMs: 1500 },       // new method
+  'getDoctorPublicProfile': { enabled: true, ttlMs: 2000 }, // new method
   
   // Methods that should rarely be deduplicated but could be in some scenarios
-  'getMyUserProfile': { enabled: true, ttlMs: 500 },     // 0.5 seconds
-  'getMyAppointments': { enabled: true, ttlMs: 1000 },   // 1 second
+  'getMyUserProfile': { enabled: true, ttlMs: 500 },     // unchanged
+  'getMyAppointments': { enabled: true, ttlMs: 1000 },   // unchanged
+  'getAllUsers': { enabled: true, ttlMs: 1500 },         // new method
+  'getAllPatients': { enabled: true, ttlMs: 1500 },      // new method
+  'getPatientDetails': { enabled: true, ttlMs: 1000 },   // new method
   
   // Default configuration for any method not explicitly listed
   'default': { enabled: false, ttlMs: 0 }
@@ -80,7 +85,9 @@ const METHOD_TO_CATEGORY: Record<string, CacheCategory> = {
   'getMyAppointments': CacheCategory.APPOINTMENTS,
   'getDoctorPublicProfile': CacheCategory.DOCTORS,
   'getAllDoctors': CacheCategory.DOCTORS,
-  'getAllUsers': CacheCategory.USERS
+  'getAllUsers': CacheCategory.USERS,
+  'getAllPatients': CacheCategory.USERS,
+  'getPatientDetails': CacheCategory.USERS
 };
 
 // Statistics tracking for performance monitoring
