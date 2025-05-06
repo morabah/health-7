@@ -7,6 +7,15 @@ const nextConfig = {
   images: {
     domains: ['example.com'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/book-appointment/:doctorId',
+        destination: '/platform/book-appointment/:doctorId',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 
