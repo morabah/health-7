@@ -5,7 +5,7 @@ import type { VerificationStatus, AccountStatus } from '@/types/enums';
 import { UserType, VerificationStatus as VerificationStatusEnum } from '@/types/enums';
 import type { DoctorProfile } from '@/types/schemas';
 import { logInfo } from '@/lib/logger';
-import { UnauthorizedError, AuthError } from '@/lib/errors';
+import { UnauthorizedError, AuthError } from '@/lib/errors/errorClasses';
 
 /**
  * Hook to fetch all users

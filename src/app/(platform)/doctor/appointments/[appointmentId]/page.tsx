@@ -1,397 +1,519 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import Badge from '@/components/ui/Badge';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import {
   Calendar,
   Clock,
   User,
-  ChevronLeft,
   CheckCircle,
   XCircle,
   FileText,
-  MessageCircle,
-  FileCheck,
-  MapPin,
-  Video,
-  AlertTriangle
+  AlertCircle,
+  Phone,
+  Mail,
+  MapPin
 } from 'lucide-react';
-import { useAppointmentDetails, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
-import { AppointmentStatus, AppointmentType } from '@/types/enums';
-import { logInfo, logValidation, logError } from '@/lib/logger';
-import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
-import CancelAppointmentModal from '@/components/doctor/CancelAppointmentModal';
+import { AppointmentStatus, UserType } from '@/types/enums';
+import { logInfo } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
-import { useQueryClient } from '@tanstack/react-query';
-import { AppointmentErrorBoundary } from "@/components/error-boundaries";
-import { ApiError, AppointmentError, SlotUnavailableError } from "@/lib/errors";
 import { useAuth } from '@/context/AuthContext';
+import { useErrorSystem, isOnline } from '@/hooks/useErrorSystem';
+import AppErrorBoundary from '@/components/error/AppErrorBoundary';
+import PageTitle from '@/components/ui/PageTitle';
+import Toast from '@/components/ui/Toast';
 
-// Define response types
-interface AppointmentDetailResponse {
-  success: boolean;
-  error?: string;
-  appointment?: Appointment;
-}
-
-interface AppointmentActionResponse {
-  success: boolean;
-  error?: string;
-}
-
-export default function AppointmentDetailsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
-  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
-  const [appointmentNotes, setAppointmentNotes] = useState('');
-  const [toastMessage, setToastMessage] = useState<{title: string, description: string} | null>(null);
-  
-  // Simplified toast implementation
-  const toast = (message: {title: string, description: string}) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(null), 3000);
+interface AppointmentDetailPageProps {
+  params: {
+    appointmentId: string;
   };
+}
+
+// Define the expected API response type
+interface AppointmentResponse {
+  success: boolean;
+  appointment: Appointment;
+  error?: string;
+}
+
+interface AppointmentData {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  dateTime: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  notes?: string;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  patient: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+  };
+}
+
+export default function AppointmentDetailPage({ params }: AppointmentDetailPageProps) {
+  // For Next.js App Router in React 18, we need to use React.use() to safely access params
+  const unwrappedParams = React.use(params as any) as { appointmentId: string };
+  const appointmentId = unwrappedParams.appointmentId;
+  
+  return (
+    <AppErrorBoundary componentName="AppointmentDetailPage">
+      <AppointmentDetail appointmentId={appointmentId} />
+    </AppErrorBoundary>
+  );
+}
+
+function useCleanupEffect(
+  effect: (signal: AbortSignal) => Promise<void> | void, 
+  deps: React.DependencyList
+) {
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+    
+    const runEffect = async () => {
+      try {
+        await effect(controller.signal);
+      } catch (error) {
+        // Ignore abort errors
+        if (!(error instanceof DOMException && error.name === 'AbortError') && isMounted) {
+          throw error;
+        }
+      }
+    };
+    
+    runEffect();
+    
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, deps);
+}
+
+function AppointmentDetail({ appointmentId }: { appointmentId: string }) {
+  const [appointment, setAppointment] = useState<AppointmentData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [actionInProgress, setActionInProgress] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('info');
+  const { user } = useAuth();
+  const router = useRouter();
+  
+  // Use our error system
+  const { handleError, clearError, error } = useErrorSystem({
+    component: 'AppointmentDetail',
+    defaultCategory: 'appointment',
+    autoDismiss: true,
+    autoDismissTimeout: 5000
+  });
+
+  const isOwner = appointment?.doctorId === user?.uid;
   
   // Fetch appointment details
-  const { data, isLoading, error, refetch } = useAppointmentDetails(params?.appointmentId as string);
-  const completeMutation = useCompleteAppointment();
-  const cancelMutation = useDoctorCancelAppointment();
-  
-  // Handle appointment completion
-  const handleCompleteAppointment = async (appointmentId: string, notes: string) => {
+  useCleanupEffect(async (signal) => {
+    if (!user?.uid || !appointmentId) return;
+    
+    setLoading(true);
+    
     try {
-      const result = await completeMutation.mutateAsync({
-        appointmentId,
-        notes
-      }) as AppointmentActionResponse;
-      
-      if (!result.success) {
-        throw new ApiError(result.error || 'Failed to mark appointment as completed', {
-          code: 'APPOINTMENT_COMPLETION_FAILED', 
-          status: 400,
-          context: { appointmentId }
-        });
+      if (!isOnline()) {
+        setToastMessage('You are offline. Some features may be limited.');
+        setToastType('warning');
       }
       
-      setConfirmCompleteOpen(false);
-      logInfo('Appointment completed', { id: appointmentId });
-      logValidation('4.10', 'success', 'Doctor appointment completion fully functional');
+      // Import the useAppointmentDetails hook from doctorLoaders to leverage React Query caching
+      const { queryClient } = await import('@/lib/queryClient');
       
-      // Refetch appointment details to show updated status
-      queryClient.invalidateQueries({ queryKey: ['appointmentDetails', appointmentId] });
-      await refetch();
-      toast({
-        title: "Appointment completed",
-        description: "The appointment has been marked as completed.",
-      });
-    } catch (err) {
-      logInfo(`Error completing appointment: ${err instanceof Error ? err.message : String(err)}`);
-      throw new AppointmentError(
-        err instanceof Error ? err.message : "An error occurred while completing the appointment",
-        { 
-          appointmentId,
-          code: 'APPOINTMENT_COMPLETION_ERROR',
-          context: { notes, error: err }
+      // Use the queryClient to fetch the data once
+      const cachedData = queryClient.getQueryData<AppointmentResponse>(['appointmentDetails', appointmentId, user?.uid]);
+      
+      if (cachedData) {
+        // Use cached data if available
+        setAppointment(cachedData.appointment as unknown as AppointmentData);
+        logInfo('Using cached appointment details', { appointmentId });
+      } else {
+        // Fetch fresh data if not in cache
+        const result = await queryClient.fetchQuery<AppointmentResponse>({
+          queryKey: ['appointmentDetails', appointmentId, user?.uid],
+          queryFn: async ({ signal }): Promise<AppointmentResponse> => {
+            if (!user?.uid) throw new Error('Not authenticated');
+            
+            // Call the existing API method with proper context
+            const { doctorGetAppointmentById } = await import('@/data/doctorLoaders');
+            const response = await doctorGetAppointmentById({ 
+              uid: user.uid, 
+              role: user.role 
+            }, appointmentId);
+            
+            // Ensure we're returning the expected type
+            return response as AppointmentResponse;
+          },
+          staleTime: 5 * 60 * 1000 // 5 minutes
+        });
+        
+        if (result.success && result.appointment) {
+          setAppointment(result.appointment as unknown as AppointmentData);
+          logInfo('Appointment details loaded successfully', { appointmentId });
         }
-      );
+      }
+    } catch (error) {
+      handleError(error, {
+        category: 'appointment',
+        message: 'Failed to load appointment details'
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [appointmentId, user, handleError]);
+
+  // Complete appointment
+  const handleComplete = async () => {
+    if (!isOwner) {
+      handleError(new Error('You are not authorized to complete this appointment'), {
+        category: 'permission',
+        message: 'You do not have permission to complete this appointment',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    setActionInProgress(true);
+    
+    try {
+      // Check if we're online
+      if (!isOnline()) {
+        setToastMessage('Cannot complete appointment while offline');
+        setToastType('error');
+        setActionInProgress(false);
+        return;
+      }
+
+      const { callApi } = await import('@/lib/apiClient');
+      await callApi('doctorCompleteAppointment', { appointmentId });
+      
+      // Update the local appointment state
+      setAppointment(prev => prev ? { ...prev, status: 'completed' } : null);
+      
+      setToastMessage('Appointment marked as completed successfully');
+      setToastType('success');
+      
+      // Clear any existing errors
+      clearError();
+    } catch (error) {
+      handleError(error, {
+        category: 'appointment',
+        message: 'Failed to complete appointment'
+      });
+      
+      setToastMessage('Failed to complete appointment');
+      setToastType('error');
+    } finally {
+      setActionInProgress(false);
     }
   };
-  
-  // Handle appointment cancellation
-  const handleCancelAppointment = async (id: string, reason: string) => {
-    setCancelError(null);
+
+  // Cancel appointment
+  const handleCancel = async () => {
+    if (!isOwner) {
+      handleError(new Error('You are not authorized to cancel this appointment'), {
+        category: 'permission',
+        message: 'You do not have permission to cancel this appointment',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    setActionInProgress(true);
+    
     try {
-      const result = await cancelMutation.mutateAsync({
-        appointmentId: id,
-        reason: reason
-      }) as AppointmentActionResponse;
-      
-      if (!result.success) {
-        const errorMessage = result.error || 'Failed to cancel appointment';
-        setCancelError(errorMessage);
-        
-        // Show appropriate error message for auth errors
-        if (errorMessage.includes('not authorized')) {
-          setCancelError('You are not authorized to cancel this appointment. Only the doctor assigned to this appointment can cancel it.');
-        }
+      // Check if we're online
+      if (!isOnline()) {
+        setToastMessage('Cannot cancel appointment while offline');
+        setToastType('error');
+        setActionInProgress(false);
         return;
       }
       
-      setConfirmCancelOpen(false);
-      logInfo('Appointment cancelled', { id });
+      const { callApi } = await import('@/lib/apiClient');
+      await callApi('doctorCancelAppointment', { appointmentId, reason: 'Cancelled by doctor' });
       
-      // Refetch appointment details to show updated status
-      queryClient.invalidateQueries({ queryKey: ['appointmentDetails', id] });
-      await refetch();
-      toast({
-        title: "Appointment cancelled",
-        description: "The appointment has been cancelled successfully.",
+      // Update the local appointment state
+      setAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      
+      setToastMessage('Appointment cancelled successfully');
+      setToastType('success');
+      
+      // Clear any existing errors
+      clearError();
+    } catch (error) {
+      handleError(error, {
+        category: 'appointment',
+        message: 'Failed to cancel appointment'
       });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred while cancelling the appointment';
-      setCancelError(errorMessage);
-      logError('Error cancelling appointment', {
-        appointmentId: id,
-        code: 'APPOINTMENT_CANCELLATION_ERROR',
-        context: { reason, error: err }
-      });
+      
+      setToastMessage('Failed to cancel appointment');
+      setToastType('error');
+    } finally {
+      setActionInProgress(false);
     }
   };
 
-  // Loading state
-  if (isLoading) {
+  // Close toast
+  const handleCloseToast = () => {
+    setToastMessage(null);
+  };
+
+  if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner className="w-8 h-8" />
+      <div className="flex justify-center items-center h-64">
+        <Spinner />
       </div>
     );
   }
 
-  // Error state
-  if (error) {
+  if (!appointment && !error) {
     return (
-      <Alert variant="error" className="my-4">
-        Error loading appointment: {error instanceof Error ? error.message : String(error)}
+      <Alert variant="warning">
+        <div>
+          <h3 className="font-bold">Appointment Not Found</h3>
+          <p>The appointment you're looking for doesn't exist or you don't have permission to view it.</p>
+        </div>
       </Alert>
     );
   }
-
-  const typedData = data as AppointmentDetailResponse;
-  const appointment = typedData?.appointment;
-  if (!appointment) {
-    return (
-      <Alert variant="error">Appointment not found</Alert>
-    );
-  }
-
-  // Format date for display
-  const formattedDate = format(new Date(appointment.appointmentDate), 'PPPP');
-  
-  // Determine if actions are available based on status
-  const isCompletable = appointment.status === AppointmentStatus.CONFIRMED;
-  const isCancellable = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
-  const isPastAppointment = new Date(appointment.appointmentDate) < new Date();
-  const isCurrentDoctor = appointment.doctorId === user?.uid;
-
-  // Map for status display
-  const statusMap: Record<string, string> = {
-    [AppointmentStatus.PENDING]: 'Pending',
-    [AppointmentStatus.CONFIRMED]: 'Confirmed',
-    [AppointmentStatus.COMPLETED]: 'Completed',
-    [AppointmentStatus.CANCELED]: 'Cancelled',
-    [AppointmentStatus.RESCHEDULED]: 'Rescheduled'
-  };
-
-  // Map for status badge colors
-  const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
-    [AppointmentStatus.PENDING]: 'pending',
-    [AppointmentStatus.CONFIRMED]: 'info',
-    [AppointmentStatus.COMPLETED]: 'success',
-    [AppointmentStatus.CANCELED]: 'danger',
-    [AppointmentStatus.RESCHEDULED]: 'warning',
-  };
-
-  // Map for appointment type display
-  const appointmentTypeMap: Record<string, string> = {
-    [AppointmentType.IN_PERSON]: 'In-Person Visit',
-    [AppointmentType.VIDEO]: 'Video Consultation'
-  };
 
   return (
     <div className="space-y-6">
       {/* Toast message */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 max-w-md bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border-l-4 border-primary-600 animate-fade-in">
-          <h4 className="font-medium">{toastMessage.title}</h4>
-          <p className="text-gray-500 dark:text-gray-300 text-sm">{toastMessage.description}</p>
-        </div>
+        <Toast 
+          message={toastMessage} 
+          variant={toastType} 
+          onClose={handleCloseToast} 
+          autoClose={5000}
+        />
       )}
       
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Appointment Details</h1>
-        <Link href="/doctor/appointments">
-          <Button variant="outline" size="sm">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to All Appointments
-          </Button>
-        </Link>
+      {/* Error handling */}
+      {error && (
+        <Alert variant={
+          typeof error === 'object' && 'severity' in error && error.severity === 'warning' 
+            ? 'warning' 
+            : 'error'
+        }>
+          <div>
+            <h3 className="font-bold">
+              {typeof error === 'object' && 'category' in error && error.category === 'permission' 
+                ? 'Access Denied' 
+                : 'Error'}
+            </h3>
+            <p>
+              {typeof error === 'object' && 'message' in error 
+                ? error.message 
+                : 'An error occurred while loading the appointment details.'}
+            </p>
       </div>
-
-      {cancelError && (
-        <Alert variant="error" className="my-4">
-          {cancelError}
         </Alert>
       )}
 
-      {!isCurrentDoctor && (
-        <Alert variant="warning" className="my-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            <span>This appointment is assigned to a different doctor. You can view details but cannot modify it.</span>
+      {/* Not owner warning */}
+      {appointment && !isOwner && (
+        <Alert variant="warning">
+          <div>
+            <h3 className="font-bold">Notice</h3>
+            <p>You are viewing an appointment that is not assigned to you. You cannot modify it.</p>
           </div>
         </Alert>
       )}
-
-      {/* Status Card */}
-      <Card className="p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="mr-4">
-            <Badge variant={statusColor[appointment.status] || 'default'}>
-              {statusMap[appointment.status] || 'Unknown'}
-            </Badge>
-          </div>
-          <div>
-            <div className="text-sm text-slate-500">Appointment ID</div>
-            <div className="font-mono text-xs">{appointment.id}</div>
-          </div>
-        </div>
-        
-        <div className="flex space-x-2">
-          {isCompletable && !isPastAppointment && isCurrentDoctor && (
-            <Button size="sm" variant="primary" onClick={() => setConfirmCompleteOpen(true)}>
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Complete
-            </Button>
-          )}
-          {isCancellable && isCurrentDoctor && (
-            <Button size="sm" variant="danger" onClick={() => setConfirmCancelOpen(true)}>
-              <XCircle className="h-4 w-4 mr-1" />
-              Cancel
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Patient Information */}
+      
+      {appointment && (
+        <>
+          <PageTitle 
+            title="Appointment Details" 
+            subtitle={`Appointment #${appointment.id}`}
+          />
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Appointment Info Card */}
       <Card className="p-6">
-        <h2 className="text-lg font-bold mb-4">Patient Information</h2>
-        <div className="flex items-center mb-4">
-          <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 mr-4">
-            <User className="h-6 w-6" />
-          </div>
+              <h2 className="text-xl font-semibold mb-4">Appointment Information</h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-primary-600 mt-0.5" />
           <div>
-            <h3 className="font-medium text-lg">{appointment.patientName}</h3>
-            <Link
-              href={`/patient-profile/${appointment.patientId}`}
-              className="text-primary-600 dark:text-primary-400 hover:underline text-sm"
-            >
-              View Profile
-            </Link>
+                    <p className="font-medium">Date</p>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {appointment.dateTime && typeof appointment.dateTime === 'string' && isValid(parseISO(appointment.dateTime))
+                        ? format(parseISO(appointment.dateTime), 'MMMM dd, yyyy')
+                        : 'Invalid date'}
+                    </p>
           </div>
         </div>
-      </Card>
-
-      {/* Appointment Details */}
-      <Card className="p-6">
-        <h2 className="text-lg font-bold mb-4">Appointment Details</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
+                
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-primary-600 mt-0.5" />
             <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <Calendar className="h-5 w-5 mr-2" />
-                <span className="font-medium">Date</span>
+                    <p className="font-medium">Time</p>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {appointment.dateTime && typeof appointment.dateTime === 'string' && isValid(parseISO(appointment.dateTime))
+                        ? format(parseISO(appointment.dateTime), 'h:mm a')
+                        : 'Invalid time'}
+                    </p>
               </div>
-              <p className="ml-7">{formattedDate}</p>
             </div>
             
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-primary-600 mt-0.5" />
             <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <Clock className="h-5 w-5 mr-2" />
-                <span className="font-medium">Time</span>
+                    <p className="font-medium">Status</p>
+                    <StatusBadge status={appointment.status} />
               </div>
-              <p className="ml-7">{appointment.startTime} - {appointment.endTime}</p>
             </div>
             
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                {appointment.appointmentType === AppointmentType.IN_PERSON ? (
-                  <MapPin className="h-5 w-5 mr-2" />
-                ) : (
-                  <Video className="h-5 w-5 mr-2" />
+                {appointment.notes && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-primary-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Notes</p>
+                      <p className="text-gray-600 dark:text-gray-300">{appointment.notes}</p>
+                    </div>
+                  </div>
                 )}
-                <span className="font-medium">Type</span>
+                
+                {appointment.cancellationReason && (
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-red-500 mt-0.5" />
+            <div>
+                      <p className="font-medium">Cancellation Reason</p>
+                      <p className="text-gray-600 dark:text-gray-300">{appointment.cancellationReason}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="ml-7">{appointmentTypeMap[appointment.appointmentType] || 'In-Person Visit'}</p>
-              {appointment.appointmentType === AppointmentType.VIDEO && appointment.videoCallUrl && (
-                <a 
-                  href={appointment.videoCallUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="ml-7 mt-2 inline-flex items-center text-primary-600 hover:underline"
-                >
-                  <Video className="h-4 w-4 mr-1" />
-                  Join Video Call
-                </a>
+            </Card>
+            
+            {/* Patient Info Card */}
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
+              
+              {appointment.patient ? (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <User className="w-5 h-5 text-primary-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Name</p>
+                      <p className="text-gray-600 dark:text-gray-300">{appointment.patient.name || 'Not available'}</p>
+                    </div>
+                  </div>
+                
+                  <div className="flex items-start gap-3">
+                    <Mail className="w-5 h-5 text-primary-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Email</p>
+                      <p className="text-gray-600 dark:text-gray-300">{appointment.patient.email || 'Not available'}</p>
+                    </div>
+                  </div>
+                  
+                  {appointment.patient.phone && (
+                    <div className="flex items-start gap-3">
+                      <Phone className="w-5 h-5 text-primary-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Phone</p>
+                        <p className="text-gray-600 dark:text-gray-300">{appointment.patient.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                
+                  {appointment.patient.address && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-primary-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium">Address</p>
+                        <p className="text-gray-600 dark:text-gray-300">{appointment.patient.address}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40">
+                  <div className="text-center text-gray-500">
+                    <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>Patient information not available</p>
+                  </div>
+                </div>
               )}
-            </div>
+            </Card>
           </div>
           
-          <div className="space-y-4">
-            {appointment.reason && (
-              <div>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                  <FileText className="h-5 w-5 mr-2" />
-                  <span className="font-medium">Reason</span>
-                </div>
-                <p className="ml-7">{appointment.reason}</p>
-              </div>
-            )}
-            
-            {appointment.notes && (
-              <div>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  <span className="font-medium">Notes</span>
-                </div>
-                <p className="ml-7">{appointment.notes}</p>
-              </div>
-            )}
-            
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <FileCheck className="h-5 w-5 mr-2" />
-                <span className="font-medium">Created</span>
-              </div>
-              <p className="ml-7">{format(new Date(appointment.createdAt), 'PPpp')}</p>
-              {appointment.updatedAt !== appointment.createdAt && (
-                <p className="ml-7 text-sm text-slate-500">
-                  Updated: {format(new Date(appointment.updatedAt), 'PPpp')}
-                </p>
-              )}
+          {/* Action Buttons */}
+          {appointment.status === 'scheduled' && (
+            <div className="flex flex-wrap gap-4 mt-6">
+              <Button
+                variant="primary"
+                onClick={handleComplete}
+                disabled={actionInProgress || !isOwner}
+                isLoading={actionInProgress && toastType !== 'success'}
+              >
+                Mark as Completed
+              </Button>
+              
+              <Button
+                variant="danger"
+                onClick={handleCancel}
+                disabled={actionInProgress || !isOwner}
+                isLoading={actionInProgress && toastType !== 'success'}
+              >
+                Cancel Appointment
+              </Button>
             </div>
-          </div>
-        </div>
-      </Card>
-      
-      {/* Complete Appointment Modal */}
-      <CompleteAppointmentModal
-        isOpen={confirmCompleteOpen}
-        onClose={() => setConfirmCompleteOpen(false)}
-        appt={typedData?.appointment || null}
-        onConfirm={handleCompleteAppointment}
-      />
-
-      {/* Cancel Appointment Modal */}
-      <CancelAppointmentModal
-        isOpen={confirmCancelOpen}
-        onClose={() => setConfirmCancelOpen(false)}
-        appt={typedData?.appointment || null}
-        onConfirm={handleCancelAppointment}
-      />
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  let bgColor = '';
+  let textColor = '';
+  let icon = null;
+  
+  switch (status) {
+    case 'scheduled':
+      bgColor = 'bg-blue-100 dark:bg-blue-900/30';
+      textColor = 'text-blue-800 dark:text-blue-300';
+      icon = <Calendar className="w-4 h-4" />;
+      break;
+    case 'completed':
+      bgColor = 'bg-green-100 dark:bg-green-900/30';
+      textColor = 'text-green-800 dark:text-green-300';
+      icon = <CheckCircle className="w-4 h-4" />;
+      break;
+    case 'cancelled':
+      bgColor = 'bg-red-100 dark:bg-red-900/30';
+      textColor = 'text-red-800 dark:text-red-300';
+      icon = <XCircle className="w-4 h-4" />;
+      break;
+    default:
+      bgColor = 'bg-gray-100 dark:bg-gray-700';
+      textColor = 'text-gray-800 dark:text-gray-300';
+  }
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${bgColor} ${textColor}`}>
+      {icon}
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
   );
 } 

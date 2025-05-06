@@ -10,7 +10,7 @@ import Alert from '@/components/ui/Alert';
 import { logInfo, logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import AuthErrorBoundary from '@/components/error-boundaries/AuthErrorBoundary';
-import { ValidationError } from '@/lib/errors';
+import { ValidationError } from '@/lib/errors/errorClasses';
 
 /**
  * Login Page
@@ -56,13 +56,13 @@ function LoginPageContent() {
       // Validate email and password
       if (!email || typeof email !== 'string') {
         throw new ValidationError('Valid email is required', {
-          validationIssues: { email: ['Email is required and must be a valid format'] }
+          validationErrors: { email: ['Email is required and must be a valid format'] }
         });
       }
 
       if (!password || typeof password !== 'string') {
         throw new ValidationError('Valid password is required', {
-          validationIssues: { password: ['Password is required'] }
+          validationErrors: { password: ['Password is required'] }
         });
       }
 
@@ -86,13 +86,25 @@ function LoginPageContent() {
           setError('Invalid credentials. Please try again.');
           logInfo('Login attempt failed', { email });
         }
-      } catch (loginErr) {
-        console.error('Login error details:', loginErr);
+      } catch (e) {
         setIsLoading(false);
-        setError(
-          loginErr instanceof Error ? loginErr.message : 'Login process error. Please try again.'
-        );
-        logError('Login error in try-catch', loginErr);
+        console.error('Error during login:', e);
+        
+        // Handle validation errors
+        if (e instanceof ValidationError) {
+          // Set validation errors properly
+          setError(e.validationErrors.email ? e.validationErrors.email[0] : e.validationErrors.password ? e.validationErrors.password[0] : 'Login failed. Please try again.');
+          return;
+        }
+        
+        // Handle different error types
+        if (typeof e === 'string') {
+          setError(e);
+        } else if (e instanceof Error) {
+          setError(e.message);
+        } else {
+          setError('Login failed. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Outer error details:', err);

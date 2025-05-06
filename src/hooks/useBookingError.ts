@@ -8,7 +8,7 @@ import {
   AppointmentError, 
   SlotUnavailableError,
   ValidationError 
-} from '@/lib/errors';
+} from '@/lib/errors/errorClasses';
 
 // Error code types for booking process
 export type BookingErrorCode = 
@@ -160,7 +160,7 @@ export function useBookingError() {
     if (code === 'SLOT_UNAVAILABLE') {
       throw new SlotUnavailableError(message, {
         context: details,
-        slotDateTime: details?.slotDateTime || details?.date
+        slot: details?.slotDateTime || details?.date
       });
     }
     
@@ -171,7 +171,7 @@ export function useBookingError() {
           ...details,
           errorCode: code
         },
-        validationIssues: { 
+        validationErrors: { 
           date: [message] 
         }
       });
@@ -216,7 +216,7 @@ export function useBookingError() {
           ...details,
           errorCode: code
         },
-        validationIssues: { 
+        validationErrors: { 
           payment: [message] 
         }
       });
@@ -244,7 +244,7 @@ export function useBookingError() {
     if (code === 'SLOT_UNAVAILABLE') {
       throw new SlotUnavailableError(message, {
         context: details,
-        slotDateTime: details?.slotDateTime as string || details?.date as string
+        slot: details?.slotDateTime as string || details?.date as string
       });
     }
     

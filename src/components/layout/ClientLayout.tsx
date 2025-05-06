@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { QueryProvider } from '@/lib/queryClient';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import Layout from '@/components/layout/Layout';
-import RootErrorBoundary from './RootErrorBoundary';
+import AppErrorBoundary from '@/components/error/AppErrorBoundary';
+import { setupErrorHandling } from '@/lib/errorSystem';
 
 /**
  * Client Layout Component
@@ -13,8 +14,13 @@ import RootErrorBoundary from './RootErrorBoundary';
  * Uses optimized QueryProvider with enhanced caching
  */
 export function ClientLayout({ children }: { children: React.ReactNode }) {
+  // Initialize the error handling system
+  useEffect(() => {
+    setupErrorHandling();
+  }, []);
+
   return (
-    <RootErrorBoundary>
+    <AppErrorBoundary componentName="MainApplication">
       <ThemeProvider>
         <QueryProvider>
           <AuthProvider>
@@ -22,6 +28,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </AuthProvider>
         </QueryProvider>
       </ThemeProvider>
-    </RootErrorBoundary>
+    </AppErrorBoundary>
   );
 }

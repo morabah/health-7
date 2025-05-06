@@ -387,6 +387,11 @@
       ],
       "saturday": [
         {
+          "startTime": "08:00",
+          "endTime": "09:00",
+          "isAvailable": true
+        },
+        {
           "startTime": "10:00",
           "endTime": "14:00",
           "isAvailable": true
@@ -409,7 +414,7 @@
       "2025-07-03T20:35:44.187Z"
     ],
     "createdAt": "2025-03-30T20:35:44.187Z",
-    "updatedAt": "2025-05-05T17:21:04.389Z",
+    "updatedAt": "2025-05-06T13:05:56.066Z",
     "id": "u-005"
   },
   {
@@ -516,5 +521,46 @@
     "createdAt": "2025-05-02T08:47:06.700Z",
     "updatedAt": "2025-05-02T11:17:03.513Z",
     "id": "htggr2d1eeevik1kcux1ed"
+  },
+  {
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "specialty": "General Practice",
+    "licenseNumber": "2233",
+    "yearsOfExperience": 0,
+    "bio": null,
+    "verificationStatus": "pending",
+    "verificationNotes": null,
+    "adminNotes": "",
+    "education": null,
+    "servicesOffered": null,
+    "location": null,
+    "languages": [
+      "English"
+    ],
+    "consultationFee": 0,
+    "profilePictureUrl": null,
+    "profilePicturePath": null,
+    "licenseDocumentUrl": null,
+    "licenseDocumentPath": null,
+    "certificateUrl": null,
+    "certificatePath": null,
+    "educationHistory": [],
+    "experience": [],
+    "weeklySchedule": {
+      "monday": [],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [],
+      "friday": [],
+      "saturday": [],
+      "sunday": []
+    },
+    "timezone": "UTC",
+    "blockedDates": [],
+    "createdAt": "2025-05-05T20:07:25.396Z",
+    "updatedAt": "2025-05-05T20:07:25.396Z",
+    "rating": 0,
+    "reviewCount": 0,
+    "id": "nh35k2nhsycrdm4l6zazq"
   }
 ]

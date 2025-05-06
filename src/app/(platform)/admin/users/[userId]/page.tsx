@@ -26,7 +26,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { UserType, AccountStatus, VerificationStatus } from '@/types/enums';
 import { useUserDetail, useAdminActivateUser } from '@/data/adminLoaders';
 import { logInfo, logError } from '@/lib/logger';
-import { ApiError, DataError } from '@/lib/errors';
+import { ApiError, DataError } from '@/lib/errors/errorClasses';
 
 // Define types for the API response
 interface UserDetailResponse {
@@ -100,8 +100,7 @@ export default function UserDetailPage() {
       
       if (!result.success) {
         throw new ApiError(result.error || 'Failed to update user status', {
-          code: 'USER_STATUS_UPDATE_FAILED',
-          status: 400,
+          statusCode: 400,
           context: { userId, status, reason }
         });
       }

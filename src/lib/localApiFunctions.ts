@@ -80,6 +80,7 @@ export type LocalApi = {
   findDoctors: typeof findDoctors;
   getMyAppointments: typeof getMyAppointments;
   getAppointmentDetails: typeof getAppointmentDetails;
+  doctorGetAppointmentById: typeof getAppointmentDetails;
   bookAppointment: typeof bookAppointment;
   cancelAppointment: typeof cancelAppointment;
   completeAppointment: typeof completeAppointment;
@@ -127,6 +128,7 @@ export const localApi: LocalApi = {
   findDoctors,
   getMyAppointments,
   getAppointmentDetails,
+  doctorGetAppointmentById: getAppointmentDetails,
   bookAppointment,
   cancelAppointment,
   completeAppointment,

@@ -14,7 +14,7 @@ import {
   DataError,
   NotFoundError,
   enhanceError
-} from './errors';
+} from './errors/errorClasses';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import { logError, logWarn } from './logger';
 

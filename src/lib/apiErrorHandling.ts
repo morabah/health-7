@@ -21,7 +21,7 @@ import {
   SessionExpiredError,
   enhanceError,
   throwHttpError
-} from './errors';
+} from './errors/errorClasses';
 
 /**
  * Configuration options for API calls
@@ -685,29 +685,29 @@ export async function callApiWithErrorHandling<T>(
 
   try {
     // If offline, throw a special offline error that can be handled appropriately
-    if (isOffline()) {
+  if (isOffline()) {
       // Create a network error for offline state
       throw new NetworkError('You appear to be offline. Please check your internet connection.', {
         retryable: true,
-        severity: 'warning',
+      severity: 'warning',
         context: { endpoint, args: JSON.stringify(args) }
-      });
-    }
-
+    });
+  }
+  
     // Try to execute the function
     const result = await fn(...args);
     perf.stop();
     return result;
-  } catch (error) {
+    } catch (error) {
     perf.stop();
     
     // Handle errors with specific error classes based on error type
     
     // Handle Firebase errors
     if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && error.code.includes('/')) {
-      // This is likely a Firebase error
+        // This is likely a Firebase error
       const firebaseError = createFirebaseError(error as { code: string; message: string });
-      
+  
       // Check if it's an auth error
       if (error.code.startsWith('auth/')) {
         // Convert to our AuthError type
@@ -749,7 +749,7 @@ export async function callApiWithErrorHandling<T>(
       
       logError(`Network error in ${endpoint}`, {
         error: networkError,
-        endpoint,
+          endpoint,
         category: 'network',
         severity: 'warning',
         method: endpoint
@@ -774,8 +774,8 @@ export async function callApiWithErrorHandling<T>(
       });
       
       throw timeoutError;
-    }
-    
+        }
+        
     // Handle HTTP errors with status codes
     if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number') {
       const statusCode = error.status as number;
@@ -789,7 +789,7 @@ export async function callApiWithErrorHandling<T>(
         
         logError(`Authentication error in ${endpoint}`, {
           error: authError,
-          endpoint,
+        endpoint,
           category: 'auth',
           severity: 'warning',
           method: endpoint
@@ -817,8 +817,8 @@ export async function callApiWithErrorHandling<T>(
         
         throw httpError;
       }
-    }
-    
+        }
+        
     // For validation errors (API contracts, etc.)
     if (
       error && 
@@ -844,7 +844,7 @@ export async function callApiWithErrorHandling<T>(
         severity: 'warning',
         method: endpoint
       });
-      
+        
       throw validationError;
     }
     
@@ -871,7 +871,7 @@ export async function callApiWithErrorHandling<T>(
       method: endpoint,
       args: JSON.stringify(args)
     });
-    
+        
     throw apiError;
   }
 }

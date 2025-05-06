@@ -766,11 +766,20 @@ export function getFirebaseErrorInfo(code: string): EnhancedErrorInfo {
 export function createFirebaseError(error: { code: string; message: string }): Error {
   const errorInfo = getFirebaseErrorInfo(error.code);
   
-  const standardError = new Error(errorInfo.message);
+  // Import the ApiError class from the proper location
+  const { ApiError } = require('./errors/errorClasses');
   
-  // Add all error info as properties
-  Object.entries(errorInfo).forEach(([key, value]) => {
-    ((standardError as unknown) as Record<string, unknown>)[key] = value;
+  // Create a proper ApiError with all the relevant information
+  const apiError = new ApiError(errorInfo.message, {
+    code: errorInfo.code,
+    severity: errorInfo.severity,
+    retryable: errorInfo.retryable,
+    context: {
+      domain: errorInfo.domain,
+      originalMessage: error.message,
+      isNetworkRelated: errorInfo.isNetworkRelated,
+      isPermissionIssue: errorInfo.isPermissionIssue
+    }
   });
   
   // Log the enriched error
@@ -779,7 +788,7 @@ export function createFirebaseError(error: { code: string; message: string }): E
     enhancedInfo: errorInfo 
   });
   
-  return standardError;
+  return apiError;
 }
 
 export default {

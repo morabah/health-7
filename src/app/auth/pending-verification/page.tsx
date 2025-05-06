@@ -10,7 +10,7 @@ import { CheckCircle, Mail, ArrowLeft, RefreshCw, Clock, Lock } from 'lucide-rea
 import { useAuth } from '@/context/AuthContext';
 import { logInfo, logError } from '@/lib/logger';
 import { UserType } from '@/types/enums';
-import { NetworkError } from '@/lib/errors';
+import { NetworkError } from '@/lib/errors/errorClasses';
 
 /**
  * Pending verification page shown to users after they register

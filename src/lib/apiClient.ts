@@ -16,7 +16,7 @@ import { logInfo, logError, logWarn } from './logger';
 import { callApiWithErrorHandling, ErrorHandlingOptions } from './apiErrorHandling';
 import type { ErrorCategory, ErrorSeverity } from '@/components/ui/ErrorDisplay';
 import { createFirebaseError } from './firebaseErrorMapping';
-import { ApiError } from './errors';
+import { ApiError } from './errors/errorClasses';
 import { 
   getOptimizedDoctors, 
   getOptimizedUsers, 
@@ -198,7 +198,7 @@ export async function callApiWithOptions<T = unknown>(
         }
         throw new ApiError(`API method ${mappedMethod} not found`, {
           code: 'API_METHOD_NOT_FOUND',
-          status: 404,
+          statusCode: 404,
           retryable: false,
           severity: 'error',
           context: { method: mappedMethod, originalMethod: method }

@@ -29,7 +29,7 @@ import Image from 'next/image';
 import Tabs from '@/components/ui/Tabs';
 import Badge from '@/components/ui/Badge';
 import Tooltip from '@/components/ui/Tooltip';
-import { ValidationError, ApiError, PermissionError } from '@/lib/errors';
+import { ValidationError, ApiError, PermissionError } from '@/lib/errors/errorClasses';
 
 // Define response types
 interface DoctorDetailResponse {
@@ -164,7 +164,7 @@ const DoctorVerificationPage = () => {
       if (status === VerificationStatus.VERIFIED && !allItemsChecked) {
         throw new ValidationError('Please complete all verification checklist items before approving.', {
           code: 'VERIFICATION_CHECKLIST_INCOMPLETE',
-          validationIssues: {
+          validationErrors: {
             checklist: ['All verification checklist items must be checked before approving.']
           }
         });
@@ -179,7 +179,7 @@ const DoctorVerificationPage = () => {
       if (!result.success) {
         throw new ApiError(result.error || 'Failed to update verification status', {
           code: 'VERIFICATION_UPDATE_FAILED',
-          status: 400,
+          statusCode: 400,
           context: { doctorId, status, verificationStatus: status }
         });
       }
@@ -195,11 +195,25 @@ const DoctorVerificationPage = () => {
       setTimeout(() => {
         router.push('/admin/doctors');
       }, 1500);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to update verification status';
-      logError('Verification error:', err);
-      setMutationError(errorMessage);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        setMutationError('Validation failed. Please check the form.');
+        console.error('Validation error:', error.validationErrors);
+        return;
+      }
+      
+      if (error instanceof PermissionError) {
+        setMutationError(`Permission denied: ${error.message}`);
+        return;
+      }
+      
+      if (error instanceof ApiError) {
+        setMutationError(`API error: ${error.message} (${error.statusCode || 'unknown status'})`);
+        return;
+      }
+      
+      // Fallback error message
+      setMutationError(`Error approving doctor: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

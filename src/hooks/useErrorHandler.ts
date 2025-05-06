@@ -8,6 +8,11 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
 import { logError } from '@/lib/logger';
 import React from 'react';
+import { 
+  normalizeError, 
+  getUserFriendlyMessage 
+} from '@/lib/errors/errorUtils';
+import { AppError } from '@/lib/errors/errorClasses';
 
 /**
  * Enhanced error state with metadata
@@ -72,6 +77,15 @@ interface ErrorHandlerOptions {
    * Whether to use the simple API mode (tuple return)
    */
   simpleMode?: boolean;
+  
+  /** Whether to automatically report errors */
+  autoReport?: boolean;
+  
+  /** Default error message if none provided */
+  defaultMessage?: string;
+  
+  /** Additional context to add to errors */
+  context?: Record<string, unknown>;
 }
 
 // Define return types
@@ -116,6 +130,13 @@ interface EnhancedErrorHandler {
 }
 
 /**
+ * Error Handler Hook
+ * 
+ * A React hook for handling errors in UI components.
+ * Provides a consistent way to handle, display, and report errors.
+ */
+
+/**
  * Error handler hook for React components
  * 
  * This unified hook provides two usage modes:
@@ -149,7 +170,10 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
     defaultSeverity = 'error',
     redirectOnFatal = false,
     errorPagePath = '/error',
-    simpleMode = false
+    simpleMode = false,
+    autoReport = true,
+    defaultMessage = '',
+    context = {}
   } = options || {};
   
   const router = useRouter();
@@ -157,101 +181,58 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
   const [isErrorVisible, setIsErrorVisible] = useState(false);
   
   /**
-   * Handle and report an error
+   * Handle an error
    */
-  const handleError = useCallback((
-    err: Error | unknown,
-    opts: {
-      message?: string;
-      category?: ErrorCategory;
-      severity?: ErrorSeverity;
-      context?: Record<string, unknown>;
-      retryable?: boolean;
-      action?: string;
-    } = {}
-  ) => {
-    // If error is null or false, clear the error state
-    if (err === null || err === false) {
-      setError(null);
-      setIsErrorVisible(false);
-      return;
-    }
-    
-    // Create context with component name if provided
-    const errorContext = {
-      ...(component ? { component } : {}),
-      ...(opts.action ? { action: opts.action } : {}),
-      ...(opts.context || {}),
-    };
-    
-    // Add timestamp
-    const timestamp = Date.now();
-    
-    // For simple mode, just log and set the error
-    if (simpleMode) {
-      // Ensure we're working with an Error object
-      let errorObject: Error;
-      if (err instanceof Error) {
-        errorObject = err;
-      } else if (typeof err === 'string') {
-        errorObject = new Error(err);
-      } else {
-        errorObject = new Error('An unknown error occurred');
-      }
-      
-      // Log the error
-      logError('useErrorHandler caught an error', errorObject);
-      
-      // Set the error state which will throw in render phase and be caught by ErrorBoundary
-      if (errorObject) {
-        throw errorObject;
-      }
-      
-      return undefined;
-    }
-    
-    // For enhanced mode, report to monitoring system and handle more gracefully
-    // Report the error to our error monitoring system
-    const { errorId, userMessage, category, severity } = reportError(err, {
-      ...errorContext,
-      category: opts.category || defaultCategory,
-      severity: opts.severity || defaultSeverity,
-      message: opts.message,
+  const handleError = useCallback((err: unknown, opts?: {
+    message?: string;
+    category?: ErrorCategory;
+    severity?: ErrorSeverity;
+    context?: Record<string, unknown>;
+    retryable?: boolean;
+    action?: string;
+  }): ErrorState | undefined => {
+    // Normalize the error to ensure consistent properties
+    const normalizedError = normalizeError(err, {
+      defaultMessage: opts?.message || defaultMessage,
+      context: { ...context, ...opts?.context },
     });
     
-    // Create the error state
+    // Get a user-friendly message
+    const message = getUserFriendlyMessage(normalizedError);
+    
+    // Extract additional information if it's an AppError
+    const isAppError = normalizedError instanceof AppError;
+    const isRetryable = opts?.retryable ?? (isAppError ? normalizedError.retryable : false);
+    const category = opts?.category || (isAppError ? normalizedError.category : defaultCategory);
+    const severity = opts?.severity || (isAppError ? normalizedError.severity : defaultSeverity);
+    
+    // Create error state
     const errorState: ErrorState = {
-      error: err,
-      message: opts.message,
-      category: category,
-      severity: severity,
-      errorId,
-      context: errorContext,
-      timestamp,
-      userMessage,
-      retryable: opts.retryable,
+      error: normalizedError,
+      message,
+      category,
+      severity,
+      errorId: isAppError ? normalizedError.errorId : undefined,
+      context: isAppError ? { ...normalizedError.context } : undefined,
+      timestamp: Date.now(),
+      userMessage: message,
+      retryable: isRetryable,
     };
     
-    // Set the error state
+    // Update the error state
     setError(errorState);
     setIsErrorVisible(true);
     
-    // Call onError callback if provided
-    if (onError) {
-      onError(errorState);
+    // Optionally report the error
+    if (autoReport !== false) {
+      reportError(normalizedError);
     }
     
-    // Redirect to error page if the error is fatal and redirectOnFatal is true
-    if (redirectOnFatal && severity === 'fatal') {
-      router.push(`${errorPagePath}?id=${errorId}`);
-    }
-    
-    // Return the error state so it can be used by the caller
     return errorState;
-  }, [component, defaultCategory, defaultSeverity, onError, redirectOnFatal, errorPagePath, router, simpleMode]);
+  }, [autoReport, context, defaultMessage, defaultCategory, defaultSeverity]);
   
   /**
-   * Clear the error state
+   * Clear the current error
    */
   const clearError = useCallback(() => {
     setError(null);
@@ -288,7 +269,7 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
     try {
       return await fn();
     } catch (err) {
-      handleError(err, opts);
+      handleError(err);
       return null;
     }
   }, [handleError]);
@@ -311,7 +292,7 @@ function useErrorHandler(options?: ErrorHandlerOptions): SimpleErrorHandler | En
       try {
         return await fn(...args);
       } catch (err) {
-        handleError(err, opts);
+        handleError(err);
         return null;
       }
     };

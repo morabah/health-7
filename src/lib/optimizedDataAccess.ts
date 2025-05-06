@@ -13,7 +13,7 @@ import { cacheKeys, cacheManager } from './queryClient';
 import { enhancedCache, CacheCategory } from './cacheManager';
 import { callApi } from './apiClient';
 import { queryOptions } from '@tanstack/react-query';
-import { DataError } from './errors';
+import { DataError } from './errors/errorClasses';
 
 // Import types from schemas
 import type { 
@@ -184,7 +184,7 @@ interface DataAccessError extends Error {
   retryable: boolean;
 }
 
-// Use the imported error classes from errors.ts
+// Use the correctly imported DataError from errorClasses.ts
 class DataFetchError extends DataError {
   constructor(message: string, code = 'DATA_FETCH_ERROR', context?: Record<string, unknown>, retryable = true) {
     super(message, {

@@ -34,7 +34,7 @@ import {
 import useErrorHandler from '@/hooks/useErrorHandler';
 import useBookingError, { BookingError, BookingErrorCode } from '@/hooks/useBookingError';
 import { callApi } from '@/lib/apiClient';
-import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors';
+import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors/errorClasses';
 import { UserType } from '@/types/enums';
 
 // Define the merged doctor profile type based on API response
@@ -135,6 +135,10 @@ function BookAppointmentPageContent() {
   const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
   // Set up mount status tracking
   useEffect(() => {
@@ -391,7 +395,7 @@ function BookAppointmentPageContent() {
     if (!selectedDate || !selectedTimeSlot) {
       throw new ValidationError('Please select a date and time for your appointment', {
         code: 'APPOINTMENT_VALIDATION_ERROR',
-        validationIssues: {
+        validationErrors: {
           date: !selectedDate ? ['Date is required'] : [],
           time: !selectedTimeSlot ? ['Time slot is required'] : []
         },
@@ -513,7 +517,7 @@ function BookAppointmentPageContent() {
         } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
           throw new ValidationError(errorMessage, {
             code: 'APPOINTMENT_VALIDATION_ERROR',
-            validationIssues: {
+            validationErrors: {
               appointment: ['Invalid appointment data']
             },
             context: bookingContext
@@ -548,6 +552,37 @@ function BookAppointmentPageContent() {
           error instanceof AuthError ||
           error instanceof ApiError) {
         throw error;
+      }
+      
+      // Handle validation errors
+      if (error instanceof ValidationError) {
+        setFieldErrors(prevErrors => ({
+          ...prevErrors,
+          ...Object.fromEntries(
+            Object.entries(error.validationErrors || {}).map(([field, errors]) => 
+              [field, errors.join(', ')]
+            )
+          )
+        }));
+        setFormError('Please correct the errors in the form.');
+        return;
+      }
+
+      // Handle payment validation errors - special case with its own section
+      if (error instanceof ValidationError && 'payment' in error.validationErrors) {
+        setPaymentError(error.validationErrors.payment[0] || 'Payment validation failed');
+        return;
+      }
+
+      // For appointment errors, show relevant message
+      if (error instanceof AppointmentError) {
+        if (error instanceof SlotUnavailableError) {
+          setAvailabilityError('This time slot is no longer available. Please select another time.');
+          scrollToRef(timeSelectRef);
+        } else {
+          setFormError(`Appointment error: ${error.message}`);
+        }
+        return;
       }
       
       // Otherwise, wrap it in a standardized AppointmentError

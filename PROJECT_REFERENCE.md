@@ -26,6 +26,7 @@ This reference document compiles all key learnings, implementation details, and 
 20. [Linting and TypeScript Fixes](#linting-and-typescript-fixes)
 21. [Outstanding Issues](#outstanding-issues)
 22. [Current Project State](#current-project-state)
+23. [Error System Migration Plan](#error-system-migration-plan)
 
 ---
 
@@ -185,22 +186,35 @@ The application uses a layered approach to error handling:
 
 The application implements a comprehensive, consistent error handling system throughout the codebase:
 
-1. **Specialized Error Classes**
+1. **Specialized Error Classes** (`errorClasses.ts`)
    - Base `AppError` class - Common properties (category, severity, retryable, context)
    - Specialized subclasses - `AuthError`, `NetworkError`, `ValidationError`, `ApiError`, etc.
    - Specific domain error classes - `AppointmentError`, `SlotUnavailableError`, etc.
 
-2. **Error Utilities**
+2. **Error Utilities** (`errorUtils.ts`)
    - `withErrorHandling` and `withErrorHandlingSync` - Standardized try/catch patterns
    - `normalizeError` - Converts any error to standardized AppError format
    - `getUserFriendlyMessage` - Extracts user-presentable message from errors
    - `getStatusCodeFromError` - Gets HTTP status code from error objects
 
-3. **Specific Domain Error Handling**
-   - API error handling in `apiErrorHandling.ts` - Comprehensive error mapping for API and network errors  
-   - Firebase error mapping in `firebaseErrorMapping.ts` - Maps Firebase error codes to user-friendly messages
+3. **Error Monitoring System** (`errorMonitoring.ts`)
+   - `ErrorMonitor` singleton - Centralized error reporting and tracking
+   - `reportError` - Reports errors to monitoring systems (production) or console (development)
+   - `addBreadcrumb` - Records contextual information for better error diagnosis
 
-4. **Implementation Consistency**
+4. **API Error Handling** (`apiErrorHandling.ts`)
+   - `callApiWithErrorHandling` - Wraps API calls with retry logic and error normalization
+   - `isRetryableError` - Determines if an error should trigger a retry
+   - `parseApiError` - Standardizes API response errors
+   - `handleApiRouteError` - Server-side error formatting for Next.js API routes
+
+5. **Firebase Error Mapping** (`firebaseErrorMapping.ts`)
+   - `getFirebaseErrorMessage` - Maps Firebase error codes to user-friendly messages
+   - `isFirebaseErrorRetryable` - Determines if a Firebase error is retryable
+   - `mapFirebaseError` - Converts Firebase errors to application error types
+   - `extractFirebaseValidationErrors` - Extracts field-level validation errors from Firebase errors
+
+6. **Implementation Consistency**
    - Data loaders use specific error classes (AuthError, ValidationError, etc.) instead of generic errors
    - API client uses ApiError with detailed context and status codes
    - Firebase configuration uses AuthError for authentication-related failures
@@ -712,3 +726,262 @@ The application is stable and running, but would benefit from addressing the abo
     - `src/app/(platform)/patient/appointments/page.tsx`
     - `src/app/(platform)/doctor/appointments/page.tsx`
     - `src/lib/performance.ts`
+
+## Completed Features & Implementations
+
+### Error Handling System Implementation
+
+We have implemented a comprehensive error handling system for the application:
+
+1. **Error Classes Structure**
+   - Base `AppError` class with context, severity, and retryable properties
+   - Specialized error classes for different domains (Auth, API, Network, Validation, etc.)
+   - Specific domain error classes (AppointmentError, SlotUnavailableError, etc.)
+
+2. **Error Utility Modules**
+   - `errorClasses.ts` - All specialized error classes
+   - `errorUtils.ts` - Utilities for handling errors consistently
+   - `errorMonitoring.ts` - Centralized error reporting
+   - `apiErrorHandling.ts` - API-specific error handling
+   - `firebaseErrorMapping.ts` - Firebase-specific error mapping
+   - `networkUtils.ts` - Network state awareness and handling
+   - `errorPersistence.ts` - Error persistence for offline analysis
+
+3. **UI Integration Components**
+   - `AppErrorBoundary` - React error boundary that integrates with our error system
+   - `useAppErrorHandler` - React hook for handling errors in UI components
+
+4. **Key Benefits**
+   - Consistent error handling throughout the application
+   - Better error messages for users
+   - Proper error categorization and reporting
+   - Simplified retry logic for transient errors
+   - Enhanced debugging with error context
+   - Network state awareness for better offline support
+   - Error persistence for later analysis when offline
+   - React integration for better UI error handling
+
+This implementation ensures that errors are consistently handled, properly categorized, and clearly presented to users across all parts of the application, with enhancements for network status awareness and error persistence.
+
+## Error Handling System Improvements
+
+We have enhanced and unified the error handling system across the application:
+
+1. **Unified Error System**
+   - Created `useErrorSystem` hook as the single entry point for error handling
+   - Added `setupErrorHandling` function for centralized error system initialization
+   - Ensured consistent approach across different parts of the application
+   - Provided backward compatibility with existing error handling implementations
+
+2. **Streamlined API**
+   - Created a clear, consistent API for all error handling functionality
+   - Re-exported key utility functions for easier access
+   - Added comprehensive documentation and usage examples
+   - Ensured type safety throughout the error system
+
+3. **Better Integration**
+   - Connected error handling with network state monitoring
+   - Integrated with error persistence for offline error reporting
+   - Added global error handlers for unhandled exceptions
+   - Improved error monitoring functionality
+
+4. **Enhanced Documentation**
+   - Added detailed JSDoc comments to all error-related functions
+   - Updated index.ts with comprehensive reference guide
+   - Created usage examples in errorSystem.ts
+   - Ensured consistent naming and behavior
+
+5. **Simplified Usage**
+   - Developers now have a single, consistent way to handle errors
+   - Clear patterns for both simple and advanced error handling
+   - Better organization of error-related code
+   - Improved developer experience
+
+### Usage of the Unified Error System
+
+```tsx
+// Import the hook
+import { useErrorSystem } from '@/hooks/useErrorSystem';
+
+// Use in a component
+function MyComponent() {
+  const { 
+    handleError, 
+    withErrorHandling, 
+    clearError,
+    hasError,
+    message 
+  } = useErrorSystem({
+    component: 'MyComponent',
+    defaultCategory: 'data',
+    autoDismiss: true
+  });
+  
+  // Use the error handling system
+  const fetchData = withErrorHandling(async () => {
+    // Your async code here
+  });
+  
+  return (
+    <div>
+      {hasError && <div className="error">{message}</div>}
+      <button onClick={fetchData}>Fetch Data</button>
+      {hasError && <button onClick={clearError}>Clear Error</button>}
+    </div>
+  );
+}
+```
+
+### Application Initialization
+
+The error system should be initialized early in the application lifecycle:
+
+```tsx
+// In a root layout file
+import { setupErrorHandling } from '@/lib/errorSystem';
+import { useEffect } from 'react';
+
+export function RootLayout({ children }) {
+  // Initialize error handling system
+  useEffect(() => {
+    setupErrorHandling();
+  }, []);
+  
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+## Error System Migration Plan
+
+We have successfully implemented a new, modular error handling system that improves organization, consistency, and integration. The migration plan includes:
+
+1. **New Files Created**
+   - `src/hooks/useErrorSystem.ts` - Unified entry point for error handling
+   - `src/lib/errorSystem.ts` - Centralized initialization and configuration
+   - `src/lib/MIGRATION.md` - Detailed migration guide
+
+2. **System Integration**
+   - Added initialization in the root layout
+   - Updated error boundary usage in ClientLayout
+   - Demonstrated proper usage in the appointment detail page
+
+3. **Deprecation Strategy**
+   - Added deprecation notices to old error file
+   - Created migration utilities to ease transition
+   - Documented clear steps for updating imports
+
+4. **Migration Status**
+   - Created all necessary files for the new system
+   - Documented the migration process
+   - Started updating key components
+   - Backward compatibility maintained during transition
+
+5. **Next Steps**
+   - Continue updating components to use the new system
+   - Integrate network-aware error handling in data fetching operations
+   - Add error persistence for critical operations
+   - Once migration is complete, safely remove deprecated files
+
+The new error system provides:
+- Better organization through modular file structure
+- Enhanced functionality with network awareness and error persistence
+- Improved developer experience with a consistent API
+- Better type safety throughout the error system
+- Improved performance through more targeted imports
+
+See `src/lib/MIGRATION.md` for detailed migration steps.
+
+## Recent Updates
+
+### Error fixes for doctorGetAppointmentById
+
+Added support for the `doctorGetAppointmentById` API method that was previously missing from the codebase. This method is required by the doctor appointment detail page to view individual appointment details.
+
+Changes made:
+1. Added the `doctorGetAppointmentById` function to the `doctorLoaders.ts` file that maps to the existing `getAppointmentDetails` API
+2. Added the method to the `LocalApi` type definition and the `localApi` object in `localApiFunctions.ts`
+3. Updated the doctor appointment detail page to use the proper method through the data loader system instead of direct API calls
+
+This fixed the error: "API method doctorGetAppointmentById not found" that was appearing in the doctor appointment detail view.
+
+### Error fixes for error class imports
+
+Previously fixed import paths for error classes to use the correct locations:
+1. Updated imports in `apiClient.ts`, `apiErrorHandling.ts`, and other files to use error classes from `errors/errorClasses.ts` instead of the deprecated `errors.ts` file
+2. Fixed the `createFirebaseError` function in `firebaseErrorMapping.ts` to use the proper `ApiError` class
+3. Updated the imports in `optimizedDataAccess.ts` to use the correct error class paths
+
+These changes resolved "Class extends value undefined is not a constructor or null" errors.
+
+### Fixed Next.js App Router React.use() warning for params access
+
+Updated the doctor appointment detail page to correctly use React.use() to unwrap params passed from the App Router. This addressed the following warning:
+
+```
+A param property was accessed directly with `params.appointmentId`. `params` is now a Promise and should be unwrapped with `React.use()` before accessing properties of the underlying params object.
+```
+
+Changes made:
+1. Added proper React.use() call in the AppointmentDetailPage component to unwrap params
+2. Properly typed the unwrapped params for better type safety
+3. Fixed the direct access to params.appointmentId which was causing the warning
+
+This change helps future-proof the application as Next.js has indicated that direct access to param properties will be removed in a future version.
+
+### Fixed "Invalid time value" error in appointment detail page
+
+Resolved an issue where the appointment detail page was throwing an error "RangeError: Invalid time value" when trying to display appointment times. The error occurred because:
+
+1. The appointment.dateTime field sometimes contained invalid date values or non-date strings
+2. The date-fns format function was being called directly with new Date(appointment.dateTime) without validation
+
+Changes made:
+1. Added proper validation with isValid and parseISO from date-fns
+2. Added defensive checks for null or undefined dateTime values
+3. Added fallback displays for invalid dates showing "Invalid date" or "Invalid time" instead of crashing
+4. Used proper date parsing with parseISO for ISO date strings instead of the less reliable new Date() constructor
+
+This change makes the appointment detail page more robust against data inconsistencies and prevents the UI from crashing when invalid date values are encountered.
+
+### Fixed "Cannot read properties of undefined (reading 'name')" error in patient details
+
+Resolved an issue where the appointment detail page was crashing with error "Cannot read properties of undefined (reading 'name')" when trying to display patient information. The error occurred because:
+
+1. Some appointments had missing or undefined patient information
+2. The code was directly accessing appointment.patient.name without checking if appointment.patient exists
+3. This caused the application to crash when displaying appointments with incomplete data
+
+Changes made:
+1. Added a conditional check to verify if appointment.patient exists before trying to access its properties
+2. Added fallback displays for missing patient information showing "Not available" instead of crashing
+3. Created a user-friendly placeholder UI when patient data is completely missing
+4. Added null coalescing operator for individual fields to handle partially available patient data
+
+This change makes the appointment detail page more robust against data inconsistencies and prevents the UI from crashing when patient information is missing or incomplete.
+
+### Fixed deprecated error imports across the application
+
+Fixed errors related to importing error classes from deprecated `@/lib/errors` file instead of the new modular error system. Changes made:
+
+1. Updated imports in multiple files to use `@/lib/errors/errorClasses` instead of `@/lib/errors`:
+   - src/hooks/useBookingError.ts
+   - src/data/sharedLoaders.ts
+   - src/data/patientLoaders.ts
+   - src/data/adminLoaders.ts
+   - src/app/(platform)/book-appointment/[doctorId]/page.tsx
+   - src/app/(platform)/admin/doctor-verification/[doctorId]/page.tsx
+   - src/app/(platform)/admin/users/[userId]/page.tsx
+   - src/app/auth/login/page.tsx
+   - src/app/auth/pending-verification/page.tsx
+   - src/lib/errorUtils.ts
+
+2. Fixed property name mismatches in error constructors:
+   - Changed `validationIssues` to `validationErrors` in ValidationError constructors
+   - Changed `slotDateTime` to `slot` in SlotUnavailableError constructors
+   - Changed `status` to `statusCode` in ApiError constructors
+
+This resolved the "Class extends value undefined is not a constructor or null" errors that were occurring throughout the application.

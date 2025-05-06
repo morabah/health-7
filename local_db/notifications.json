@@ -1145,5 +1145,235 @@
     "isRead": false,
     "createdAt": "2025-05-05T18:03:55.413Z",
     "relatedId": "r635548vybqcnatf355xq"
+  },
+  {
+    "id": "notif-4yorjlcz4hcse32pcv2vh",
+    "userId": "u-002",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. ",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:25:10.266Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-jel0f0n435de7phnrbpm",
+    "userId": "u-002",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:25:16.166Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-qs5p0ozyvsj0cbosjot4p3i",
+    "userId": "u-002",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:25:22.730Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-ru27ie83guo3u1zam85qv3",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:37:46.740Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-6e5bsydjpy45yz625ntnc5",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:38:00.867Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-2q19e479w55ve41teugqyl",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:38:33.038Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-wv0kvlko41kbnv803nt5b",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:38:37.980Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-5r05rtvi0j8tsdbap944zt",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:38:59.837Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-wxsn6tmv8vnc6weq1aoo0c",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:47:43.080Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-hf43ciy1hb8aqrivyy72n",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:48:07.712Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-c4io37zqowgaf80jk8ce6",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:48:55.254Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-xvx2k0tolzf97sicawr1h8",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:49:04.345Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-pd9b0yb6568d5wpwihoqlk",
+    "userId": "htggr2d1eeevik1kcux1ed",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T19:57:14.670Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-r9xsgjithclm60mjedz8z",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:19:08.366Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-qc5cbdimxpvdqskofh5s",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:19:12.814Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-dllg25fmavlklrrwj8wmxd",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been suspended. Bulk suspend by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:19:17.323Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-rc0u7nlqiugu7j5kxad6ek",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:19:20.162Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-5zk6c7scl3edkiispni3ia",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:19:23.156Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-j6zr9rql5rgs2afycg9x9d",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-05T21:22:03.709Z",
+    "relatedId": null
+  },
+  {
+    "id": "notif-mvvzeptcqejfwdmxjpuihi",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-14 at 15:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T13:06:26.758Z",
+    "relatedId": "misvdj23rggjl8t0ekexeb"
+  },
+  {
+    "id": "notif-61yrefgt25v1fz38hds09aj",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-14 at 15:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-06T13:06:26.758Z",
+    "relatedId": "misvdj23rggjl8t0ekexeb"
+  },
+  {
+    "id": "notif-nm9wkr8y2tki5uu9g3yi",
+    "userId": "u-001",
+    "title": "Appointment Canceled",
+    "message": "Anita D'AmoreeAsdv3f has canceled the appointment scheduled for 2025-05-14 at 15:00 - Reason: v.",
+    "type": "appointment_canceled",
+    "isRead": false,
+    "createdAt": "2025-05-06T13:06:46.729Z",
+    "relatedId": "misvdj23rggjl8t0ekexeb"
+  },
+  {
+    "id": "notif-frc20idg9vsaxtoy34eont",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-06T13:16:54.203Z",
+    "relatedId": null
   }
 ]

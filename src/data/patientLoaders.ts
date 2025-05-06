@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { AuthError } from '@/lib/errors';
+import { AuthError } from '@/lib/errors/errorClasses';
 import type { z } from 'zod';
 import type { UpdateProfileSchema } from '@/types/schemas';
 

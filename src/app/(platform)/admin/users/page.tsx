@@ -185,11 +185,11 @@ export default function AdminUsersPage() {
 
         // Make the API call with correct parameters
         // Note: The enum values are already strings that match what the backend expects
-        const result = await activateUserMutation.mutateAsync({
-          userId,
-          status,
-          reason,
-        });
+      const result = await activateUserMutation.mutateAsync({
+        userId,
+        status,
+        reason,
+      });
 
         // Type-check the result
         if (
@@ -200,13 +200,13 @@ export default function AdminUsersPage() {
         ) {
           const errorMessage = 'error' in result ? result.error : 'Failed to update user status';
           throw new Error(errorMessage as string);
-        }
+      }
 
-        // Clear confirmation dialog
-        setConfirmAction(null);
+      // Clear confirmation dialog
+      setConfirmAction(null);
 
-        // Refetch users to get updated data
-        await refetch();
+      // Refetch users to get updated data
+      await refetch();
 
         // Force UI refresh by incrementing refresh key
         setRefreshKey(prevKey => prevKey + 1);
@@ -223,9 +223,9 @@ export default function AdminUsersPage() {
           setActionFeedback(null);
         }, 3000);
 
-        logInfo('User status updated successfully', { userId, status });
-      } catch (err) {
-        logError('Error updating user status', err);
+      logInfo('User status updated successfully', { userId, status });
+    } catch (err) {
+      logError('Error updating user status', err);
 
         // Show error feedback
         setActionFeedback({
@@ -708,20 +708,20 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Search & Filter Toolbar */}
+        {/* Search & Filter Toolbar */}
       <Card className="p-4 mb-6">
         <div className="flex flex-col space-y-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[250px]">
-              <Input
-                placeholder="Search by name or email…"
-                className="pl-10"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <Search className="h-4 w-4" />
-              </div>
+            <Input
+              placeholder="Search by name or email…"
+              className="pl-10"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search className="h-4 w-4" />
+            </div>
               {searchQuery && (
                 <button
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
@@ -731,7 +731,7 @@ export default function AdminUsersPage() {
                   <ChevronDown className="h-4 w-4 rotate-45" />
                 </button>
               )}
-            </div>
+          </div>
 
             <Button
               variant={showFilterDrawer ? 'primary' : 'outline'}
@@ -768,41 +768,41 @@ export default function AdminUsersPage() {
                   <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                     User Type
                   </label>
-                  <Select
+            <Select
                     className="w-full"
-                    value={filterType}
-                    onChange={e => setFilterType(e.target.value)}
-                  >
+              value={filterType}
+              onChange={e => setFilterType(e.target.value)}
+            >
                     <option value="">All Types</option>
-                    <option value="patient">Patients</option>
-                    <option value="doctor">Doctors</option>
-                    <option value="admin">Admins</option>
-                  </Select>
+              <option value="patient">Patients</option>
+              <option value="doctor">Doctors</option>
+              <option value="admin">Admins</option>
+            </Select>
                 </div>
 
                 <div className="min-w-[200px]">
                   <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                     Account Status
                   </label>
-                  <Select
+            <Select
                     className="w-full"
-                    value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
-                  >
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+            >
                     <option value="">All Statuses</option>
                     <option value="active">Active Only</option>
                     <option value="suspended">Suspended Only</option>
                     <option value="deactivated">Deactivated Only</option>
-                  </Select>
+            </Select>
                 </div>
 
                 <div className="flex items-end">
-                  <Button variant="outline" size="sm" onClick={resetFilters} title="Reset Filters">
+            <Button variant="outline" size="sm" onClick={resetFilters} title="Reset Filters">
                     <RotateCw className="h-4 w-4 mr-2" />
                     Reset Filters
-                  </Button>
-                </div>
-              </div>
+            </Button>
+          </div>
+        </div>
             </div>
           )}
         </div>
@@ -927,18 +927,18 @@ export default function AdminUsersPage() {
                     } animate-highlight`}
                   >
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
+                        <input
+                          type="checkbox"
                         className="rounded text-primary-600 focus:ring-primary-500"
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={() => toggleSelectUser(user.id)}
-                        id={`user-${user.id}`}
-                      />
+                          checked={selectedUsers.includes(user.id)}
+                          onChange={() => toggleSelectUser(user.id)}
+                          id={`user-${user.id}`}
+                        />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center">
                         <div className="font-medium text-slate-900 dark:text-white">
-                          {user.firstName} {user.lastName}
+                            {user.firstName} {user.lastName}
                         </div>
                       </div>
                     </td>
@@ -986,9 +986,9 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex justify-center">
                         <div className="relative" ref={dropdownRef}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                             onClick={() => toggleDropdown(user.id)}
                             className="flex items-center"
                             title="User Actions"
@@ -996,7 +996,7 @@ export default function AdminUsersPage() {
                             <MoreVertical className="h-4 w-4" />
                             <span className="ml-1">Actions</span>
                             <ChevronDown className="h-4 w-4 ml-1" />
-                          </Button>
+                        </Button>
 
                           {activeDropdown === user.id && (
                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg z-10 border border-slate-200 dark:border-slate-700">
@@ -1013,7 +1013,7 @@ export default function AdminUsersPage() {
 
                                 <li>
                                   <a
-                                    href={`/admin/users/${user.id}/edit`}
+                          href={`/admin/users/${user.id}/edit`}
                                     className="block w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
                                   >
                                     <Pencil className="h-4 w-4 mr-2" />
@@ -1028,9 +1028,9 @@ export default function AdminUsersPage() {
                                     onClick={e => {
                                       e.preventDefault();
                                       setActiveDropdown(null);
-                                      setConfirmAction({
+                              setConfirmAction({
                                         type: 'password',
-                                        userId: user.id,
+                                userId: user.id,
                                       });
                                     }}
                                   >
@@ -1046,9 +1046,9 @@ export default function AdminUsersPage() {
                                     onClick={e => {
                                       e.preventDefault();
                                       setActiveDropdown(null);
-                                      setConfirmAction({
+                            setConfirmAction({
                                         type: 'message',
-                                        userId: user.id,
+                              userId: user.id,
                                       });
                                     }}
                                   >
@@ -1145,7 +1145,7 @@ export default function AdminUsersPage() {
                   {users.length}
                 </span>{' '}
                 total users
-              </div>
+            </div>
 
               <div className="flex flex-wrap gap-4 sm:gap-6">
                 <div className="flex items-center">
@@ -1156,7 +1156,7 @@ export default function AdminUsersPage() {
                       {users.filter(u => u.userType === UserType.PATIENT).length}
                     </span>
                   </span>
-                </div>
+            </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-success mr-2"></div>
                   <span className="text-sm text-slate-600 dark:text-slate-300">
@@ -1370,10 +1370,10 @@ export default function AdminUsersPage() {
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary" isLoading={isActionLoading}>
-                  <Mail className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4 mr-2" />
                   Send Message
-                </Button>
-              </div>
+              </Button>
+            </div>
             </form>
           </div>
         </div>

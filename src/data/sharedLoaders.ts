@@ -5,7 +5,7 @@ import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
-import { AuthError } from '@/lib/errors';
+import { AuthError } from '@/lib/errors/errorClasses';
 
 /**
  * Helper function to get user role as UserType

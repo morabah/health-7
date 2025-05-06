@@ -33,11 +33,11 @@
     "firstName": "Nelson",
     "lastName": "Wisozk",
     "userType": "doctor",
-    "isActive": true,
+    "isActive": false,
     "emailVerified": true,
     "phoneVerified": true,
     "createdAt": "2025-02-03T20:35:44.184Z",
-    "updatedAt": "2025-04-29T20:35:44.184Z",
+    "updatedAt": "2025-05-05T19:25:22.721Z",
     "id": "u-002",
     "userId": "u-002"
   },
@@ -73,13 +73,13 @@
     "email": "user5@demo.health",
     "phone": "+20100000055",
     "firstName": "mohamed",
-    "lastName": "rabahm",
+    "lastName": "erabahm",
     "userType": "doctor",
     "isActive": true,
     "emailVerified": true,
     "phoneVerified": true,
     "createdAt": "2025-03-09T20:35:44.185Z",
-    "updatedAt": "2025-05-05T18:22:47.694Z",
+    "updatedAt": "2025-05-06T11:59:36.874Z",
     "id": "u-005",
     "userId": "u-005"
   },
@@ -179,8 +179,22 @@
     "phoneVerified": false,
     "phone": "",
     "createdAt": "2025-05-02T08:47:06.700Z",
-    "updatedAt": "2025-05-05T17:19:29.283Z",
+    "updatedAt": "2025-05-05T19:57:14.661Z",
     "profilePictureUrl": null,
     "address": ""
+  },
+  {
+    "id": "nh35k2nhsycrdm4l6zazq",
+    "email": "morabahbb@gmail.com",
+    "firstName": "Mohamed",
+    "lastName": "Rabah",
+    "userType": "doctor",
+    "isActive": true,
+    "emailVerified": true,
+    "phoneVerified": false,
+    "phone": null,
+    "createdAt": "2025-05-05T20:07:25.396Z",
+    "updatedAt": "2025-05-06T13:16:54.180Z",
+    "profilePictureUrl": null
   }
 ]
