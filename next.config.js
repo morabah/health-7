@@ -9,11 +9,13 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Handle any requests with /platform in the URL (cleanup old links)
       {
-        source: '/book-appointment/:doctorId',
-        destination: '/platform/book-appointment/:doctorId',
+        source: '/platform/book-appointment/:doctorId',
+        destination: '/book-appointment/:doctorId',
         permanent: true,
       },
+      // Remove the self-redirect which causes an infinite loop
     ];
   },
 };
