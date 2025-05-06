@@ -174,7 +174,7 @@ function BookAppointmentPageContent() {
   const { 
     data: availabilityDataResponse, 
     isLoading: isLoadingAvailability,
-    error: availabilityError
+    error: availabilityQueryError
   } = useDoctorAvailability(doctorId) as {
     data: AvailabilityResponse | undefined;
     isLoading: boolean;
@@ -193,10 +193,10 @@ function BookAppointmentPageContent() {
     if (doctorError) {
       logError('Failed to fetch doctor profile', { doctorId, error: doctorError });
     }
-    if (availabilityError) {
-      logError('Failed to fetch doctor availability', { doctorId, error: availabilityError });
+    if (availabilityQueryError) {
+      logError('Failed to fetch doctor availability', { doctorId, error: availabilityQueryError });
     }
-  }, [doctorError, availabilityError, doctorId]);
+  }, [doctorError, availabilityQueryError, doctorId]);
 
   // Handle successful booking
   useEffect(() => {
@@ -578,7 +578,6 @@ function BookAppointmentPageContent() {
       if (error instanceof AppointmentError) {
         if (error instanceof SlotUnavailableError) {
           setAvailabilityError('This time slot is no longer available. Please select another time.');
-          scrollToRef(timeSelectRef);
         } else {
           setFormError(`Appointment error: ${error.message}`);
         }
@@ -612,11 +611,11 @@ function BookAppointmentPageContent() {
     bookAppointmentMutation
   ]);
 
-  if (doctorError || availabilityError) {
+  if (doctorError || availabilityQueryError) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <ErrorDisplay 
-          error={doctorError || availabilityError}
+          error={doctorError || availabilityQueryError}
           message="We couldn't load the doctor's information"
           category="data"
           onRetry={() => window.location.reload()}
