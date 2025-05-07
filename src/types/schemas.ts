@@ -914,12 +914,16 @@ export const GetAppointmentDetailsSchema = z.object({
  * Zod schema for getting user's appointments
  * 
  * This schema validates the authentication context for user accessing their appointments.
- * No parameters are required since we filter by the authenticated user's ID.
+ * Parameters for filtering appointments are optional.
  */
 export const GetMyAppointmentsSchema = z.object({
-  // Optional filter parameters could be added here in the future
-  // Example: status, dateRange, etc.
-}).strict();
+  // Optional filter parameters
+  status: z.nativeEnum(AppointmentStatus).optional(),
+  startDate: isoDateTimeStringSchema.optional(),
+  endDate: isoDateTimeStringSchema.optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  offset: z.number().int().min(0).optional(),
+}).strict().partial();
 
 /**
  * Zod schema for admin user updates

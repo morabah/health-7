@@ -424,17 +424,17 @@ export async function completeAppointment(
 /**
  * Get appointments for the current user
  */
-export async function getMyAppointments(ctx: {
-  uid: string;
-  role: UserType;
-}): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
+export async function getMyAppointments(
+  ctx: { uid: string; role: UserType },
+  payload: { status?: AppointmentStatus; startDate?: string; endDate?: string; limit?: number; offset?: number } = {}
+): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
   const perf = trackPerformance('getMyAppointments');
 
   try {
     const { uid, role } = ctx;
 
     // Validate with GetMyAppointmentsSchema from central schema repository
-    const validationResult = GetMyAppointmentsSchema.safeParse({});
+    const validationResult = GetMyAppointmentsSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
@@ -442,10 +442,13 @@ export async function getMyAppointments(ctx: {
       };
     }
 
-    logInfo('getMyAppointments called', { uid, role });
+    // Get the validated data
+    const filters = validationResult.data;
+
+    logInfo('getMyAppointments called', { uid, role, filters });
 
     const appointments = await getAppointments();
-
+    
     // Filter appointments based on role
     let myAppointments: Appointment[];
 
@@ -461,6 +464,21 @@ export async function getMyAppointments(ctx: {
       myAppointments = [];
     }
 
+    // Apply filters if provided
+    if (filters.status) {
+      myAppointments = myAppointments.filter(a => a.status === filters.status);
+    }
+
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      myAppointments = myAppointments.filter(a => new Date(a.appointmentDate) >= startDate);
+    }
+
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      myAppointments = myAppointments.filter(a => new Date(a.appointmentDate) <= endDate);
+    }
+
     // Sort appointments by date and time (most recent first)
     myAppointments.sort((a, b) => {
       const dateA = `${a.appointmentDate}T${a.startTime}`;
@@ -468,6 +486,13 @@ export async function getMyAppointments(ctx: {
 
       return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
+
+    // Apply pagination if provided
+    if (filters.offset !== undefined || filters.limit !== undefined) {
+      const offset = filters.offset || 0;
+      const limit = filters.limit || myAppointments.length;
+      myAppointments = myAppointments.slice(offset, offset + limit);
+    }
 
     return { success: true, appointments: myAppointments };
   } catch (e) {
