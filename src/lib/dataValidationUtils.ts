@@ -262,3 +262,160 @@ async function getLocalData(collectionName: string): Promise<unknown[] | null> {
       return null;
   }
 }
+
+/**
+ * Audits an API endpoint implementation to check if it properly uses schema validation
+ *
+ * @param functionName - The name of the function to audit
+ * @param fileContent - The entire file content as a string
+ * @returns Analysis result with details about validation patterns found
+ */
+export function auditApiEndpointValidation(
+  functionName: string,
+  fileContent: string
+): {
+  usesSchemaValidation: boolean;
+  importsFromCentralSchema: boolean;
+  usesZodSafeParse: boolean;
+  validatesBeforeProcessing: boolean;
+  returnsValidationErrors: boolean;
+  inlineSchemaDefinitions: boolean;
+  score: number; // 0-100 score based on adherence to best practices
+  recommendations: string[];
+} {
+  const result = {
+    usesSchemaValidation: false,
+    importsFromCentralSchema: false,
+    usesZodSafeParse: false,
+    validatesBeforeProcessing: false,
+    returnsValidationErrors: false,
+    inlineSchemaDefinitions: false,
+    score: 0,
+    recommendations: [] as string[],
+  };
+
+  // Create a regex pattern to find the specific function
+  const functionRegex = new RegExp(
+    `export\\s+async\\s+function\\s+${functionName}\\s*\\([\\s\\S]*?\\{([\\s\\S]*?)\\n\\}`,
+    'g'
+  );
+  const functionMatch = functionRegex.exec(fileContent);
+
+  if (!functionMatch || !functionMatch[1]) {
+    // Function body not found
+    result.recommendations.push('Add Zod schema validation to validate input data');
+    return result;
+  }
+
+  // Function body
+  const functionBody = functionMatch[1];
+
+  // Check for import statements related to schemas
+  const hasSchemaImport = /import\s+\{[^}]*Schema[^}]*\}\s+from\s+['"]@\/types\/schemas['"]/i.test(
+    fileContent
+  );
+  const importSpecificSchema = new RegExp(
+    `import\\s+\\{[^}]*\\b(\\w+Schema)\\b[^}]*\\}\\s+from\\s+['"]@\\/types\\/schemas['"]`,
+    'i'
+  );
+
+  // Use Array.from to fix the RegExpStringIterator issue
+  const importMatches = Array.from(fileContent.matchAll(new RegExp(importSpecificSchema, 'g')));
+
+  const importedSchemas = importMatches.flatMap(match => {
+    const importStatement = match[0];
+    // Extract everything between the curly braces
+    const schemaMatch = importStatement.match(/\{([^}]*)\}/);
+    if (schemaMatch && schemaMatch[1]) {
+      // Split by comma and trim to get individual schema names
+      return schemaMatch[1].split(',').map((s: string) => s.trim());
+    }
+    return [];
+  });
+
+  result.importsFromCentralSchema = hasSchemaImport;
+
+  // Check if the function uses any of the imported schemas or any schema
+  const useSchemaRegex = new RegExp(
+    `(${importedSchemas.join('|')}|\\w+Schema)\\.safeParse\\(`,
+    'i'
+  );
+  const anySchemaUsage = useSchemaRegex.test(functionBody);
+  const schemaUsageWithinFunction =
+    /Schema\.safeParse\(/i.test(functionBody) || /\.safeParse\(/i.test(functionBody);
+
+  result.usesSchemaValidation = anySchemaUsage || schemaUsageWithinFunction;
+
+  // Check for safeParse usage
+  result.usesZodSafeParse = /\.safeParse\(/i.test(functionBody);
+
+  // Check if validation is performed before business logic
+  const safeParseIndex = functionBody.indexOf('.safeParse(');
+  const awaitIndex = functionBody.indexOf('await');
+  if (safeParseIndex > -1 && awaitIndex > -1) {
+    result.validatesBeforeProcessing = safeParseIndex < awaitIndex;
+  } else if (safeParseIndex > -1) {
+    // If safeParse is used but no await found, assume it's okay
+    result.validatesBeforeProcessing = true;
+  }
+
+  // Check for validation error handling
+  const hasSuccessCheck =
+    /if\s*\(\s*.*!.*\.success\s*\)/i.test(functionBody) ||
+    /if\s*\(\s*!.*\.success\s*\)/i.test(functionBody);
+  const returnsError =
+    /return\s+\{\s*success\s*:\s*false/i.test(functionBody) || /throw\s+new/i.test(functionBody);
+
+  result.returnsValidationErrors = hasSuccessCheck && returnsError;
+
+  // Check for inline schema definitions
+  result.inlineSchemaDefinitions =
+    /const\s+\w+Schema\s*=\s*z\.object\(/i.test(functionBody) ||
+    /const\s+validationSchema\s*=\s*z\.object\(/i.test(functionBody);
+
+  // Calculate score based on adherence to best practices
+  let scorePoints = 0;
+  if (result.usesSchemaValidation) scorePoints += 20;
+  if (result.importsFromCentralSchema) scorePoints += 20;
+  if (result.usesZodSafeParse) scorePoints += 20;
+  if (result.validatesBeforeProcessing) scorePoints += 20;
+  if (result.returnsValidationErrors) scorePoints += 20;
+  if (result.inlineSchemaDefinitions) scorePoints -= 10;
+
+  result.score = Math.max(0, Math.min(100, scorePoints));
+
+  // Generate recommendations
+  if (!result.usesSchemaValidation) {
+    result.recommendations.push('Add Zod schema validation to validate input data');
+  }
+
+  if (result.usesSchemaValidation && !result.importsFromCentralSchema) {
+    result.recommendations.push(
+      'Import schemas from central schema repository (@/types/schemas.ts)'
+    );
+  }
+
+  if (result.usesSchemaValidation && !result.usesZodSafeParse) {
+    result.recommendations.push(
+      'Use safeParse() instead of parse() to handle validation errors gracefully'
+    );
+  }
+
+  if (result.usesZodSafeParse && !result.validatesBeforeProcessing) {
+    result.recommendations.push(
+      'Move validation logic to the beginning of the function before processing data'
+    );
+  }
+
+  if (result.usesZodSafeParse && !result.returnsValidationErrors) {
+    result.recommendations.push('Return validation errors to the client when validation fails');
+  }
+
+  if (result.inlineSchemaDefinitions) {
+    result.recommendations.push(
+      'Replace inline schema with an import from the central schema repository'
+    );
+  }
+
+  return result;
+}

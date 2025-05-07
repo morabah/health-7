@@ -13,15 +13,15 @@ import { logError, logWarn } from './logger';
  */
 export function formatDate(dateString: string | Date, formatStr: string = 'MMM d, yyyy'): string {
   if (!dateString) return '';
-  
+
   try {
     const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
-    
+
     if (!isValid(date)) {
       logWarn(`Invalid date provided to formatDate`, { dateString });
       return '';
     }
-    
+
     return format(date, formatStr);
   } catch (error) {
     logError(`Error formatting date`, { dateString, error });
@@ -56,20 +56,20 @@ export function getRelativeTime(dateString: string): string {
  */
 export function formatDateTime(dateString: string | Date | undefined): string {
   if (!dateString) return '';
-  
+
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
-    
+
     return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
-  } catch (e) {
+  } catch {
     return '';
   }
 }
@@ -83,17 +83,17 @@ export function formatDateTime(dateString: string | Date | undefined): string {
  */
 export function formatDateForInput(dateString: string | null | undefined): string {
   if (!dateString) return '';
-  
+
   try {
     // Handle ISO strings by splitting at T
     if (dateString.includes('T')) {
       return dateString.split('T')[0];
     }
-    
+
     // For other formats, parse with Date and format
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return ''; // Invalid date
-    
+
     return date.toISOString().split('T')[0];
   } catch (err) {
     logError('Error formatting date for input', { dateString, error: err });
@@ -108,17 +108,17 @@ export function formatDateForInput(dateString: string | null | undefined): strin
  */
 export function formatDateForApi(dateString: string | null | undefined): string {
   if (!dateString) return '';
-  
+
   try {
     // If it already has a time component, return as is
     if (dateString.includes('T')) {
       return dateString;
     }
-    
+
     // Add time component
     return `${dateString}T00:00:00.000Z`;
   } catch (err) {
     logError('Error formatting date for API', { dateString, error: err });
     return '';
   }
-} 
+}

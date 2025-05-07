@@ -2,7 +2,7 @@
 
 /**
  * Enhanced Cache Manager
- * 
+ *
  * Provides a unified interface for caching with LRU eviction policy.
  * Acts as a bridge between the application and different caching mechanisms.
  */
@@ -20,40 +20,40 @@ export { CacheCategory };
 
 // TTL settings for different data types (in milliseconds)
 const TTL_CONFIG = {
-  [CacheCategory.USERS]: 120000,        // 2 minutes (increased from 1 minute)
-  [CacheCategory.DOCTORS]: 300000,      // 5 minutes (increased from 2 minutes)
-  [CacheCategory.APPOINTMENTS]: 60000,  // 1 minute (increased from 30 seconds)
+  [CacheCategory.USERS]: 120000, // 2 minutes (increased from 1 minute)
+  [CacheCategory.DOCTORS]: 300000, // 5 minutes (increased from 2 minutes)
+  [CacheCategory.APPOINTMENTS]: 60000, // 1 minute (increased from 30 seconds)
   [CacheCategory.NOTIFICATIONS]: 10000, // 10 seconds (reduced from 15 seconds)
-  [CacheCategory.OTHER]: 60000          // 1 minute (increased from 30 seconds)
+  [CacheCategory.OTHER]: 60000, // 1 minute (increased from 30 seconds)
 };
 
 // Create cache instances (one per category for better isolation)
 const caches: Record<CacheCategory, LRUCache> = {
   [CacheCategory.USERS]: new LRUCache({
-    maxSize: 2 * 1024 * 1024,  // 2MB
+    maxSize: 2 * 1024 * 1024, // 2MB
     maxEntries: 100,
-    defaultTtl: TTL_CONFIG[CacheCategory.USERS]
+    defaultTtl: TTL_CONFIG[CacheCategory.USERS],
   }),
   [CacheCategory.DOCTORS]: new LRUCache({
-    maxSize: 5 * 1024 * 1024,  // 5MB (doctors have more data)
+    maxSize: 5 * 1024 * 1024, // 5MB (doctors have more data)
     maxEntries: 200,
-    defaultTtl: TTL_CONFIG[CacheCategory.DOCTORS]
+    defaultTtl: TTL_CONFIG[CacheCategory.DOCTORS],
   }),
   [CacheCategory.APPOINTMENTS]: new LRUCache({
-    maxSize: 3 * 1024 * 1024,  // 3MB
+    maxSize: 3 * 1024 * 1024, // 3MB
     maxEntries: 300,
-    defaultTtl: TTL_CONFIG[CacheCategory.APPOINTMENTS]
+    defaultTtl: TTL_CONFIG[CacheCategory.APPOINTMENTS],
   }),
   [CacheCategory.NOTIFICATIONS]: new LRUCache({
-    maxSize: 2 * 1024 * 1024,  // 2MB
-    maxEntries: 500,           // Higher count for notifications
-    defaultTtl: TTL_CONFIG[CacheCategory.NOTIFICATIONS]
+    maxSize: 2 * 1024 * 1024, // 2MB
+    maxEntries: 500, // Higher count for notifications
+    defaultTtl: TTL_CONFIG[CacheCategory.NOTIFICATIONS],
   }),
   [CacheCategory.OTHER]: new LRUCache({
-    maxSize: 2 * 1024 * 1024,  // 2MB
+    maxSize: 2 * 1024 * 1024, // 2MB
     maxEntries: 100,
-    defaultTtl: TTL_CONFIG[CacheCategory.OTHER]
-  })
+    defaultTtl: TTL_CONFIG[CacheCategory.OTHER],
+  }),
 };
 
 /**
@@ -70,7 +70,7 @@ export function setCacheData<T>(
     caches[category].set(key, data, {
       ttl: options.ttl || TTL_CONFIG[category],
       priority: options.priority,
-      tag: options.tag
+      tag: options.tag,
     });
   } catch (error) {
     logError('Error setting cache data', { category, key, error });
@@ -91,7 +91,7 @@ export function getCacheData<T>(
     if (cached) {
       return cached;
     }
-    
+
     // If not found in memory cache and browser is available, try browser cache
     if (typeof window !== 'undefined') {
       const browserCached = browserCache.get<T>(category, key);
@@ -101,7 +101,7 @@ export function getCacheData<T>(
         return browserCached;
       }
     }
-    
+
     return undefined;
   } catch (error) {
     logError('Error getting cache data', { category, key, error });
@@ -112,10 +112,7 @@ export function getCacheData<T>(
 /**
  * Check if a key exists in the cache
  */
-export function hasCacheData(
-  category: CacheCategory,
-  key: string
-): boolean {
+export function hasCacheData(category: CacheCategory, key: string): boolean {
   try {
     return caches[category].has(key);
   } catch (error) {
@@ -127,10 +124,7 @@ export function hasCacheData(
 /**
  * Delete a value from the cache
  */
-export function deleteCacheData(
-  category: CacheCategory,
-  key: string
-): boolean {
+export function deleteCacheData(category: CacheCategory, key: string): boolean {
   try {
     return caches[category].delete(key);
   } catch (error) {
@@ -168,11 +162,11 @@ export function clearAllCaches(): void {
  */
 export function getCacheStats(): Record<CacheCategory, ReturnType<LRUCache['getStats']>> {
   const stats: Record<string, ReturnType<LRUCache['getStats']>> = {};
-  
+
   Object.entries(caches).forEach(([category, cache]) => {
     stats[category] = cache.getStats();
   });
-  
+
   return stats;
 }
 
@@ -181,11 +175,11 @@ export function getCacheStats(): Record<CacheCategory, ReturnType<LRUCache['getS
  */
 export function pruneAllExpired(): Record<CacheCategory, number> {
   const results: Record<string, number> = {};
-  
+
   Object.entries(caches).forEach(([category, cache]) => {
     results[category] = cache.pruneExpired();
   });
-  
+
   return results;
 }
 
@@ -199,11 +193,11 @@ export function startAutoPruning(intervalMs = 60000): void {
   if (pruneInterval) {
     stopAutoPruning();
   }
-  
+
   pruneInterval = setInterval(() => {
     const pruned = pruneAllExpired();
     const total = Object.values(pruned).reduce((sum, count) => sum + count, 0);
-    
+
     if (total > 0) {
       logInfo(`Auto-pruned ${total} expired cache entries`);
     }
@@ -244,17 +238,20 @@ export function migrateReactQueryToLRUCache<T>(
   try {
     // Try to get data from React Query cache
     const queryData = reactQueryCache.getQueryData(reactQueryKey);
-    
+
     if (queryData) {
       // Store in our LRU cache
       setCacheData(category, lruKey, queryData);
       return queryData as T;
     }
-    
+
     return undefined;
   } catch (error) {
-    logError('Error migrating React Query data to LRU cache', { 
-      reactQueryKey, category, lruKey, error 
+    logError('Error migrating React Query data to LRU cache', {
+      reactQueryKey,
+      category,
+      lruKey,
+      error,
     });
     return undefined;
   }
@@ -269,19 +266,24 @@ export function migrateReactQueryToLRUCache<T>(
 export function setDoctorData(doctorId: string, data: unknown, options: CacheOptions = {}): void {
   try {
     const key = createCacheKey('doctor', doctorId);
-    
+
     // Set in the LRU Cache
     setCacheData(CacheCategory.DOCTORS, key, data, {
       ttl: options.ttl || TTL_CONFIG[CacheCategory.DOCTORS],
       priority: options.priority || 'high', // Doctors data is high priority
-      tag: options.tag || 'doctor'
+      tag: options.tag || 'doctor',
     });
-    
+
     // Get reference to React Query cache manager
-    const reactQueryCache = typeof window !== 'undefined' 
-      ? (window as any).__REACT_QUERY_CACHE__ 
-      : null;
-    
+    interface ReactQueryCache {
+      setQueryData: (key: unknown[], data: unknown) => void;
+    }
+
+    const reactQueryCache =
+      typeof window !== 'undefined'
+        ? (window as Window & { __REACT_QUERY_CACHE__?: ReactQueryCache }).__REACT_QUERY_CACHE__
+        : null;
+
     // Also update React Query cache if available
     if (reactQueryCache && typeof reactQueryCache.setQueryData === 'function') {
       reactQueryCache.setQueryData(['doctor', doctorId], { success: true, doctor: data });
@@ -291,7 +293,7 @@ export function setDoctorData(doctorId: string, data: unknown, options: CacheOpt
     if (typeof window !== 'undefined') {
       browserCache.setDoctor(doctorId, data);
     }
-    
+
     logInfo('Doctor data cached', { doctorId });
   } catch (error) {
     logError('Error setting doctor data in cache', { doctorId, error });
@@ -313,7 +315,7 @@ const enhancedCache = {
   createKey: createCacheKey,
   migrateFromReactQuery: migrateReactQueryToLRUCache,
   setDoctorData,
-  category: CacheCategory
+  category: CacheCategory,
 };
 
 // Register the enhancedCache with the queryClient to avoid circular dependencies
@@ -322,4 +324,4 @@ setEnhancedCacheRef(enhancedCache);
 // Auto-start pruning when this module is loaded
 startAutoPruning();
 
-export default enhancedCache; 
+export default enhancedCache;

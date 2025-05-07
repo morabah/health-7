@@ -15,7 +15,9 @@
     "test:e2e": "playwright test --headed=false",
     "prepare": "husky",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "typecheck:watch": "tsc --noEmit -p tsconfig.test.json --watch"
+    "typecheck:watch": "tsc --noEmit -p tsconfig.test.json --watch",
+    "validate-api": "tsx ./scripts/validateApiEndpoints.ts",
+    "validate-db": "tsx ./scripts/validateDbSchemas.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

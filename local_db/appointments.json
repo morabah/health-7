@@ -405,13 +405,13 @@
     "appointmentDate": "2025-05-14",
     "startTime": "18:30",
     "endTime": "19:00",
-    "status": "pending",
+    "status": "canceled",
     "reason": null,
-    "notes": null,
+    "notes": "Canceled - r",
     "appointmentType": "IN_PERSON",
     "videoCallUrl": null,
     "createdAt": "2025-05-05T17:21:40.317Z",
-    "updatedAt": "2025-05-05T17:21:40.317Z"
+    "updatedAt": "2025-05-07T07:37:21.535Z"
   },
   {
     "id": "misvdj23rggjl8t0ekexeb",
@@ -574,5 +574,23 @@
     "videoCallUrl": null,
     "createdAt": "2025-05-06T21:46:30.598Z",
     "updatedAt": "2025-05-06T21:46:30.598Z"
+  },
+  {
+    "id": "ud7g83x2kaepfq49hqzh7",
+    "patientId": "u-007",
+    "patientName": "Anita D'AmoreeAsdv3f",
+    "doctorId": "u-001",
+    "doctorName": "Chris Streich",
+    "doctorSpecialty": "Cardiology",
+    "appointmentDate": "2025-05-06",
+    "startTime": "08:30",
+    "endTime": "09:00",
+    "status": "pending",
+    "reason": null,
+    "notes": null,
+    "appointmentType": "IN_PERSON",
+    "videoCallUrl": null,
+    "createdAt": "2025-05-07T07:36:55.902Z",
+    "updatedAt": "2025-05-07T07:36:55.902Z"
   }
 ]

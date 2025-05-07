@@ -1,0 +1,14 @@
+{
+  "summary": {
+    "totalDocuments": 0,
+    "validDocuments": 0,
+    "validPercentage": 0
+  },
+  "collections": {
+    "users": [],
+    "patients": [],
+    "doctors": [],
+    "appointments": [],
+    "notifications": []
+  }
+}

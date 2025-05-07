@@ -5,23 +5,30 @@
  */
 
 import { z } from 'zod';
-import { UserType, AppointmentStatus, NotificationType, AppointmentType, VerificationStatus } from '@/types/enums';
+import {
+  UserType,
+  AppointmentStatus,
+  NotificationType,
+  AppointmentType,
+  VerificationStatus,
+} from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { 
-  getAppointments, 
+import {
+  getAppointments,
   saveAppointments,
   getPatients,
   getDoctors,
   getUsers,
   getNotifications,
-  saveNotifications
+  saveNotifications,
 } from '@/lib/localDb';
 import { generateId, nowIso } from '@/lib/localApiCore';
 import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
 
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Appointment, Notification, DoctorProfile, TimeSlot } from '@/types/schemas';
+import { BookAppointmentSchema, CancelAppointmentSchema } from '@/types/schemas';
 
 /**
  * Book an appointment with a doctor
@@ -42,21 +49,12 @@ export async function bookAppointment(
   try {
     const { uid, role } = context;
 
-    // Validate with Zod schema
-    const validationSchema = z.object({
-      doctorId: z.string().min(1, 'Doctor ID is required'),
-      appointmentDate: z.string().min(1, 'Appointment date is required'),
-      startTime: z.string().min(1, 'Start time is required'),
-      endTime: z.string().min(1, 'End time is required'),
-      reason: z.string().optional(),
-      appointmentType: z.nativeEnum(AppointmentType).optional(),
-    });
-
-    const result = validationSchema.safeParse(payload);
+    // Validate with Zod schema from central schema definitions
+    const result = BookAppointmentSchema.safeParse(payload);
     if (!result.success) {
       return {
         success: false,
-        error: `Invalid booking data: ${result.error.message}`,
+        error: `Invalid booking data: ${result.error.format()}`,
       };
     }
 
@@ -69,12 +67,8 @@ export async function bookAppointment(
       return { success: false, error: 'Only patients can book appointments' };
     }
 
-    // Check required parameters
-    const { doctorId, appointmentDate, startTime, endTime, reason, appointmentType } = payload;
-
-    if (!doctorId || !appointmentDate || !startTime || !endTime) {
-      return { success: false, error: 'Missing required appointment details' };
-    }
+    // Get validated payload data
+    const { doctorId, appointmentDate, startTime, endTime, reason, appointmentType } = result.data;
 
     // Check doctor exists
     const doctors = await getDoctors();
@@ -196,21 +190,18 @@ export async function cancelAppointment(
 
   try {
     const { uid, role } = ctx;
-    const { appointmentId, reason } = payload;
 
-    // Validate with Zod schema
-    const validationSchema = z.object({
-      appointmentId: z.string().min(1, 'Appointment ID is required'),
-      reason: z.string().optional(),
-    });
-
-    const result = validationSchema.safeParse(payload);
+    // Validate with Zod schema from central schema definitions
+    const result = CancelAppointmentSchema.safeParse(payload);
     if (!result.success) {
       return {
         success: false,
-        error: `Invalid cancellation data: ${result.error.message}`,
+        error: `Invalid cancellation data: ${result.error.format()}`,
       };
     }
+
+    // Get validated data
+    const { appointmentId, reason } = result.data;
 
     logInfo('cancelAppointment called', { uid, role, appointmentId, reason });
 
@@ -268,7 +259,7 @@ export async function cancelAppointment(
 
     // Create notifications for both parties
     const notifications = await getNotifications();
-    
+
     if (role === UserType.PATIENT) {
       // Patient canceled, notify doctor
       const doctorNotification: Notification = {
@@ -535,7 +526,12 @@ export async function getAppointmentDetails(
 /**
  * Validates the authentication context for API calls
  */
-function validateAuthContext(ctx: { uid?: string; role?: UserType }): { isValid: boolean; error?: string; uid?: string; role?: UserType } {
+function validateAuthContext(ctx: { uid?: string; role?: UserType }): {
+  isValid: boolean;
+  error?: string;
+  uid?: string;
+  role?: UserType;
+} {
   // Validate context
   if (!ctx || typeof ctx !== 'object') {
     logError('API - Invalid context', { ctx });
@@ -564,13 +560,13 @@ function validateDateFormat(date: string): { isValid: boolean; error?: string } 
   try {
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) {
-      return { 
-        isValid: false, 
-        error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.' 
+      return {
+        isValid: false,
+        error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.',
       };
     }
     return { isValid: true };
-  } catch (error) {
+  } catch {
     return { isValid: false, error: 'Invalid date format' };
   }
 }
@@ -583,7 +579,6 @@ function validateGetAvailableSlotsPayload(
   uid: string,
   role: UserType
 ): { isValid: boolean; error?: string; doctorId?: string; date?: string } {
-  
   // Validate required parameters
   if (!payload || typeof payload !== 'object') {
     logError('getAvailableSlots - Missing payload', { uid, role });
@@ -604,7 +599,10 @@ function validateGetAvailableSlotsPayload(
   const dateValidation = validateDateFormat(payload.date);
   if (!dateValidation.isValid) {
     logError('getAvailableSlots - Invalid date format', {
-      uid, role, doctorId: payload.doctorId, date: payload.date
+      uid,
+      role,
+      doctorId: payload.doctorId,
+      date: payload.date,
     });
     return { isValid: false, error: dateValidation.error };
   }
@@ -615,9 +613,11 @@ function validateGetAvailableSlotsPayload(
 /**
  * Retrieves and validates the doctor profile
  */
-async function retrieveDoctorProfile(doctorId: string, uid: string, role: UserType): 
-  Promise<{ success: boolean; doctor?: DoctorProfile; error?: string }> {
-  
+async function retrieveDoctorProfile(
+  doctorId: string,
+  uid: string,
+  role: UserType
+): Promise<{ success: boolean; doctor?: DoctorProfile; error?: string }> {
   try {
     const doctors = await getDoctors();
     const doctor = doctors.find(d => d.userId === doctorId);
@@ -630,7 +630,10 @@ async function retrieveDoctorProfile(doctorId: string, uid: string, role: UserTy
     // Check if doctor is verified
     if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
       logError('getAvailableSlots - Doctor not verified', {
-        uid, role, doctorId, status: doctor.verificationStatus,
+        uid,
+        role,
+        doctorId,
+        status: doctor.verificationStatus,
       });
       return { success: false, error: 'Doctor is not verified' };
     }
@@ -645,9 +648,9 @@ async function retrieveDoctorProfile(doctorId: string, uid: string, role: UserTy
 /**
  * Retrieves doctor's appointments
  */
-async function getDoctorAppointments(doctorId: string): 
-  Promise<{ success: boolean; appointments?: Appointment[]; error?: string }> {
-  
+async function getDoctorAppointments(
+  doctorId: string
+): Promise<{ success: boolean; appointments?: Appointment[]; error?: string }> {
   try {
     const appointments = await getAppointments();
     const doctorAppointments = appointments.filter(
@@ -665,7 +668,7 @@ async function getDoctorAppointments(doctorId: string):
  */
 function ensureDoctorScheduleProperties(doctor: DoctorProfile): DoctorProfile {
   const updatedDoctor = { ...doctor };
-  
+
   if (!updatedDoctor.weeklySchedule) {
     // Initialize with empty default schedule if needed
     updatedDoctor.weeklySchedule = {
@@ -689,16 +692,18 @@ function ensureDoctorScheduleProperties(doctor: DoctorProfile): DoctorProfile {
 /**
  * Calculates available slots for a doctor on a date
  */
-function calculateAvailableSlots(doctor: DoctorProfile, date: string, appointments: Appointment[]): 
-  { success: boolean; slots?: TimeSlot[]; error?: string } {
-  
+function calculateAvailableSlots(
+  doctor: DoctorProfile,
+  date: string,
+  appointments: Appointment[]
+): { success: boolean; slots?: TimeSlot[]; error?: string } {
   try {
     const preparedDoctor = ensureDoctorScheduleProperties(doctor);
     const availableSlots = getAvailableSlotsForDate(preparedDoctor, date, appointments);
-    
-    return { 
-      success: true, 
-      slots: availableSlots 
+
+    return {
+      success: true,
+      slots: availableSlots,
     };
   } catch (error) {
     logError('calculateAvailableSlots - Error', {
@@ -730,9 +735,9 @@ export async function getAvailableSlots(
     if (!contextValidation.isValid) {
       return { success: false, error: contextValidation.error || 'Invalid authentication context' };
     }
-    
+
     const { uid, role } = contextValidation;
-    
+
     // Ensure uid and role are defined
     if (!uid || !role) {
       return { success: false, error: 'Missing user authentication data' };
@@ -750,9 +755,9 @@ export async function getAvailableSlots(
     if (!payloadValidation.isValid) {
       return { success: false, error: payloadValidation.error || 'Invalid payload' };
     }
-    
+
     const { doctorId, date } = payloadValidation;
-    
+
     // Ensure doctorId and date are defined
     if (!doctorId || !date) {
       return { success: false, error: 'Missing required parameters' };
@@ -772,11 +777,11 @@ export async function getAvailableSlots(
 
     // Step 5: Calculate available slots
     const slotsResult = calculateAvailableSlots(
-      doctorResult.doctor, 
+      doctorResult.doctor,
       date,
       appointmentsResult.appointments
     );
-    
+
     if (!slotsResult.success || !slotsResult.slots) {
       return { success: false, error: slotsResult.error || 'Error calculating available slots' };
     }
@@ -794,4 +799,4 @@ export async function getAvailableSlots(
   } finally {
     perf.stop();
   }
-} 
+}

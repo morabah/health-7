@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Star, Calendar, User, Award, CheckCircle, MessageSquare } from 'lucide-react';
+import { MapPin, Star, Calendar, User, Award, CheckCircle } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -21,7 +21,7 @@ interface DoctorCardProps {
     reviewCount?: number;
     experience?: string | number;
     isVerified?: boolean;
-    availableSoon?: boolean; 
+    availableSoon?: boolean;
     languages?: string[];
     servicesOffered?: string[];
   };
@@ -34,9 +34,9 @@ interface DoctorCardProps {
 
 /**
  * DoctorCard component for displaying doctor information
- * 
+ *
  * @example
- * <DoctorCard 
+ * <DoctorCard
  *   doctor={{
  *     id: "123",
  *     firstName: "John",
@@ -56,7 +56,7 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
   compact = false,
   variant = 'default',
   onClick,
-  hideBookButton = false
+  hideBookButton = false,
 }) => {
   const {
     id,
@@ -70,22 +70,23 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
     reviewCount,
     experience,
     isVerified,
-    availableSoon,
     languages,
-    servicesOffered
+    servicesOffered,
   } = doctor;
 
   const fullName = `${firstName} ${lastName}`;
-  
+
   // Modern health-focused doctor card
   if (variant === 'health') {
     return (
-      <Card 
-        className={twMerge(clsx(
-          'overflow-hidden transition-all duration-200 hover:shadow-lg',
-          onClick ? 'cursor-pointer' : '',
-          className
-        ))}
+      <Card
+        className={twMerge(
+          clsx(
+            'overflow-hidden transition-all duration-200 hover:shadow-lg',
+            onClick ? 'cursor-pointer' : '',
+            className
+          )
+        )}
         variant="health"
         onClick={onClick}
       >
@@ -106,20 +107,19 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                 </div>
               )}
               {isVerified && (
-                <div className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1" aria-label="Verified doctor">
+                <div
+                  className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1"
+                  aria-label="Verified doctor"
+                >
                   <CheckCircle className="w-5 h-5" />
                 </div>
               )}
             </div>
 
-            <h3 className="text-xl font-bold text-center">
-              {fullName}
-            </h3>
+            <h3 className="text-xl font-bold text-center">{fullName}</h3>
 
             {specialty && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                {specialty}
-              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{specialty}</p>
             )}
 
             {/* Rating */}
@@ -148,15 +148,19 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
             {experience && (
               <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-2">
                 <Award className="w-4 h-4 mr-2 text-slate-400" />
-                <span>{typeof experience === 'number' ? `${experience} years experience` : experience}</span>
+                <span>
+                  {typeof experience === 'number' ? `${experience} years experience` : experience}
+                </span>
               </div>
             )}
 
             {/* Languages */}
             {languages && languages.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-3 mb-2">
-                {languages.map((language) => (
-                  <Badge key={language} variant="secondary" appearance="subtle" size="sm">{language}</Badge>
+                {languages.map(language => (
+                  <Badge key={language} variant="secondary" appearance="subtle" size="sm">
+                    {language}
+                  </Badge>
                 ))}
               </div>
             )}
@@ -166,11 +170,21 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
               <div className="mt-3">
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5">Services:</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {servicesOffered.slice(0, 3).map((service) => (
-                    <Badge key={service} variant="secondary" appearance="outline" size="sm" className="bg-white dark:bg-slate-800">{service}</Badge>
+                  {servicesOffered.slice(0, 3).map(service => (
+                    <Badge
+                      key={service}
+                      variant="secondary"
+                      appearance="outline"
+                      size="sm"
+                      className="bg-white dark:bg-slate-800"
+                    >
+                      {service}
+                    </Badge>
                   ))}
                   {servicesOffered.length > 3 && (
-                    <Badge variant="secondary" appearance="subtle" size="sm">+{servicesOffered.length - 3} more</Badge>
+                    <Badge variant="secondary" appearance="subtle" size="sm">
+                      +{servicesOffered.length - 3} more
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -182,19 +196,26 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
             {consultationFee && (
               <p className="text-center mb-2">
                 <span className="text-lg font-bold text-primary">${consultationFee}</span>
-                <span className="text-sm text-slate-500 dark:text-slate-400"> per consultation</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {' '}
+                  per consultation
+                </span>
               </p>
             )}
-            
+
             {!hideBookButton && (
               <Link href={`/book-appointment/${id}`} className="w-full">
-                <Button variant="primary" className="w-full" aria-label={`Book appointment with ${fullName}`}>
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  aria-label={`Book appointment with ${fullName}`}
+                >
                   <Calendar className="w-4 h-4 mr-2" />
                   Book Appointment
                 </Button>
               </Link>
             )}
-            
+
             <Link href={`/doctor-profile/${id}`} className="w-full">
               <Button variant="secondary" className="w-full">
                 <User className="w-4 h-4 mr-2" />
@@ -210,12 +231,14 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
   // Modern variant with subtle design
   if (variant === 'modern') {
     return (
-      <Card 
-        className={twMerge(clsx(
-          'overflow-hidden transition-all duration-200 hover:shadow-md hover:border-primary/30',
-          onClick ? 'cursor-pointer' : '',
-          className
-        ))}
+      <Card
+        className={twMerge(
+          clsx(
+            'overflow-hidden transition-all duration-200 hover:shadow-md hover:border-primary/30',
+            onClick ? 'cursor-pointer' : '',
+            className
+          )
+        )}
         variant="outlined"
         onClick={onClick}
       >
@@ -236,7 +259,10 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                 </div>
               )}
               {isVerified && (
-                <div className="absolute bottom-0 right-0 bg-green-500 text-white rounded-full p-0.5" aria-label="Verified doctor">
+                <div
+                  className="absolute bottom-0 right-0 bg-green-500 text-white rounded-full p-0.5"
+                  aria-label="Verified doctor"
+                >
                   <CheckCircle className="w-4 h-4" />
                 </div>
               )}
@@ -266,12 +292,10 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                   )}
                 </h3>
                 {specialty && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {specialty}
-                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{specialty}</p>
                 )}
               </div>
-              
+
               {consultationFee && !compact && (
                 <div className="text-right">
                   <span className="text-lg font-bold text-primary">${consultationFee}</span>
@@ -291,7 +315,9 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
             {experience && !compact && (
               <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-2">
                 <Award className="w-4 h-4 mr-1 text-slate-400" />
-                <span>{typeof experience === 'number' ? `${experience} years experience` : experience}</span>
+                <span>
+                  {typeof experience === 'number' ? `${experience} years experience` : experience}
+                </span>
               </div>
             )}
 
@@ -299,11 +325,15 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
             {servicesOffered && servicesOffered.length > 0 && !compact && (
               <div className="mt-3">
                 <div className="flex flex-wrap gap-1">
-                  {servicesOffered.slice(0, 3).map((service) => (
-                    <Badge key={service} variant="secondary" appearance="subtle" size="sm">{service}</Badge>
+                  {servicesOffered.slice(0, 3).map(service => (
+                    <Badge key={service} variant="secondary" appearance="subtle" size="sm">
+                      {service}
+                    </Badge>
                   ))}
                   {servicesOffered.length > 3 && (
-                    <Badge variant="secondary" appearance="subtle" size="sm">+{servicesOffered.length - 3}</Badge>
+                    <Badge variant="secondary" appearance="subtle" size="sm">
+                      +{servicesOffered.length - 3}
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -320,7 +350,7 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                     </Button>
                   </Link>
                 )}
-                
+
                 <Link href={`/doctor-profile/${id}`}>
                   <Button variant="secondary" size="sm">
                     <User className="w-4 h-4 mr-1" />
@@ -337,12 +367,8 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
 
   // Default variant
   return (
-    <Card 
-      className={twMerge(clsx(
-        'overflow-hidden',
-        onClick ? 'cursor-pointer' : '',
-        className
-      ))}
+    <Card
+      className={twMerge(clsx('overflow-hidden', onClick ? 'cursor-pointer' : '', className))}
       onClick={onClick}
     >
       <div className="flex flex-col sm:flex-row">
@@ -362,7 +388,10 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
               </div>
             )}
             {isVerified && (
-              <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1" aria-label="Verified doctor">
+              <div
+                className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1"
+                aria-label="Verified doctor"
+              >
                 <CheckCircle className="w-4 h-4" />
               </div>
             )}
@@ -373,16 +402,12 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
         <div className="sm:w-3/4 p-4 pt-0 sm:pt-4">
           <div className="flex flex-col sm:flex-row sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold">
-                {fullName}
-              </h3>
-              
+              <h3 className="text-lg font-bold">{fullName}</h3>
+
               {specialty && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {specialty}
-                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{specialty}</p>
               )}
-              
+
               {/* Rating */}
               {rating && (
                 <div className="flex items-center mt-1">
@@ -394,7 +419,7 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                 </div>
               )}
             </div>
-            
+
             {consultationFee && (
               <div className="mt-2 sm:mt-0 sm:text-right">
                 <span className="text-primary font-bold">${consultationFee}</span>
@@ -421,7 +446,7 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
                 </Button>
               </Link>
             )}
-            
+
             {!compact && (
               <Link href={`/doctor-profile/${id}`}>
                 <Button variant="secondary" size="sm">
@@ -437,4 +462,4 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
   );
 };
 
-export default DoctorCard; 
+export default DoctorCard;
