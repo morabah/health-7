@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Star, Clock, Calendar, User, Award, CheckCircle, MessageSquare } from 'lucide-react';
+import { MapPin, Star, Calendar, User, Award, CheckCircle, MessageSquare } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';

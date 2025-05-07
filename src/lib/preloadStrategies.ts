@@ -13,6 +13,7 @@ import { enhancedCache, CacheCategory } from './cacheManager';
 import { callApi } from './apiClient';
 import { UserType } from '@/types/enums';
 import { logInfo, logError } from './logger';
+import { getIsNavigationInProgress } from '@/lib/navigationState';
 
 // Type for preload strategies
 interface PreloadStrategy {
@@ -66,6 +67,20 @@ interface DoctorPublicProfile {
 interface TimeSlot {
   startTime: string;
   endTime: string;
+}
+
+// Types
+export type PreloadFunction = () => Promise<unknown>;
+type PreloadConfig = {
+  priority: number;
+  condition?: () => boolean;
+};
+
+interface PreloadResourceMap {
+  [key: string]: {
+    preloadFn: PreloadFunction;
+    config: PreloadConfig;
+  }
 }
 
 /**
@@ -393,4 +408,26 @@ export async function preloadPageData(page: string, params: Record<string, strin
   if (preloader) {
     await preloader.preloadAll();
   }
+}
+
+export async function enhancedPreload(
+  resourceKey: string,
+  preloadFn: PreloadFunction,
+  dependencies: string[] = []
+): Promise<unknown> {
+  // ... existing code ...
+}
+
+export function applyStrategies<T>(
+  strategies: T[],
+  executeStrategy: (strategy: T) => Promise<unknown>
+): Promise<unknown[]> {
+  // ... existing code ...
+}
+
+export async function executeWithPriority<T>(
+  items: T[],
+  processor: (item: T) => Promise<unknown>
+): Promise<unknown[]> {
+  // ... existing code ...
 } 

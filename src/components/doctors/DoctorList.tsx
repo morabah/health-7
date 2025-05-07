@@ -3,7 +3,6 @@ import DoctorCard from './DoctorCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Search, Filter, User, ArrowUpDown, Grid, List, RefreshCw } from 'lucide-react';
-import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
 
 // Type for doctor data

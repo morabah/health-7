@@ -9,7 +9,13 @@
 
 import { CacheCategory } from './browserCacheManager';
 import { enhancedCache } from './cacheManager';
-import { logInfo, logError } from './logger';
+import { logInfo } from './logger';
+import { 
+  clearStoredNetworkActivity, 
+  getStoredNetworkActivity, 
+  setStoredNetworkActivity 
+} from '@/lib/localStorage';
+import { performance, measure } from '@/lib/performance';
 
 // Types
 type RequestKey = string;
@@ -120,7 +126,7 @@ function createRequestKey(method: string, args: unknown[]): RequestKey {
     
     // Regular case - stringify all arguments
     return `${method}:${JSON.stringify(args)}`;
-  } catch (e) {
+  } catch {
     // Fallback for arguments that can't be stringified
     return `${method}:${args.length}:${Date.now()}`;
   }
@@ -304,4 +310,30 @@ export function deduplicatedApiCall<T>(
   });
   
   return promise;
+}
+
+export function apiDeduplicate<T>(
+  key: string,
+  apiFn: () => Promise<T>,
+  options: ApiDeduplicateOptions = {}
+): Promise<T> {
+  const {
+    dedupTime = 2000,
+    logPerformance = false,
+    debug = false,
+  } = options;
+
+  // ... existing code ...
+}
+
+export function preloadApiCall<T>(
+  key: string,
+  apiFn: () => Promise<T>,
+  options: ApiDeduplicateOptions = {}
+) {
+  try {
+    // ... existing code ...
+  } catch {
+    // Handle silently
+  }
 } 
