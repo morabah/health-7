@@ -20,7 +20,7 @@ interface StatsCardProps {
   changeClassName?: string;
   onClick?: () => void;
   footer?: React.ReactNode;
-  variant?: 'default' | 'outline' | 'filled' | 'gradient';
+  variant?: 'default' | 'outline' | 'filled' | 'gradient' | 'neomorphic' | 'health';
 }
 
 /**
@@ -55,6 +55,8 @@ const StatsCard: React.FC<StatsCardProps> = ({
     outline: 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
     filled: 'bg-slate-50 dark:bg-slate-800/60',
     gradient: 'bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900',
+    neomorphic: 'bg-slate-100 dark:bg-slate-800 shadow-[5px_5px_10px_0px_rgba(0,0,0,0.1),-5px_-5px_10px_0px_rgba(255,255,255,0.8)] dark:shadow-[5px_5px_10px_0px_rgba(0,0,0,0.3),-5px_-5px_10px_0px_rgba(30,41,59,0.5)]',
+    health: 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700 border-b-2 border-primary-400'
   };
   
   // Style variations for the icon container
@@ -63,6 +65,8 @@ const StatsCard: React.FC<StatsCardProps> = ({
     outline: 'bg-white text-primary dark:bg-slate-800 dark:text-primary-400 border border-primary/30 dark:border-primary-900/30',
     filled: 'bg-primary text-white dark:bg-primary-600',
     gradient: 'bg-gradient-to-r from-primary to-primary-600/90 text-white',
+    neomorphic: 'bg-slate-100 dark:bg-slate-800 text-primary dark:text-primary-400 shadow-[inset_3px_3px_6px_0px_rgba(0,0,0,0.1),inset_-3px_-3px_6px_0px_rgba(255,255,255,0.8)] dark:shadow-[inset_3px_3px_6px_0px_rgba(0,0,0,0.3),inset_-3px_-3px_6px_0px_rgba(30,41,59,0.5)]',
+    health: 'bg-white dark:bg-slate-700 text-primary dark:text-primary-400 shadow-lg rounded-full p-3'
   };
   
   // Style variations for change indicators
@@ -71,6 +75,80 @@ const StatsCard: React.FC<StatsCardProps> = ({
     decrease: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
     neutral: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
   };
+
+  // Health variant has a different layout
+  if (variant === 'health') {
+    return (
+      <Card
+        className={twMerge(
+          clsx(
+            cardVariants[variant],
+            'p-5 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-visible',
+            onClick && 'cursor-pointer',
+            cardClassName
+          )
+        )}
+        onClick={onClick}
+      >
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className={twMerge(
+              clsx(
+                'text-sm font-medium text-slate-500 dark:text-slate-400',
+                titleClassName
+              )
+            )}>
+              {title}
+            </h3>
+            
+            {icon && (
+              <div className={twMerge(
+                clsx(
+                  'rounded-full',
+                  iconVariants[variant],
+                  iconClassName
+                )
+              )}>
+                {icon}
+              </div>
+            )}
+          </div>
+          
+          <div className={twMerge(
+            clsx(
+              'mt-1 text-3xl font-bold text-slate-900 dark:text-white',
+              valueClassName
+            )
+          )}>
+            {value}
+          </div>
+          
+          {change && (
+            <div className="mt-3">
+              <div className={twMerge(
+                clsx(
+                  'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
+                  changeStyles[change.type],
+                  changeClassName
+                )
+              )}>
+                {change.type === 'increase' && '↑ '}
+                {change.type === 'decrease' && '↓ '}
+                {change.value}%
+                {change.text && <span className="ml-1 opacity-75">{change.text}</span>}
+              </div>
+            </div>
+          )}
+          
+          {footer && (
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+              {footer}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
   
   return (
     <Card
