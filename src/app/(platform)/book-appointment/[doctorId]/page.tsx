@@ -15,8 +15,8 @@ import { format } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
 import type { TimeSlot } from '@/types/schemas';
-import { 
-  BookingWorkflowErrorBoundary, 
+import {
+  BookingWorkflowErrorBoundary,
   TimeSlotSelectionErrorBoundary,
 } from '@/components/error-boundaries';
 import useBookingError from '@/hooks/useBookingError';
@@ -72,8 +72,8 @@ interface DoctorProfileResponse {
 interface AvailabilityResponse {
   success: boolean;
   error?: string;
-  availability: { 
-    weeklySchedule: Record<string, TimeSlot[]>; 
+  availability: {
+    weeklySchedule: Record<string, TimeSlot[]>;
     blockedDates: string[];
   };
 }
@@ -124,7 +124,7 @@ function BookAppointmentPageContent() {
 
   // Track performance
   const perfTracker = useRef(trackPerformance('BookAppointmentPage'));
-  
+
   const doctorId = params?.doctorId ? String(params.doctorId) : '';
   const isMountedRef = useRef<boolean>(true);
 
@@ -161,7 +161,7 @@ function BookAppointmentPageContent() {
 
     // Track initial page load performance
     perfTracker.current.mark('preload-start');
-    
+
     // Preload all doctor data in an optimized batch
     if (doctorId && !didInitialPreload) {
       const preloader = new BookAppointmentPreloader(doctorId, user?.uid, user?.role as UserType);
@@ -178,7 +178,7 @@ function BookAppointmentPageContent() {
           logError('Error preloading doctor data', { error, doctorId });
         });
     }
-    
+
     return () => {
       isMountedRef.current = false;
       // Record performance metrics
@@ -196,8 +196,8 @@ function BookAppointmentPageContent() {
   }, [user]);
 
   // Fetch doctor profile with proper typing
-  const { 
-    data: doctorDataResponse, 
+  const {
+    data: doctorDataResponse,
     isLoading: isLoadingDoctor,
     error: doctorError,
   } = useDoctorProfile(doctorId) as {
@@ -205,12 +205,12 @@ function BookAppointmentPageContent() {
     isLoading: boolean;
     error: Error | null;
   };
-  
+
   const doctor = doctorDataResponse?.success ? doctorDataResponse.doctor : null;
 
   // Fetch doctor availability with proper typing
-  const { 
-    data: availabilityDataResponse, 
+  const {
+    data: availabilityDataResponse,
     isLoading: isLoadingAvailability,
     error: availabilityQueryError,
   } = useDoctorAvailability(doctorId) as {
@@ -245,7 +245,7 @@ function BookAppointmentPageContent() {
         setSuccess(true);
         perfTracker.current.mark('booking-success');
       }
-      
+
       // Use a variable to track timeout
       const redirectTimeout = setTimeout(() => {
         // Check if component is still mounted before redirecting
@@ -253,7 +253,7 @@ function BookAppointmentPageContent() {
           router.push('/patient/appointments?justBooked=1');
         }
       }, 3000);
-      
+
       // Clean up the timeout if the component unmounts
       return () => {
         clearTimeout(redirectTimeout);
@@ -267,7 +267,7 @@ function BookAppointmentPageContent() {
 
     // Don't proceed if component is unmounted
     if (!isMountedRef.current) return;
-    
+
     const dates: Date[] = [];
     const availableDates: Date[] = [];
     const today = new Date();
@@ -309,7 +309,7 @@ function BookAppointmentPageContent() {
   // Use effect to generate dates when availability data is loaded
   useEffect(() => {
     if (availability) {
-    generateDates();
+      generateDates();
     }
   }, [availability, generateDates]);
 
@@ -335,8 +335,8 @@ function BookAppointmentPageContent() {
       setSelectedDate(date);
       setSelectedTimeSlot('');
       setSelectedEndTime('');
-    setSlotsLoading(true);
-    setAvailabilityError(null);
+      setSlotsLoading(true);
+      setAvailabilityError(null);
 
       try {
         const dateStr = date.toISOString().split('T')[0];
@@ -351,7 +351,7 @@ function BookAppointmentPageContent() {
 
         // Try getting from enhanced cache
         const cachedData = enhancedCache.get<Array<{ startTime: string; endTime: string }>>(
-        CacheCategory.APPOINTMENTS, 
+          CacheCategory.APPOINTMENTS,
           enhancedCache.createKey('slots', doctorId, dateStr)
         );
 
@@ -360,42 +360,42 @@ function BookAppointmentPageContent() {
             setAvailableTimeSlots(cachedData);
             // Store in our local component cache
             cachedSlots.current[dateStr] = cachedData;
-        setSlotsLoading(false);
+            setSlotsLoading(false);
             perfTracker.current.mark('slots-loaded-from-cache');
           }
-        return;
-      }
-      
+          return;
+        }
+
         // If not cached, fetch from API
-      const response = await callApi<AvailableSlotsResponse>(
-        'getAvailableSlots', 
+        const response = await callApi<AvailableSlotsResponse>(
+          'getAvailableSlots',
           user ? { uid: user.uid, role: user.role } : undefined,
           { doctorId, date: dateStr }
-      );
-      
-      if (!isMountedRef.current) return;
-      
-      if (response.success && response.slots) {
-        setAvailableTimeSlots(response.slots);
+        );
+
+        if (!isMountedRef.current) return;
+
+        if (response.success && response.slots) {
+          setAvailableTimeSlots(response.slots);
           // Cache the result for future use
           cachedSlots.current[dateStr] = response.slots;
           // Also cache in enhanced cache
-        enhancedCache.set(
-          CacheCategory.APPOINTMENTS,
+          enhancedCache.set(
+            CacheCategory.APPOINTMENTS,
             enhancedCache.createKey('slots', doctorId, dateStr),
-          response.slots,
+            response.slots,
             { ttl: 5 * 60 * 1000, priority: 'high' }
           );
           perfTracker.current.mark('slots-loaded-from-api');
-      } else {
-        setAvailableTimeSlots([]);
+        } else {
+          setAvailableTimeSlots([]);
           // If error, we still cache an empty array to prevent repeated failed calls
           cachedSlots.current[dateStr] = [];
           if (response.error) {
             setAvailabilityError(response.error);
           }
-      }
-    } catch (error) {
+        }
+      } catch (error) {
         if (error instanceof SlotUnavailableError) {
           setAvailabilityError('No available time slots for this date.');
         } else if (error instanceof ApiError) {
@@ -405,8 +405,8 @@ function BookAppointmentPageContent() {
           logError('Error fetching time slots', { error, doctorId, date: date.toISOString() });
         }
         // Set empty slots if there's an error
-      setAvailableTimeSlots([]);
-    } finally {
+        setAvailableTimeSlots([]);
+      } finally {
         setSlotsLoading(false);
         perfTracker.current.mark('date-select-complete');
       }
@@ -424,9 +424,9 @@ function BookAppointmentPageContent() {
   // Handle form submission
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isMountedRef.current) return;
-    
+      e.preventDefault();
+      if (!isMountedRef.current) return;
+
       perfTracker.current.mark('form-submit-start');
 
       // Reset error states
@@ -441,45 +441,48 @@ function BookAppointmentPageContent() {
         if (!selectedTimeSlot) errors.time = 'Please select a time slot';
         if (Object.keys(errors).length > 0) {
           setFieldErrors(errors);
-      return;
-    }
-    
+          return;
+        }
+
         if (!user || !user.uid) {
           throw new AuthError('You must be logged in to book an appointment');
         }
 
         // Format date for API
-        const appointmentDate = selectedDate!.toISOString().split('T')[0];
+        const [hours, minutes] = selectedTimeSlot!.split(':');
+        const appointmentDateTime = new Date(selectedDate!);
+        appointmentDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+        const appointmentDate = appointmentDateTime.toISOString();
 
         // Prepare booking payload
         const bookingPayload: BookAppointmentParams = {
-        doctorId,
+          doctorId,
           appointmentDate,
-        startTime: selectedTimeSlot,
+          startTime: selectedTimeSlot,
           endTime: selectedEndTime,
-        appointmentType,
+          appointmentType,
           reason: reason.trim() || undefined,
         };
 
         // Call booking API
         bookAppointmentMutation.mutate(
           {
-        doctorId,
+            doctorId,
             appointmentDate,
-        startTime: selectedTimeSlot,
+            startTime: selectedTimeSlot,
             endTime: selectedEndTime,
-        appointmentType,
+            appointmentType,
             reason: reason.trim() || undefined,
           },
           {
             onSuccess: data => {
-      // Check if component is still mounted
-      if (!isMountedRef.current) return;
-      
+              // Check if component is still mounted
+              if (!isMountedRef.current) return;
+
               // Validate response
-      const isBookingResult = (value: unknown): value is BookingResult => 
-        typeof value === 'object' && 
-        value !== null && 
+              const isBookingResult = (value: unknown): value is BookingResult =>
+                typeof value === 'object' &&
+                value !== null &&
                 'success' in value &&
                 typeof value.success === 'boolean';
 
@@ -494,7 +497,7 @@ function BookAppointmentPageContent() {
                   // Handle API error response
                   throw new ApiError(data.error);
                 }
-      } else {
+              } else {
                 throw new Error('Invalid response format');
               }
             },
@@ -508,7 +511,7 @@ function BookAppointmentPageContent() {
                 setFormError('Please check your appointment details and try again.');
               } else if (error instanceof AppointmentError) {
                 setFormError(error.message);
-        } else {
+              } else {
                 setFormError('Failed to book appointment. Please try again later.');
                 logError('Unhandled booking error', { error });
               }
@@ -516,7 +519,7 @@ function BookAppointmentPageContent() {
             },
           }
         );
-    } catch (error) {
+      } catch (error) {
         if (!isMountedRef.current) return;
 
         if (error instanceof AuthError) {
@@ -538,12 +541,12 @@ function BookAppointmentPageContent() {
     },
     [
       bookAppointmentMutation,
-    doctorId, 
-    selectedDate, 
-    selectedTimeSlot, 
-    selectedEndTime, 
-    appointmentType, 
-    reason, 
+      doctorId,
+      selectedDate,
+      selectedTimeSlot,
+      selectedEndTime,
+      appointmentType,
+      reason,
       user,
       router,
     ]
@@ -552,18 +555,18 @@ function BookAppointmentPageContent() {
   // Memoize UI elements for better performance
   const DoctorInfoSection = useMemo(() => {
     if (isLoadingDoctor) {
-    return (
+      return (
         <div className="animate-pulse">
           <div className="w-full h-40 bg-slate-200 dark:bg-slate-700 rounded-lg mb-4"></div>
           <div className="w-4/5 h-6 bg-slate-200 dark:bg-slate-700 rounded mb-2"></div>
           <div className="w-2/3 h-4 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
           <div className="w-1/2 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
-      </div>
-    );
-  }
+        </div>
+      );
+    }
 
     if (doctorError || !doctor) {
-  return (
+      return (
         <Alert variant="error">Failed to load doctor information. Please try again later.</Alert>
       );
     }
@@ -579,28 +582,28 @@ function BookAppointmentPageContent() {
         <div className="p-5">
           <div className="flex flex-col md:flex-row gap-5">
             <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden flex-shrink-0 border-2 border-white dark:border-slate-700 shadow-sm mx-auto md:mx-0">
-                  <Image
-                    src={doctor.profilePictureUrl || '/images/default-doctor.png'}
+              <Image
+                src={doctor.profilePictureUrl || '/images/default-doctor.png'}
                 alt={`Dr. ${doctor.firstName} ${doctor.lastName}`}
-                    fill
-                    className="object-cover"
+                fill
+                className="object-cover"
                 priority
-                  />
-                </div>
+              />
+            </div>
 
             <div className="flex-1">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white text-center md:text-left">
-                  Dr. {doctor.firstName} {doctor.lastName}
-                </h2>
+                    Dr. {doctor.firstName} {doctor.lastName}
+                  </h2>
 
                   {doctor.specialty && (
                     <p className="text-primary-600 dark:text-primary-400 font-medium text-sm mt-1 text-center md:text-left">
                       {doctor.specialty}
                     </p>
-                )}
-              </div>
+                  )}
+                </div>
 
                 {doctor.rating !== undefined && (
                   <div className="flex items-center justify-center md:justify-start mt-2 md:mt-0">
@@ -623,7 +626,7 @@ function BookAppointmentPageContent() {
                   </div>
                 )}
               </div>
-            
+
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {doctor.location && (
                   <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
@@ -683,17 +686,17 @@ function BookAppointmentPageContent() {
                     </span>
                   </div>
                 )}
-                </div>
               </div>
-        </div>
+            </div>
+          </div>
 
           <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-700 text-sm">
             <p className="text-slate-600 dark:text-slate-300">
               Please select a date and time to schedule your appointment with Dr. {doctor.lastName}.
             </p>
-                </div>
-              </div>
-            </Card>
+          </div>
+        </div>
+      </Card>
     );
   }, [doctor, doctorError, isLoadingDoctor]);
 
@@ -710,12 +713,12 @@ function BookAppointmentPageContent() {
                 className="min-w-[100px] h-20 bg-slate-200 dark:bg-slate-700 rounded-lg"
               ></div>
             ))}
-            </div>
+          </div>
         </div>
       );
     }
 
-                    return (
+    return (
       <Card className="mt-5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
         <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <h2 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
@@ -731,8 +734,8 @@ function BookAppointmentPageContent() {
         <div className="p-5">
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-4">
-                      <button
-                        type="button"
+            <button
+              type="button"
               className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
               aria-label="Previous week"
               onClick={() => {
@@ -831,10 +834,10 @@ function BookAppointmentPageContent() {
                   {isToday && !isSelected && (
                     <div className="absolute bottom-0.5 w-1 h-1 rounded-full bg-primary"></div>
                   )}
-                      </button>
-                    );
-                  })}
-                </div>
+                </button>
+              );
+            })}
+          </div>
 
           <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-4 px-2">
             <div className="flex items-center gap-1">
@@ -851,7 +854,7 @@ function BookAppointmentPageContent() {
             </div>
           </div>
         </div>
-              </Card>
+      </Card>
     );
   }, [allDates, selectedDate, isLoadingAvailability, isDateSelectable, handleDateSelect]);
 
@@ -938,7 +941,7 @@ function BookAppointmentPageContent() {
           <h2 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
             <Clock className="w-5 h-5 mr-2 text-primary" />
             Select Time
-              {selectedDate && (
+            {selectedDate && (
               <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
                 for {format(selectedDate, 'MMMM d')}
               </span>
@@ -947,12 +950,12 @@ function BookAppointmentPageContent() {
         </div>
 
         <div className="p-5">
-                    {slotsLoading ? (
+          {slotsLoading ? (
             <div className="animate-pulse space-y-6">
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full mr-2"></div>
                 <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                      </div>
+              </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -1116,7 +1119,7 @@ function BookAppointmentPageContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div role="radiogroup" aria-labelledby="appointment-type-heading" className="contents">
               <button
-                            type="button"
+                type="button"
                 onClick={() => setAppointmentType(AppointmentType.VIDEO)}
                 className={`
                   relative p-4 rounded-md border transition-all
@@ -1227,7 +1230,7 @@ function BookAppointmentPageContent() {
               <Link href="/auth/login">
                 <Button variant="primary" className="w-full py-3 shadow-md">
                   Login as Patient
-                          </Button>
+                </Button>
               </Link>
 
               <Link href="/auth/register/patient">
@@ -1241,7 +1244,7 @@ function BookAppointmentPageContent() {
                   Return to Home
                 </Button>
               </Link>
-                      </div>
+            </div>
           </div>
         </Card>
       </div>
@@ -1330,8 +1333,8 @@ function BookAppointmentPageContent() {
                     </div>
                   </div>
                 </div>
-                      </div>
-                    )}
+              </div>
+            )}
 
             <div className="space-y-3 mt-6">
               <Link href="/patient/appointments">
@@ -1347,7 +1350,7 @@ function BookAppointmentPageContent() {
               </Link>
             </div>
           </div>
-                  </Card>
+        </Card>
       </div>
     );
   }
@@ -1363,7 +1366,7 @@ function BookAppointmentPageContent() {
       {/* Time Slot Selection */}
       <TimeSlotSelectionErrorBoundary>{TimeSlotsSection}</TimeSlotSelectionErrorBoundary>
 
-                  {/* Appointment Type */}
+      {/* Appointment Type */}
       {AppointmentTypeSection}
 
       {/* Reason for Visit */}
@@ -1386,8 +1389,8 @@ function BookAppointmentPageContent() {
             </svg>
             Reason for Visit
           </h2>
-                  </div>
-                  
+        </div>
+
         <div className="p-5">
           <div className="mb-4">
             <label
@@ -1395,10 +1398,10 @@ function BookAppointmentPageContent() {
               className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
             >
               Please describe your symptoms or reason for this appointment
-                    </label>
+            </label>
             <Textarea
               id="reason"
-                      value={reason}
+              value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="Describe your symptoms or reason for booking this appointment"
               rows={4}
@@ -1409,7 +1412,7 @@ function BookAppointmentPageContent() {
             {fieldErrors.reason && (
               <p className="mt-1 text-sm text-red-500">{fieldErrors.reason}</p>
             )}
-                  </div>
+          </div>
 
           <div>
             <label className="flex items-center" htmlFor="emergency-checkbox">
@@ -1430,8 +1433,8 @@ function BookAppointmentPageContent() {
               If you're experiencing a medical emergency, please call emergency services
               immediately.
             </p>
-                </div>
-              </div>
+          </div>
+        </div>
       </Card>
 
       {/* Submit & Error Section */}
@@ -1442,11 +1445,11 @@ function BookAppointmentPageContent() {
           </Alert>
         )}
 
-                  <Button
-                    type="submit"
+        <Button
+          type="submit"
           variant="primary"
           className="w-full py-3"
-                    isLoading={bookAppointmentMutation.isPending}
+          isLoading={bookAppointmentMutation.isPending}
           disabled={
             bookAppointmentMutation.isPending ||
             slotsLoading ||
@@ -1455,7 +1458,7 @@ function BookAppointmentPageContent() {
           }
         >
           {bookAppointmentMutation.isPending ? 'Booking Appointment...' : 'Confirm Appointment'}
-                  </Button>
+        </Button>
 
         <div className="text-center">
           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1469,8 +1472,8 @@ function BookAppointmentPageContent() {
             </Link>
             .
           </p>
-              </div>
         </div>
+      </div>
     </form>
   );
 }
@@ -1515,7 +1518,7 @@ export default function BookAppointmentPage() {
         </div>
       </div>
 
-    <BookingWorkflowErrorBoundary componentName="BookAppointmentPage">
+      <BookingWorkflowErrorBoundary componentName="BookAppointmentPage">
         <React.Suspense
           fallback={
             <div className="space-y-8">
@@ -1579,9 +1582,9 @@ export default function BookAppointmentPage() {
             </div>
           }
         >
-      <BookAppointmentPageContent />
+          <BookAppointmentPageContent />
         </React.Suspense>
-    </BookingWorkflowErrorBoundary>
+      </BookingWorkflowErrorBoundary>
     </div>
   );
 }

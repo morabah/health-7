@@ -8,20 +8,25 @@ import type { z } from 'zod';
 import { UserType, VerificationStatus, NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { 
-  getUsers, 
+import {
+  getUsers,
   saveUsers,
   getDoctors,
   saveDoctors,
   getAppointments,
   getNotifications,
-  saveNotifications
+  saveNotifications,
 } from '@/lib/localDb';
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
-import type { UserProfileSchema, DoctorProfileSchema, Appointment, Notification } from '@/types/schemas';
-import { 
-  AdminVerifyDoctorSchema, 
+import type {
+  UserProfileSchema,
+  DoctorProfileSchema,
+  Appointment,
+  Notification,
+} from '@/types/schemas';
+import {
+  AdminVerifyDoctorSchema,
   AdminUpdateUserSchema,
   AdminCreateUserSchema,
   AdminUpdateUserStatusSchema,
@@ -29,7 +34,7 @@ import {
   AdminGetAllUsersSchema,
   AdminGetAllDoctorsSchema,
   AdminGetAllAppointmentsSchema,
-  AdminGetDoctorByIdSchema
+  AdminGetDoctorByIdSchema,
 } from '@/types/schemas';
 
 /**
@@ -44,14 +49,14 @@ export async function adminVerifyDoctor(
   }
 ): Promise<ResultOk<{ message: string }> | ResultErr> {
   const perf = trackPerformance('adminVerifyDoctor');
-  
+
   try {
     const { uid, role } = ctx;
-    
+
     logInfo('adminVerifyDoctor called', {
       uid,
       role,
-      ...payload
+      ...payload,
     });
 
     // Only admin can verify doctors
@@ -64,7 +69,7 @@ export async function adminVerifyDoctor(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -149,7 +154,13 @@ export async function adminGetAllUsers(
     filter?: string;
     status?: string;
   } = {}
-): Promise<ResultOk<{ users: z.infer<typeof UserProfileSchema>[] }> | ResultErr> {
+): Promise<
+  | ResultOk<{
+      users: z.infer<typeof UserProfileSchema>[];
+      totalCount: number;
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('adminGetAllUsers');
 
   try {
@@ -165,9 +176,16 @@ export async function adminGetAllUsers(
     // Validate with schema
     const validationResult = AdminGetAllUsersSchema.safeParse(payload);
     if (!validationResult.success) {
+      // Log the detailed Zod error on the server for debugging
+      logError('[adminGetAllUsers] Payload validation failed', {
+        payload,
+        error: validationResult.error.format(),
+      });
+      // Return a clearer error message to the client
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        // error: `Invalid request: ${validationResult.error.format()}` // OLD
+        error: 'Invalid request parameters for fetching users.', // NEW - Clearer client message
       };
     }
 
@@ -195,11 +213,14 @@ export async function adminGetAllUsers(
       );
     }
 
+    // Get the total count *after* filtering
+    const totalCount = filteredUsers.length;
+
     // Apply pagination
     const start = (page - 1) * limit;
     const paginatedUsers = filteredUsers.slice(start, start + limit);
 
-    return { success: true, users: paginatedUsers };
+    return { success: true, users: paginatedUsers, totalCount };
   } catch (e) {
     logError('adminGetAllUsers failed', e);
     return { success: false, error: 'Error fetching all users' };
@@ -247,7 +268,7 @@ export async function adminGetAllDoctors(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -259,12 +280,12 @@ export async function adminGetAllDoctors(
     // Join doctor profiles with user info
     let enrichedDoctors = doctors.map(doctor => {
       const user = users.find(u => u.id === doctor.userId) || {
-        id: doctor.userId, 
-        firstName: 'Unknown', 
+        id: doctor.userId,
+        firstName: 'Unknown',
         lastName: 'User',
-        email: ''
+        email: '',
       };
-      
+
       return {
         ...doctor,
         id: doctor.userId,
@@ -314,8 +335,8 @@ export async function adminGetUserDetail(
 ): Promise<
   | ResultOk<{
       success: boolean;
-      user: Partial<z.infer<typeof UserProfileSchema>> & { 
-        doctorProfile?: Partial<z.infer<typeof DoctorProfileSchema>> | null 
+      user: Partial<z.infer<typeof UserProfileSchema>> & {
+        doctorProfile?: Partial<z.infer<typeof DoctorProfileSchema>> | null;
       };
       hasData: boolean;
     }>
@@ -325,7 +346,7 @@ export async function adminGetUserDetail(
 
   try {
     const { uid, role } = ctx;
-    
+
     logInfo('adminGetUserDetail called', { uid, role, userId: payload.userId });
 
     // Only admins can access this endpoint
@@ -336,9 +357,9 @@ export async function adminGetUserDetail(
     // Validate with Zod schema
     const validationResult = AdminGetUserDetailSchema.safeParse(payload);
     if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid request: ${validationResult.error.format()}` 
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -365,9 +386,9 @@ export async function adminGetUserDetail(
             ...user,
             doctorProfile: {
               ...doctorProfile,
-              verificationStatus: doctorProfile.verificationStatus || 'pending'
-            }
-          }
+              verificationStatus: doctorProfile.verificationStatus || 'pending',
+            },
+          },
         };
       }
     }
@@ -378,8 +399,8 @@ export async function adminGetUserDetail(
       hasData: true,
       user: {
         ...user,
-        doctorProfile: null
-      }
+        doctorProfile: null,
+      },
     };
   } catch (error) {
     logError('adminGetUserDetail failed', error);
@@ -415,9 +436,9 @@ export async function adminUpdateUserStatus(
     // Validate payload with Zod schema
     const validationResult = AdminUpdateUserStatusSchema.safeParse(payload);
     if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid request: ${validationResult.error.format()}` 
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -503,9 +524,9 @@ export async function adminCreateUser(
     // Validate the user data with Zod schema
     const validationResult = AdminCreateUserSchema.safeParse(userData);
     if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid user data: ${validationResult.error.format()}` 
+      return {
+        success: false,
+        error: `Invalid user data: ${validationResult.error.format()}`,
       };
     }
 
@@ -629,18 +650,18 @@ export async function adminGetAllAppointments(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
-    const { 
-      page = 1, 
-      limit = 10, 
-      status, 
-      startDate, 
-      endDate, 
-      doctorId, 
-      patientId 
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      startDate,
+      endDate,
+      doctorId,
+      patientId,
     } = validationResult.data;
 
     const appointments = await getAppointments();
@@ -719,9 +740,9 @@ export async function adminUpdateUserProfile(
     // Validate with Zod schema
     const validationResult = AdminUpdateUserSchema.safeParse(payload);
     if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid request: ${validationResult.error.format()}` 
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -739,7 +760,7 @@ export async function adminUpdateUserProfile(
 
     // Update fields that are provided
     const user = { ...users[userIndex] };
-    
+
     if (validatedData.firstName !== undefined) user.firstName = validatedData.firstName;
     if (validatedData.lastName !== undefined) user.lastName = validatedData.lastName;
     if (validatedData.email !== undefined) user.email = validatedData.email;
@@ -789,14 +810,17 @@ export async function adminUpdateUserProfile(
 export async function adminGetDoctorById(
   ctx: { uid: string; role: UserType },
   payload: { doctorId: string }
-): Promise<ResultOk<{ 
-  doctor: z.infer<typeof DoctorProfileSchema> & { 
-    id: string; 
-    firstName: string; 
-    lastName: string; 
-    email: string;
-  }
-}> | ResultErr> {
+): Promise<
+  | ResultOk<{
+      doctor: z.infer<typeof DoctorProfileSchema> & {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('adminGetDoctorById');
 
   try {
@@ -814,7 +838,7 @@ export async function adminGetDoctorById(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -853,4 +877,4 @@ export async function adminGetDoctorById(
   } finally {
     perf.stop();
   }
-} 
+}

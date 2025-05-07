@@ -4,25 +4,21 @@
  * Functions for retrieving dashboard statistics for different user types
  */
 
+import type { z } from 'zod';
 import { UserType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { 
-  getAppointments, 
-  getDoctors, 
-  getNotifications,
-  getUsers 
-} from '@/lib/localDb';
+import { getAppointments, getDoctors, getNotifications, getUsers } from '@/lib/localDb';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
-import type { Appointment } from '@/types/schemas';
 import { GetMyDashboardStatsSchema, AdminGetDashboardDataSchema } from '@/types/schemas';
+import type { Appointment, DoctorProfileSchema } from '@/types/schemas';
 
 /**
  * Get dashboard stats for the current user
  */
 export async function getMyDashboardStats(
   ctx: { uid: string; role: UserType },
-  payload: {} = {}
+  payload: Record<string, never> = {}
 ): Promise<
   | ResultOk<{
       upcomingCount: number;
@@ -48,7 +44,7 @@ export async function getMyDashboardStats(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -108,12 +104,14 @@ export async function getMyDashboardStats(
 
     if (role === UserType.ADMIN) {
       const users = await getUsers();
-      const doctors = await getDoctors();
 
       const totalPatients = users.filter(u => u.userType === UserType.PATIENT).length;
-      const totalDoctors = doctors.length;
-      const pendingVerifications = doctors.filter(
-        d => d.verificationStatus === VerificationStatus.PENDING
+      const totalDoctors = users.filter(u => u.userType === UserType.DOCTOR).length;
+
+      const allDoctorProfiles = await getDoctors();
+      const pendingVerifications = allDoctorProfiles.filter(
+        (d: z.infer<typeof DoctorProfileSchema>) =>
+          d.verificationStatus === VerificationStatus.PENDING
       ).length;
 
       adminStats = {
@@ -143,10 +141,11 @@ export async function getMyDashboardStats(
  */
 export async function adminGetDashboardData(
   ctx: { uid: string; role: UserType },
-  payload: {} = {}
+  payload: Record<string, never> = {}
 ): Promise<
   | ResultOk<{
       adminStats: {
+        totalUsers: number;
         totalPatients: number;
         totalDoctors: number;
         pendingVerifications: number;
@@ -166,7 +165,7 @@ export async function adminGetDashboardData(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -174,30 +173,40 @@ export async function adminGetDashboardData(
     if (role !== UserType.ADMIN) {
       return {
         success: false,
-        error: 'Only administrators can access this data'
+        error: 'Only administrators can access this data',
       };
     }
 
-    // Get users and doctors data
     const users = await getUsers();
-    const doctors = await getDoctors();
+    console.log(`[dashboardFunctions.ts] Total users fetched: ${users.length}`);
+    const doctorUsers = users.filter(u => u.userType === UserType.DOCTOR);
+    console.log(
+      `[dashboardFunctions.ts] Users identified as DOCTOR (${doctorUsers.length}):`,
+      doctorUsers.map(u => ({ id: u.id, email: u.email, type: u.userType }))
+    );
 
-    // Calculate statistics
+    const totalUsers = users.length;
     const totalPatients = users.filter(u => u.userType === UserType.PATIENT).length;
-    const totalDoctors = doctors.length;
-    const pendingVerifications = doctors.filter(
-      d => d.verificationStatus === VerificationStatus.PENDING
+    const totalDoctors = doctorUsers.length;
+
+    const allDoctorProfiles = await getDoctors();
+    const pendingVerifications = allDoctorProfiles.filter(
+      (d: z.infer<typeof DoctorProfileSchema>) =>
+        d.verificationStatus === VerificationStatus.PENDING
     ).length;
 
     const adminStats = {
+      totalUsers,
       totalPatients,
       totalDoctors,
       pendingVerifications,
     };
 
+    console.log('[dashboardFunctions.ts] adminGetDashboardData calculated stats:', adminStats);
+
     return {
       success: true,
-      adminStats
+      adminStats,
     };
   } catch (e) {
     logError('adminGetDashboardData failed', e);
@@ -205,4 +214,4 @@ export async function adminGetDashboardData(
   } finally {
     perf.stop();
   }
-} 
+}

@@ -142,6 +142,7 @@ function ActivityItem({
 
 // API response types
 interface AdminStatsResponse {
+  totalUsers: number;
   totalPatients: number;
   totalDoctors: number;
   pendingVerifications: number;
@@ -227,18 +228,26 @@ function AdminDashboardContent() {
   };
 
   // Still need these for the user and doctor lists
-  const { data: usersData, isLoading: usersLoading, error: usersError } = useAllUsers() as {
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useAllUsers() as {
     data: UsersDataResponse | undefined;
     isLoading: boolean;
     error: unknown;
   };
-  
-  const { data: doctorsData, isLoading: doctorsLoading, error: doctorsError } = useAllDoctors() as {
+
+  const {
+    data: doctorsData,
+    isLoading: doctorsLoading,
+    error: doctorsError,
+  } = useAllDoctors() as {
     data: DoctorsDataResponse | undefined;
     isLoading: boolean;
     error: unknown;
   };
-  
+
   const {
     data: appointmentsData,
     isLoading: appointmentsLoading,
@@ -250,7 +259,7 @@ function AdminDashboardContent() {
   };
 
   // Get stats from dashboard data
-  const totalUsers = usersData?.success ? usersData.users.length : 0;
+  const totalUsers = dashboardData?.success ? dashboardData.adminStats?.totalUsers || 0 : 0;
   const totalPatients = dashboardData?.success ? dashboardData.adminStats?.totalPatients || 0 : 0;
   const totalDoctors = dashboardData?.success ? dashboardData.adminStats?.totalDoctors || 0 : 0;
   const pendingVerifications = dashboardData?.success
@@ -259,49 +268,59 @@ function AdminDashboardContent() {
   const totalAppointments = appointmentsData?.success ? appointmentsData.appointments.length : 0;
 
   // Get derived statistics - memoize to prevent infinite render loops
-  const verifiedDoctorsCount = useMemo(() => 
-    doctorsData?.success
-      ? doctorsData.doctors.filter(
-          (doctor: Doctor) => doctor.verificationStatus === VerificationStatus.VERIFIED
-        ).length
-      : 0
-  , [doctorsData]);
+  const verifiedDoctorsCount = useMemo(
+    () =>
+      doctorsData?.success
+        ? doctorsData.doctors.filter(
+            (doctor: Doctor) => doctor.verificationStatus === VerificationStatus.VERIFIED
+          ).length
+        : 0,
+    [doctorsData]
+  );
 
-  const doctorVerificationRate = useMemo(() =>
-    totalDoctors > 0 ? Math.round((verifiedDoctorsCount / totalDoctors) * 100) : 0
-  , [totalDoctors, verifiedDoctorsCount]);
+  const doctorVerificationRate = useMemo(
+    () => (totalDoctors > 0 ? Math.round((verifiedDoctorsCount / totalDoctors) * 100) : 0),
+    [totalDoctors, verifiedDoctorsCount]
+  );
 
   // Get recent users and pending doctors - memoize to prevent infinite render loops
-  const recentUsers = useMemo(() => 
-    usersData?.success
-      ? usersData.users
-          .sort(
-            (a: User, b: User) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-          .slice(0, 5)
-      : []
-  , [usersData]);
+  const recentUsers = useMemo(
+    () =>
+      usersData?.success
+        ? usersData.users
+            .sort(
+              (a: User, b: User) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )
+            .slice(0, 5)
+        : [],
+    [usersData]
+  );
 
-  const pendingDoctors = useMemo(() => 
-    doctorsData?.success
-      ? doctorsData.doctors
-          .filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING)
-          .slice(0, 5)
-      : []
-  , [doctorsData]);
+  const pendingDoctors = useMemo(
+    () =>
+      doctorsData?.success
+        ? doctorsData.doctors
+            .filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING)
+            .slice(0, 5)
+        : [],
+    [doctorsData]
+  );
 
   // Get upcoming appointments - memoize to prevent infinite render loops
-  const upcomingAppointments = useMemo(() => 
-    appointmentsData?.success
-      ? appointmentsData.appointments
-          .filter((appt: Appointment) => appt.status === AppointmentStatus.CONFIRMED)
-          .sort(
-            (a: Appointment, b: Appointment) =>
-              new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
-          )
-          .slice(0, 5)
-      : []
-  , [appointmentsData]);
+  const upcomingAppointments = useMemo(
+    () =>
+      appointmentsData?.success
+        ? appointmentsData.appointments
+            .filter((appt: Appointment) => appt.status === AppointmentStatus.CONFIRMED)
+            .sort(
+              (a: Appointment, b: Appointment) =>
+                new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
+            )
+            .slice(0, 5)
+        : [],
+    [appointmentsData]
+  );
 
   // Combined error state
   const hasError = dashboardError || usersError || doctorsError || appointmentsError;
@@ -425,19 +444,19 @@ function AdminDashboardContent() {
           title="Total Users"
           value={totalUsers}
           Icon={Users}
-          onClick={() => window.location.href = '/admin/users'}
+          onClick={() => (window.location.href = '/admin/users')}
         />
         <Stat
           title="Patients"
           value={totalPatients}
           Icon={UserRound}
-          onClick={() => window.location.href = '/admin/users?type=patient'}
+          onClick={() => (window.location.href = '/admin/users?type=patient')}
         />
         <Stat
           title="Doctors"
           value={totalDoctors}
           Icon={Stethoscope}
-          onClick={() => window.location.href = '/admin/doctors'}
+          onClick={() => (window.location.href = '/admin/doctors')}
         />
         <Stat
           title="Pending Verifications"
@@ -445,7 +464,7 @@ function AdminDashboardContent() {
           Icon={ShieldAlert}
           trend={pendingVerifications > 5 ? 'negative' : null}
           subtitle={pendingVerifications > 5 ? 'Needs attention' : ''}
-          onClick={() => window.location.href = '/admin/doctors?status=PENDING'}
+          onClick={() => (window.location.href = '/admin/doctors?status=PENDING')}
         />
       </div>
 
@@ -455,7 +474,7 @@ function AdminDashboardContent() {
           title="Total Appointments"
           value={totalAppointments}
           Icon={Calendar}
-          onClick={() => window.location.href = '/admin/appointments'}
+          onClick={() => (window.location.href = '/admin/appointments')}
         />
         <Stat
           title="Doctor Verification Rate"
@@ -507,10 +526,7 @@ function AdminDashboardContent() {
 
         {/* Pending Verifications */}
         <Card className="col-span-1">
-          <HeaderWithLink 
-            title="Pending Verifications" 
-            href="/admin/doctors?status=PENDING" 
-          />
+          <HeaderWithLink title="Pending Verifications" href="/admin/doctors?status=PENDING" />
           <div className="divide-y">
             {pendingDoctors.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No pending verifications</div>
@@ -525,7 +541,9 @@ function AdminDashboardContent() {
                       <p className="text-sm text-gray-500">{doctor.specialty}</p>
                     </div>
                     <Link href={`/admin/doctor-verification/${doctor.id}`}>
-                      <Button size="sm" variant="outline">Verify</Button>
+                      <Button size="sm" variant="outline">
+                        Verify
+                      </Button>
                     </Link>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -544,7 +562,7 @@ function AdminDashboardContent() {
             {activityFeed.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No recent activity</div>
             ) : (
-              activityFeed.map((activity) => (
+              activityFeed.map(activity => (
                 <ActivityItem
                   key={activity.id}
                   title={activity.title}

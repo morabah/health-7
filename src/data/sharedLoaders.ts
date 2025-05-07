@@ -9,6 +9,7 @@ import { AuthError } from '@/lib/errors/errorClasses';
 import { ValidationError } from '@/lib/errors/errorClasses';
 import { logError } from '@/lib/logger';
 import { AppointmentType } from '@/types/enums';
+import type { Appointment } from '@/types/schemas'; // Import Appointment type
 
 /**
  * Helper function to get user role as UserType
@@ -121,11 +122,12 @@ export const useMarkAllNotificationsRead = () => {
  */
 export function useDoctorProfile(doctorId: string) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['doctor', doctorId],
     queryFn: async () => {
-      return callApi('getDoctorPublicProfile', 
+      return callApi(
+        'getDoctorPublicProfile',
         user ? { uid: user.uid, role: user.role } : undefined,
         { doctorId }
       );
@@ -140,11 +142,12 @@ export function useDoctorProfile(doctorId: string) {
  */
 export function useDoctorAvailability(doctorId: string) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['doctorAvailability', doctorId],
     queryFn: async () => {
-      return callApi('getDoctorAvailability', 
+      return callApi(
+        'getDoctorAvailability',
         user ? { uid: user.uid, role: user.role } : undefined,
         { doctorId }
       );
@@ -159,14 +162,14 @@ export function useDoctorAvailability(doctorId: string) {
  */
 export function useAvailableSlots(doctorId: string, date: string) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['availableSlots', doctorId, date],
     queryFn: async () => {
-      return callApi('getAvailableSlots', 
-        user ? { uid: user.uid, role: user.role } : undefined,
-        { doctorId, date }
-      );
+      return callApi('getAvailableSlots', user ? { uid: user.uid, role: user.role } : undefined, {
+        doctorId,
+        date,
+      });
     },
     enabled: !!doctorId && !!date,
     staleTime: 60 * 1000, // 1 minute
@@ -178,11 +181,12 @@ export function useAvailableSlots(doctorId: string, date: string) {
  */
 export function useFindDoctors(searchParams: Record<string, any> = {}) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['findDoctors', searchParams],
     queryFn: async () => {
-      return callApi('findDoctors', 
+      return callApi(
+        'findDoctors',
         user ? { uid: user.uid, role: user.role } : undefined,
         searchParams
       );
@@ -191,7 +195,7 @@ export function useFindDoctors(searchParams: Record<string, any> = {}) {
   });
 }
 
-// Define the appointment payload interface locally since it's not exported from schemas
+// Define interfaces needed for cache update
 interface BookAppointmentParams {
   doctorId: string;
   appointmentDate: string;
@@ -201,38 +205,85 @@ interface BookAppointmentParams {
   reason?: string;
 }
 
+interface BookAppointmentApiResponse {
+  success: boolean;
+  appointment?: Appointment;
+  error?: string;
+}
+
+// Assuming AppointmentsResponse is defined somewhere accessible or define it here
+interface AppointmentsResponse {
+  success: boolean;
+  error?: string;
+  appointments?: Appointment[];
+}
+
 /**
  * Hook to book an appointment with a doctor
  */
 export function useBookAppointment() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (payload: BookAppointmentParams) => {
+    mutationFn: async (payload: BookAppointmentParams): Promise<BookAppointmentApiResponse> => {
       if (!user?.uid) {
         throw new AuthError('You must be logged in to book an appointment');
       }
-      
+
       // Validate payload
       if (!payload.doctorId || !payload.appointmentDate || !payload.startTime || !payload.endTime) {
         throw new ValidationError('Missing required appointment fields');
       }
-      
-      return callApi('bookAppointment', 
-        { uid: user.uid, role: user.role },
+
+      // Make sure role is defined before passing
+      const userRole = user.role || UserType.PATIENT; // Provide a default if needed
+
+      return callApi<BookAppointmentApiResponse>(
+        'bookAppointment',
+        { uid: user.uid, role: userRole },
         payload
       );
     },
-    onSuccess: () => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    onSuccess: data => {
+      // data is BookAppointmentApiResponse
+      // --- START NEW CACHE UPDATE LOGIC ---
+      if (data?.success && data.appointment) {
+        const newAppointment = data.appointment; // Already correctly typed
+
+        const queryKey = ['appointments', user?.uid];
+        const previousAppointments = queryClient.getQueryData<AppointmentsResponse>(queryKey);
+
+        if (previousAppointments?.appointments) {
+          const updatedAppointments = [...previousAppointments.appointments, newAppointment];
+          queryClient.setQueryData<AppointmentsResponse>(queryKey, {
+            ...previousAppointments,
+            appointments: updatedAppointments,
+          });
+          console.log(
+            'React Query cache updated manually with new appointment:',
+            newAppointment.id
+          );
+        } else {
+          queryClient.setQueryData<AppointmentsResponse>(queryKey, {
+            success: true,
+            appointments: [newAppointment],
+          });
+          console.log('React Query cache initialized with new appointment:', newAppointment.id);
+        }
+      } else {
+        // Fallback: Invalidate if direct update fails or data is unexpected
+        // Also invalidate if the API call itself wasn't successful according to its own flag
+        queryClient.invalidateQueries({ queryKey: ['appointments', user?.uid] });
+        console.log('Manual cache update skipped, invalidating query instead.', data);
+      }
+      // --- END NEW CACHE UPDATE LOGIC ---
     },
-    onError: (error) => {
+    onError: error => {
       logError('Failed to book appointment', { error });
       // Re-throw so UI can handle it
       throw error;
-    }
+    },
   });
 }
 

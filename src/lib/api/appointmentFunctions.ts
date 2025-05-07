@@ -4,7 +4,7 @@
  * Functions for managing appointments between patients and doctors
  */
 
-import { z } from 'zod';
+// import { z } from 'zod'; // Removed unused import
 import {
   UserType,
   AppointmentStatus,
@@ -28,13 +28,13 @@ import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
 
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Appointment, Notification, DoctorProfile, TimeSlot } from '@/types/schemas';
-import { 
-  BookAppointmentSchema, 
+import {
+  BookAppointmentSchema,
   CancelAppointmentSchema,
   CompleteAppointmentSchema,
   GetAvailableSlotsSchema,
   GetAppointmentDetailsSchema,
-  GetMyAppointmentsSchema
+  GetMyAppointmentsSchema,
 } from '@/types/schemas';
 
 /**
@@ -426,7 +426,13 @@ export async function completeAppointment(
  */
 export async function getMyAppointments(
   ctx: { uid: string; role: UserType },
-  payload: { status?: AppointmentStatus; startDate?: string; endDate?: string; limit?: number; offset?: number } = {}
+  payload: {
+    status?: AppointmentStatus;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    offset?: number;
+  } = {}
 ): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
   const perf = trackPerformance('getMyAppointments');
 
@@ -448,7 +454,7 @@ export async function getMyAppointments(
     logInfo('getMyAppointments called', { uid, role, filters });
 
     const appointments = await getAppointments();
-    
+
     // Filter appointments based on role
     let myAppointments: Appointment[];
 
@@ -481,10 +487,8 @@ export async function getMyAppointments(
 
     // Sort appointments by date and time (most recent first)
     myAppointments.sort((a, b) => {
-      const dateA = `${a.appointmentDate}T${a.startTime}`;
-      const dateB = `${b.appointmentDate}T${b.startTime}`;
-
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
+      // appointmentDate is already YYYY-MM-DDTHH:mm:ss.sssZ
+      return new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime();
     });
 
     // Apply pagination if provided
@@ -588,63 +592,6 @@ function validateAuthContext(ctx: { uid?: string; role?: UserType }): {
   }
 
   return { isValid: true, uid, role };
-}
-
-/**
- * Validates date format
- */
-function validateDateFormat(date: string): { isValid: boolean; error?: string } {
-  try {
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) {
-      return {
-        isValid: false,
-        error: 'Invalid date format. Use YYYY-MM-DD or ISO date format.',
-      };
-    }
-    return { isValid: true };
-  } catch {
-    return { isValid: false, error: 'Invalid date format' };
-  }
-}
-
-/**
- * Validates payload for getAvailableSlots function
- */
-function validateGetAvailableSlotsPayload(
-  payload: { doctorId?: string; date?: string },
-  uid: string,
-  role: UserType
-): { isValid: boolean; error?: string; doctorId?: string; date?: string } {
-  // Validate required parameters
-  if (!payload || typeof payload !== 'object') {
-    logError('getAvailableSlots - Missing payload', { uid, role });
-    return { isValid: false, error: 'Missing payload data' };
-  }
-
-  if (!payload.doctorId) {
-    logError('getAvailableSlots - Missing doctorId', { uid, role, payload });
-    return { isValid: false, error: 'Doctor ID is required' };
-  }
-
-  if (!payload.date) {
-    logError('getAvailableSlots - Missing date', { uid, role, doctorId: payload.doctorId });
-    return { isValid: false, error: 'Date is required' };
-  }
-
-  // Validate date format
-  const dateValidation = validateDateFormat(payload.date);
-  if (!dateValidation.isValid) {
-    logError('getAvailableSlots - Invalid date format', {
-      uid,
-      role,
-      doctorId: payload.doctorId,
-      date: payload.date,
-    });
-    return { isValid: false, error: dateValidation.error };
-  }
-
-  return { isValid: true, doctorId: payload.doctorId, date: payload.date };
 }
 
 /**

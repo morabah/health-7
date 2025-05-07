@@ -41,7 +41,10 @@ const statusMap = {
   [AppointmentStatus.RESCHEDULED]: 'Rescheduled',
 };
 
-const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
+const statusColor: Record<
+  string,
+  'success' | 'default' | 'warning' | 'info' | 'danger' | 'pending'
+> = {
   [AppointmentStatus.PENDING]: 'pending',
   [AppointmentStatus.CONFIRMED]: 'info',
   [AppointmentStatus.CANCELED]: 'danger',
@@ -52,21 +55,28 @@ const statusColor: Record<string, "success" | "default" | "warning" | "info" | "
 /**
  * Appointment row component
  */
-const AppointmentRow = ({ appointment, onCancel }: { 
-  appointment: Appointment; 
+const AppointmentRow = ({
+  appointment,
+  onCancel,
+}: {
+  appointment: Appointment;
   onCancel: (appointment: Appointment) => void;
 }) => {
   const isPast = new Date(appointment.appointmentDate) < new Date();
   const isUpcoming = !isPast && appointment.status !== AppointmentStatus.CANCELED;
-  
+
   return (
     <Card className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 p-4">
       <div>
         <h3 className="font-semibold">{appointment.doctorName}</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400">{appointment.doctorSpecialty}</p>
-        <p className="text-sm mt-1">{format(new Date(appointment.appointmentDate), 'PPP')} at {appointment.startTime}</p>
+        <p className="text-sm mt-1">
+          {format(new Date(appointment.appointmentDate), 'PPP')} at {appointment.startTime}
+        </p>
         {appointment.reason && (
-          <p className="text-sm mt-1 text-slate-600 dark:text-slate-300">Reason: {appointment.reason}</p>
+          <p className="text-sm mt-1 text-slate-600 dark:text-slate-300">
+            Reason: {appointment.reason}
+          </p>
         )}
       </div>
 
@@ -76,10 +86,10 @@ const AppointmentRow = ({ appointment, onCancel }: {
         </Badge>
 
         <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            as={Link} 
+          <Button
+            size="sm"
+            variant="ghost"
+            as={Link}
             href={`/patient/appointments/${appointment.id}`}
           >
             <User size={14} className="mr-1" />
@@ -91,11 +101,7 @@ const AppointmentRow = ({ appointment, onCancel }: {
                 <Clock size={14} className="mr-1" />
                 Reschedule
               </Button>
-              <Button 
-                size="sm" 
-                variant="danger" 
-                onClick={() => onCancel(appointment)}
-              >
+              <Button size="sm" variant="danger" onClick={() => onCancel(appointment)}>
                 <X size={14} className="mr-1" />
                 Cancel
               </Button>
@@ -127,21 +133,16 @@ export default function PatientAppointments() {
 function PatientAppointmentsContent() {
   // Track component rendering performance with 50ms threshold
   useRenderPerformance('PatientAppointmentsContent', 50);
-  
+
   const [index, setIndex] = useState(0);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showBookingSuccess, setShowBookingSuccess] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  const { 
-    data: appointmentsData, 
-    isLoading, 
-    error,
-    refetch 
-  } = usePatientAppointments();
-  
+
+  const { data: appointmentsData, isLoading, error, refetch } = usePatientAppointments();
+
   const cancelMutation = useCancelAppointment();
 
   // Check for justBooked parameter
@@ -149,33 +150,74 @@ function PatientAppointmentsContent() {
     const justBooked = searchParams?.get('justBooked');
     if (justBooked === '1') {
       setShowBookingSuccess(true);
+      // refetch(); // Explicitly call refetch here - REMOVED as manual cache update should suffice
       // Remove the parameter from URL after a short delay
       setTimeout(() => {
         router.replace('/patient/appointments');
       }, 3000);
     }
-  }, [searchParams, router]);
+  }, [searchParams, router]); // Removed refetch from dependency array
 
   // Filter appointments based on tab
-  const appointments = (appointmentsData as AppointmentsResponse)?.success 
-    ? (appointmentsData as AppointmentsResponse).appointments || [] 
+  const appointments = (appointmentsData as AppointmentsResponse)?.success
+    ? (appointmentsData as AppointmentsResponse).appointments || []
     : [];
-  
+
   const filteredAppointments = {
-    Upcoming: appointments.filter((a: Appointment) => 
-       (a.status === AppointmentStatus.PENDING || 
-        a.status === AppointmentStatus.CONFIRMED || 
-        a.status === AppointmentStatus.RESCHEDULED) && 
-      new Date(a.appointmentDate) >= new Date()
-    ),
-    Past: appointments.filter((a: Appointment) => 
-       a.status === AppointmentStatus.COMPLETED || 
-      (a.status !== AppointmentStatus.CANCELED && new Date(a.appointmentDate) < new Date())
-    ),
-     Cancelled: appointments.filter((a: Appointment) => 
-       a.status === AppointmentStatus.CANCELED
-    )
-   };
+    Upcoming: appointments.filter((a: Appointment) => {
+      const isStatusOk =
+        a.status === AppointmentStatus.PENDING ||
+        a.status === AppointmentStatus.CONFIRMED ||
+        a.status === AppointmentStatus.RESCHEDULED;
+
+      if (!isStatusOk) {
+        return false; // Don't log details if status doesn't match
+      }
+
+      const now = new Date();
+      const appointmentDateObj = new Date(a.appointmentDate);
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfAppointmentDay = new Date(
+        appointmentDateObj.getFullYear(),
+        appointmentDateObj.getMonth(),
+        appointmentDateObj.getDate()
+      );
+
+      let isUpcoming = false;
+      if (startOfAppointmentDay > startOfToday) {
+        isUpcoming = true; // Future date
+      } else if (startOfAppointmentDay.getTime() === startOfToday.getTime()) {
+        // Same day, compare times
+        isUpcoming = appointmentDateObj >= now;
+      } else {
+        isUpcoming = false; // Past date
+      }
+
+      return isUpcoming;
+    }),
+    Past: appointments.filter((a: Appointment) => {
+      // For 'Past', if the appointment date (day) is before today, it's past.
+      // If it's today, but the time has passed, it's also past.
+      // Completed appointments are always past.
+      if (a.status === AppointmentStatus.COMPLETED) return true;
+      if (a.status === AppointmentStatus.CANCELED) return false; // Handled by Cancelled tab
+
+      const now = new Date();
+      const appointmentDateObj = new Date(a.appointmentDate);
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfAppointmentDay = new Date(
+        appointmentDateObj.getFullYear(),
+        appointmentDateObj.getMonth(),
+        appointmentDateObj.getDate()
+      );
+
+      if (startOfAppointmentDay < startOfToday) return true; // Definitely past day
+      if (startOfAppointmentDay > startOfToday) return false; // Future day, not past
+      // Same day, check time
+      return appointmentDateObj < now;
+    }),
+    Cancelled: appointments.filter((a: Appointment) => a.status === AppointmentStatus.CANCELED),
+  };
 
   // Handle opening cancel modal
   const handleOpenCancelModal = (appointment: Appointment) => {
@@ -186,15 +228,15 @@ function PatientAppointmentsContent() {
   // Handle appointment cancellation
   const handleCancelAppointment = async (appointmentId: string, reason: string) => {
     try {
-      const result = await cancelMutation.mutateAsync({ 
-        appointmentId, 
-        reason 
-      }) as CancelAppointmentResponse;
-      
+      const result = (await cancelMutation.mutateAsync({
+        appointmentId,
+        reason,
+      })) as CancelAppointmentResponse;
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to cancel appointment');
       }
-      
+
       setShowCancelModal(false);
       refetch(); // Explicitly refetch after cancellation
     } catch (err) {
@@ -251,7 +293,8 @@ function PatientAppointmentsContent() {
                       : 'text-primary/70 hover:bg-white/[0.12]'
                   )}
                 >
-                  {tab} {filteredAppointments[tab]?.length > 0 && `(${filteredAppointments[tab].length})`}
+                  {tab}{' '}
+                  {filteredAppointments[tab]?.length > 0 && `(${filteredAppointments[tab].length})`}
                 </button>
               )}
             </Tab>
@@ -272,9 +315,9 @@ function PatientAppointmentsContent() {
               <Tab.Panel key={tab} className="rounded-xl bg-white dark:bg-slate-800 p-3">
                 {filteredAppointments[tab].length > 0 ? (
                   filteredAppointments[tab].map((appointment: Appointment) => (
-                    <AppointmentRow 
-                      key={appointment.id} 
-                      appointment={appointment} 
+                    <AppointmentRow
+                      key={appointment.id}
+                      appointment={appointment}
                       onCancel={handleOpenCancelModal}
                     />
                   ))

@@ -37,6 +37,8 @@ import { logInfo, logValidation, logError } from '@/lib/logger';
 interface UsersApiResponse {
   success: boolean;
   users: User[];
+  totalCount: number;
+  error?: string;
 }
 
 // TypeScript interface for user
@@ -74,83 +76,53 @@ export default function AdminUsersPage() {
     visible: boolean;
   } | null>(null);
 
-  const { data, isLoading, error, refetch } = useAllUsers() as {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10); // Default page size
+
+  // Prepare payload for the hook based on state
+  const queryPayload = useMemo(
+    () => ({
+      page: currentPage,
+      limit: pageSize,
+      filter: searchQuery || undefined,
+      status: filterStatus && filterStatus !== 'all' ? filterStatus : undefined,
+      userType: filterType && filterType !== 'all' ? (filterType as UserType) : undefined,
+    }),
+    [currentPage, pageSize, searchQuery, filterStatus, filterType]
+  );
+
+  // Fetch data using the updated hook with payload
+  const { data, isLoading, error, refetch } = useAllUsers(queryPayload) as {
     data: UsersApiResponse | undefined;
     isLoading: boolean;
     error: unknown;
     refetch: () => Promise<any>;
   };
 
-  const activateUserMutation = useAdminActivateUser();
-
-  // Transform users data to include accountStatus field based on isActive
-  const users = useMemo(() => {
+  // The data from the hook is already filtered and paginated by the backend
+  // We no longer need extensive client-side transformation/filtering
+  const usersToDisplay = useMemo(() => {
     if (!data?.success) return [];
-
-    return data.users.map(user => {
-      // Handle the possible missing accountStatus field
-      let accountStatus;
-      if (user.accountStatus) {
-        // If accountStatus is already defined, use it
-        accountStatus = user.accountStatus;
-      } else {
-        // Otherwise map from isActive boolean
-        if (user.isActive === undefined) {
-          // Default to active if isActive is not defined
-          accountStatus = AccountStatus.ACTIVE;
-        } else {
-          accountStatus = user.isActive ? AccountStatus.ACTIVE : AccountStatus.DEACTIVATED;
-        }
-      }
-
-      return {
-        ...user,
-        accountStatus,
-      };
-    });
+    // Map isActive status if needed (or ensure backend provides accountStatus)
+    return data.users.map(user => ({
+      ...user,
+      accountStatus:
+        user.accountStatus || (user.isActive ? AccountStatus.ACTIVE : AccountStatus.DEACTIVATED),
+    }));
   }, [data]);
 
-  // Filtered users based on search and filters
-  const filteredUsers = users.filter((user: User) => {
-    // Type filter
-    if (filterType && filterType !== 'all') {
-      if (filterType === 'patient' && user.userType !== UserType.PATIENT) return false;
-      if (filterType === 'doctor' && user.userType !== UserType.DOCTOR) return false;
-      if (filterType === 'admin' && user.userType !== UserType.ADMIN) return false;
-    }
+  const totalUserCount = data?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalUserCount / pageSize);
 
-    // Status filter
-    if (filterStatus && filterStatus !== 'all') {
-      if (filterStatus === 'active' && user.accountStatus !== AccountStatus.ACTIVE) return false;
-      if (filterStatus === 'suspended' && user.accountStatus !== AccountStatus.SUSPENDED)
-        return false;
-      if (filterStatus === 'deactivated' && user.accountStatus !== AccountStatus.DEACTIVATED)
-        return false;
-    }
-
-    // Search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-      const email = user.email.toLowerCase();
-
-      if (!fullName.includes(query) && !email.includes(query)) return false;
-    }
-
-    return true;
-  });
-
-  // Sort users by creation date (newest first)
-  const sortedUsers = [...filteredUsers].sort((a: User, b: User) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  const activateUserMutation = useAdminActivateUser();
 
   // Toggle select all users
-  const toggleSelectAll = () => {
+  const toggleSelectAllOnPage = () => {
     if (isAllSelected) {
-      setSelectedUsers([]);
+      setSelectedUsers(selectedUsers.filter(id => !usersToDisplay.some(u => u.id === id)));
     } else {
-      setSelectedUsers(sortedUsers.map(user => user.id));
+      const pageUserIds = usersToDisplay.map(user => user.id);
+      setSelectedUsers([...Array.from(new Set([...selectedUsers, ...pageUserIds]))]);
     }
     setIsAllSelected(!isAllSelected);
   };
@@ -185,11 +157,11 @@ export default function AdminUsersPage() {
 
         // Make the API call with correct parameters
         // Note: The enum values are already strings that match what the backend expects
-      const result = await activateUserMutation.mutateAsync({
-        userId,
-        status,
-        reason,
-      });
+        const result = await activateUserMutation.mutateAsync({
+          userId,
+          status,
+          reason,
+        });
 
         // Type-check the result
         if (
@@ -200,13 +172,13 @@ export default function AdminUsersPage() {
         ) {
           const errorMessage = 'error' in result ? result.error : 'Failed to update user status';
           throw new Error(errorMessage as string);
-      }
+        }
 
-      // Clear confirmation dialog
-      setConfirmAction(null);
+        // Clear confirmation dialog
+        setConfirmAction(null);
 
-      // Refetch users to get updated data
-      await refetch();
+        // Refetch users to get updated data
+        await refetch();
 
         // Force UI refresh by incrementing refresh key
         setRefreshKey(prevKey => prevKey + 1);
@@ -223,9 +195,9 @@ export default function AdminUsersPage() {
           setActionFeedback(null);
         }, 3000);
 
-      logInfo('User status updated successfully', { userId, status });
-    } catch (err) {
-      logError('Error updating user status', err);
+        logInfo('User status updated successfully', { userId, status });
+      } catch (err) {
+        logError('Error updating user status', err);
 
         // Show error feedback
         setActionFeedback({
@@ -374,8 +346,8 @@ export default function AdminUsersPage() {
   const exportUsers = () => {
     const usersToExport =
       selectedUsers.length > 0
-        ? sortedUsers.filter(user => selectedUsers.includes(user.id))
-        : sortedUsers;
+        ? usersToDisplay.filter(user => selectedUsers.includes(user.id))
+        : usersToDisplay;
 
     // Create CSV header
     const headers = [
@@ -418,12 +390,12 @@ export default function AdminUsersPage() {
 
   // Update selected status when filtered list changes
   useEffect(() => {
-    if (sortedUsers.length > 0 && selectedUsers.length === sortedUsers.length) {
+    if (usersToDisplay.length > 0 && selectedUsers.length === usersToDisplay.length) {
       setIsAllSelected(true);
     } else {
       setIsAllSelected(false);
     }
-  }, [sortedUsers.length, selectedUsers.length]);
+  }, [usersToDisplay.length, selectedUsers.length]);
 
   useEffect(() => {
     logInfo('admin-users rendered (with real data)');
@@ -708,20 +680,20 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-        {/* Search & Filter Toolbar */}
+      {/* Search & Filter Toolbar */}
       <Card className="p-4 mb-6">
         <div className="flex flex-col space-y-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[250px]">
-            <Input
-              placeholder="Search by name or email…"
-              className="pl-10"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <Search className="h-4 w-4" />
-            </div>
+              <Input
+                placeholder="Search by name or email…"
+                className="pl-10"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <Search className="h-4 w-4" />
+              </div>
               {searchQuery && (
                 <button
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
@@ -731,7 +703,7 @@ export default function AdminUsersPage() {
                   <ChevronDown className="h-4 w-4 rotate-45" />
                 </button>
               )}
-          </div>
+            </div>
 
             <Button
               variant={showFilterDrawer ? 'primary' : 'outline'}
@@ -768,41 +740,41 @@ export default function AdminUsersPage() {
                   <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                     User Type
                   </label>
-            <Select
+                  <Select
                     className="w-full"
-              value={filterType}
-              onChange={e => setFilterType(e.target.value)}
-            >
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                  >
                     <option value="">All Types</option>
-              <option value="patient">Patients</option>
-              <option value="doctor">Doctors</option>
-              <option value="admin">Admins</option>
-            </Select>
+                    <option value="patient">Patients</option>
+                    <option value="doctor">Doctors</option>
+                    <option value="admin">Admins</option>
+                  </Select>
                 </div>
 
                 <div className="min-w-[200px]">
                   <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                     Account Status
                   </label>
-            <Select
+                  <Select
                     className="w-full"
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-            >
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                  >
                     <option value="">All Statuses</option>
                     <option value="active">Active Only</option>
                     <option value="suspended">Suspended Only</option>
                     <option value="deactivated">Deactivated Only</option>
-            </Select>
+                  </Select>
                 </div>
 
                 <div className="flex items-end">
-            <Button variant="outline" size="sm" onClick={resetFilters} title="Reset Filters">
+                  <Button variant="outline" size="sm" onClick={resetFilters} title="Reset Filters">
                     <RotateCw className="h-4 w-4 mr-2" />
                     Reset Filters
-            </Button>
-          </div>
-        </div>
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -874,7 +846,7 @@ export default function AdminUsersPage() {
                     <input
                       type="checkbox"
                       checked={isAllSelected}
-                      onChange={toggleSelectAll}
+                      onChange={toggleSelectAllOnPage}
                       className="rounded text-primary-600 focus:ring-primary-500"
                     />
                   </div>
@@ -906,7 +878,7 @@ export default function AdminUsersPage() {
                     </Alert>
                   </td>
                 </tr>
-              ) : sortedUsers.length === 0 ? (
+              ) : usersToDisplay.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-10 text-center text-slate-500 dark:text-slate-400">
                     <div className="flex flex-col items-center justify-center">
@@ -919,7 +891,7 @@ export default function AdminUsersPage() {
                   </td>
                 </tr>
               ) : (
-                sortedUsers.map((user: User) => (
+                usersToDisplay.map((user: User) => (
                   <tr
                     key={user.id}
                     className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${
@@ -927,18 +899,18 @@ export default function AdminUsersPage() {
                     } animate-highlight`}
                   >
                     <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
+                      <input
+                        type="checkbox"
                         className="rounded text-primary-600 focus:ring-primary-500"
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={() => toggleSelectUser(user.id)}
-                          id={`user-${user.id}`}
-                        />
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={() => toggleSelectUser(user.id)}
+                        id={`user-${user.id}`}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center">
                         <div className="font-medium text-slate-900 dark:text-white">
-                            {user.firstName} {user.lastName}
+                          {user.firstName} {user.lastName}
                         </div>
                       </div>
                     </td>
@@ -986,9 +958,9 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex justify-center">
                         <div className="relative" ref={dropdownRef}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => toggleDropdown(user.id)}
                             className="flex items-center"
                             title="User Actions"
@@ -996,7 +968,7 @@ export default function AdminUsersPage() {
                             <MoreVertical className="h-4 w-4" />
                             <span className="ml-1">Actions</span>
                             <ChevronDown className="h-4 w-4 ml-1" />
-                        </Button>
+                          </Button>
 
                           {activeDropdown === user.id && (
                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg z-10 border border-slate-200 dark:border-slate-700">
@@ -1013,7 +985,7 @@ export default function AdminUsersPage() {
 
                                 <li>
                                   <a
-                          href={`/admin/users/${user.id}/edit`}
+                                    href={`/admin/users/${user.id}/edit`}
                                     className="block w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
                                   >
                                     <Pencil className="h-4 w-4 mr-2" />
@@ -1028,9 +1000,9 @@ export default function AdminUsersPage() {
                                     onClick={e => {
                                       e.preventDefault();
                                       setActiveDropdown(null);
-                              setConfirmAction({
+                                      setConfirmAction({
                                         type: 'password',
-                                userId: user.id,
+                                        userId: user.id,
                                       });
                                     }}
                                   >
@@ -1046,9 +1018,9 @@ export default function AdminUsersPage() {
                                     onClick={e => {
                                       e.preventDefault();
                                       setActiveDropdown(null);
-                            setConfirmAction({
+                                      setConfirmAction({
                                         type: 'message',
-                              userId: user.id,
+                                        userId: user.id,
                                       });
                                     }}
                                   >
@@ -1138,14 +1110,14 @@ export default function AdminUsersPage() {
               <div className="text-sm text-slate-500 dark:text-slate-400">
                 Showing{' '}
                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {sortedUsers.length}
+                  {usersToDisplay.length}
                 </span>{' '}
                 of{' '}
                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {users.length}
+                  {totalUserCount}
                 </span>{' '}
                 total users
-            </div>
+              </div>
 
               <div className="flex flex-wrap gap-4 sm:gap-6">
                 <div className="flex items-center">
@@ -1153,16 +1125,16 @@ export default function AdminUsersPage() {
                   <span className="text-sm text-slate-600 dark:text-slate-300">
                     Patients:{' '}
                     <span className="font-medium">
-                      {users.filter(u => u.userType === UserType.PATIENT).length}
+                      {usersToDisplay.filter(u => u.userType === UserType.PATIENT).length}
                     </span>
                   </span>
-            </div>
+                </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-success mr-2"></div>
                   <span className="text-sm text-slate-600 dark:text-slate-300">
                     Doctors:{' '}
                     <span className="font-medium">
-                      {users.filter(u => u.userType === UserType.DOCTOR).length}
+                      {usersToDisplay.filter(u => u.userType === UserType.DOCTOR).length}
                     </span>
                   </span>
                 </div>
@@ -1171,7 +1143,7 @@ export default function AdminUsersPage() {
                   <span className="text-sm text-slate-600 dark:text-slate-300">
                     Admins:{' '}
                     <span className="font-medium">
-                      {users.filter(u => u.userType === UserType.ADMIN).length}
+                      {usersToDisplay.filter(u => u.userType === UserType.ADMIN).length}
                     </span>
                   </span>
                 </div>
@@ -1184,12 +1156,12 @@ export default function AdminUsersPage() {
                   Active Users
                 </div>
                 <div className="text-2xl font-bold text-green-800 dark:text-green-300">
-                  {users.filter(u => u.accountStatus === AccountStatus.ACTIVE).length}
+                  {usersToDisplay.filter(u => u.accountStatus === AccountStatus.ACTIVE).length}
                 </div>
                 <div className="text-xs text-green-600 dark:text-green-500 mt-1">
                   {Math.round(
-                    (users.filter(u => u.accountStatus === AccountStatus.ACTIVE).length /
-                      users.length) *
+                    (usersToDisplay.filter(u => u.accountStatus === AccountStatus.ACTIVE).length /
+                      usersToDisplay.length) *
                       100
                   )}
                   % of total
@@ -1201,12 +1173,13 @@ export default function AdminUsersPage() {
                   Suspended Users
                 </div>
                 <div className="text-2xl font-bold text-orange-800 dark:text-orange-300">
-                  {users.filter(u => u.accountStatus === AccountStatus.SUSPENDED).length}
+                  {usersToDisplay.filter(u => u.accountStatus === AccountStatus.SUSPENDED).length}
                 </div>
                 <div className="text-xs text-orange-600 dark:text-orange-500 mt-1">
                   {Math.round(
-                    (users.filter(u => u.accountStatus === AccountStatus.SUSPENDED).length /
-                      users.length) *
+                    (usersToDisplay.filter(u => u.accountStatus === AccountStatus.SUSPENDED)
+                      .length /
+                      usersToDisplay.length) *
                       100
                   )}
                   % of total
@@ -1218,12 +1191,13 @@ export default function AdminUsersPage() {
                   Deactivated Users
                 </div>
                 <div className="text-2xl font-bold text-red-800 dark:text-red-300">
-                  {users.filter(u => u.accountStatus === AccountStatus.DEACTIVATED).length}
+                  {usersToDisplay.filter(u => u.accountStatus === AccountStatus.DEACTIVATED).length}
                 </div>
                 <div className="text-xs text-red-600 dark:text-red-500 mt-1">
                   {Math.round(
-                    (users.filter(u => u.accountStatus === AccountStatus.DEACTIVATED).length /
-                      users.length) *
+                    (usersToDisplay.filter(u => u.accountStatus === AccountStatus.DEACTIVATED)
+                      .length /
+                      usersToDisplay.length) *
                       100
                   )}
                   % of total
@@ -1370,10 +1344,10 @@ export default function AdminUsersPage() {
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary" isLoading={isActionLoading}>
-                <Mail className="h-4 w-4 mr-2" />
+                  <Mail className="h-4 w-4 mr-2" />
                   Send Message
-              </Button>
-            </div>
+                </Button>
+              </div>
             </form>
           </div>
         </div>
