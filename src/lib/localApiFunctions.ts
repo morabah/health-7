@@ -77,6 +77,7 @@ import { trackPerformance } from './performance';
 import { logInfo, logError } from './logger';
 import { getDoctors, getAppointments, getUsers } from './localDb';
 import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
+import { BatchGetDoctorDataSchema, BatchGetDoctorsDataSchema } from '@/types/schemas';
 
 // Define the LocalApi type with function signatures that match implementations
 export type LocalApi = {
@@ -253,7 +254,16 @@ export async function batchGetDoctorData(
   const perf = trackPerformance('batchGetDoctorData');
 
   try {
-    const { doctorId, includeProfile, includeAvailability, includeAppointments, currentDate, numDays = 1 } = payload;
+    // Validate with schema
+    const validationResult = BatchGetDoctorDataSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { doctorId, includeProfile, includeAvailability, includeAppointments, currentDate, numDays = 1 } = validationResult.data;
     
     logInfo('batchGetDoctorData called', { doctorId, uid: ctx?.uid, role: ctx?.role, numDays });
     
@@ -355,17 +365,27 @@ export async function batchGetDoctorData(
  */
 export async function batchGetDoctorsData(
   ctx: { uid: string; role: UserType } | undefined,
-  doctorIds: string[]
+  payload: string[]
 ): Promise<ResultOk<{ success: true; doctors: Record<string, DoctorProfile> }> | ResultErr> {
   const perf = trackPerformance('batchGetDoctorsData');
 
   try {
+    // Validate with schema
+    const validationResult = BatchGetDoctorsDataSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const doctorIds = validationResult.data;
+    
     // Deduplicate doctor IDs
     const uniqueIds = Array.from(new Set(doctorIds));
     
     logInfo('batchGetDoctorsData called', { 
       count: uniqueIds.length, 
-      doctorIds: uniqueIds, 
       uid: ctx?.uid, 
       role: ctx?.role 
     });
@@ -374,11 +394,11 @@ export async function batchGetDoctorsData(
       return { success: true, doctors: {} };
     }
     
-    // Get all doctors from database
+    // Get all doctors and users for efficiency
     const doctors = await getDoctors();
     const users = await getUsers();
     
-    // Map of doctor ID to doctor data
+    // Create map to return
     const doctorsMap: Record<string, DoctorProfile> = {};
     
     // Process each requested doctor
@@ -386,36 +406,25 @@ export async function batchGetDoctorsData(
       const doctor = doctors.find(d => d.userId === doctorId || d.id === doctorId);
       
       if (doctor) {
-        // Get user data to enhance doctor profile
-        const user = users.find((u: any) => u.id === doctor.userId);
+        const user = users.find(u => u.id === doctor.userId);
         
-        if (user) {
-          // Create enhanced doctor profile with user data
-          const enhancedDoctor: DoctorProfile = {
-            ...doctor,
-            id: doctor.userId || doctor.id
-          };
-          
-          doctorsMap[doctorId] = enhancedDoctor;
-        } else {
-          // Include doctor without user data
-          doctorsMap[doctorId] = {
-            ...doctor,
-            id: doctor.userId || doctor.id
-          };
-        }
+        // Add the doctor to the result map
+        doctorsMap[doctorId] = {
+          ...doctor,
+          id: doctor.id || doctor.userId,
+        };
       }
-      // Skip non-existent doctors
     }
     
-    perf.stop();
-    return {
-      success: true,
-      doctors: doctorsMap
+    return { 
+      success: true, 
+      doctors: doctorsMap 
     };
   } catch (error) {
     logError('batchGetDoctorsData failed', error);
     perf.stop();
     return { success: false, error: 'Failed to batch load doctors data' };
+  } finally {
+    perf.stop();
   }
 }

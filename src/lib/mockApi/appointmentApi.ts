@@ -15,31 +15,27 @@ import {
   getAvailableSlotsForDate,
 } from '@/utils/availabilityUtils';
 import { logInfo, logError } from '@/lib/logger';
+import { 
+  BookAppointmentSchema,
+  MockGetAvailableTimeSlotsSchema,
+  MockGetDoctorScheduleSchema
+} from '@/types/schemas';
 
-// Zod schema for booking appointment payload
-export const BookAppointmentPayloadSchema = z.object({
-  patientId: z.string().min(1, 'Patient ID is required'),
-  doctorId: z.string().min(1, 'Doctor ID is required'),
-  appointmentDate: z.string().datetime(), // ISO date string
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid start time format (HH:MM)'),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid end time format (HH:MM)'),
-  reason: z.string().max(1000).optional().nullable(),
-  appointmentType: z.nativeEnum(AppointmentType).default(AppointmentType.IN_PERSON),
-});
-
-// Type for booking appointment payload
-export type BookAppointmentPayload = z.infer<typeof BookAppointmentPayloadSchema>;
+// Extended BookAppointment type for mock API purposes
+interface MockBookAppointmentPayload extends z.infer<typeof BookAppointmentSchema> {
+  patientId: string;
+}
 
 /**
  * Books a new appointment after validating availability
  * This is a mock implementation that simulates the Cloud Function
  */
 export async function bookAppointment(
-  payload: BookAppointmentPayload
+  payload: MockBookAppointmentPayload
 ): Promise<{ success: boolean; appointmentId?: string; message?: string }> {
   try {
-    // Validate the payload with Zod
-    const validationResult = BookAppointmentPayloadSchema.safeParse(payload);
+    // Validate the payload with Zod using the central schema
+    const validationResult = BookAppointmentSchema.safeParse(payload);
 
     if (!validationResult.success) {
       const errorMessage = validationResult.error.errors
@@ -49,8 +45,11 @@ export async function bookAppointment(
       return { success: false, message: `Validation failed: ${errorMessage}` };
     }
 
-    const { patientId, doctorId, appointmentDate, startTime, endTime, reason, appointmentType } =
+    const { doctorId, appointmentDate, startTime, endTime, reason, appointmentType } =
       validationResult.data;
+    
+    // For mock API, we need the patientId from the payload
+    const patientId = payload.patientId;
 
     // Get doctor profile to check availability
     const doctors = await getDoctors();
@@ -125,12 +124,13 @@ export async function bookAppointment(
       appointmentDate,
       startTime,
       endTime,
-      status: AppointmentStatus.SCHEDULED,
+      status: AppointmentStatus.PENDING, // Fixed the SCHEDULED to PENDING which exists in enum
       reason: reason || null,
       notes: null,
       createdAt: now,
       updatedAt: now,
       appointmentType,
+      videoCallUrl: appointmentType === AppointmentType.VIDEO ? 'https://video-call-link.example.com' : null,
     };
 
     // Save the appointment
@@ -154,8 +154,19 @@ export async function bookAppointment(
  * Gets available time slots for a doctor on a specific date
  * This is a mock implementation that simulates the Cloud Function
  */
-export async function getAvailableTimeSlots(doctorId: string, date: string) {
+export async function getAvailableTimeSlots(payload: { doctorId: string, date: string }) {
   try {
+    // Validate with schema
+    const validationResult = MockGetAvailableTimeSlotsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        message: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { doctorId, date } = validationResult.data;
+
     // Get doctor profile
     const doctors = await getDoctors();
     const doctor = doctors.find(d => d.userId === doctorId);
@@ -184,8 +195,19 @@ export async function getAvailableTimeSlots(doctorId: string, date: string) {
  * Gets doctor's weekly schedule
  * This is a mock implementation that simulates the Cloud Function
  */
-export async function getDoctorSchedule(doctorId: string) {
+export async function getDoctorSchedule(payload: { doctorId: string, startDate: string, endDate?: string }) {
   try {
+    // Validate with schema
+    const validationResult = MockGetDoctorScheduleSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        message: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { doctorId } = validationResult.data;
+
     // Get doctor profile
     const doctors = await getDoctors();
     const doctor = doctors.find(d => d.userId === doctorId);

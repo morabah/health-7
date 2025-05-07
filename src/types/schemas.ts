@@ -1138,3 +1138,100 @@ export const GetDoctorPublicProfileSchema = z.object({
 export const GetDoctorAvailabilitySchema = z.object({
   doctorId: z.string().min(1, 'Doctor ID is required'),
 });
+
+/**
+ * Zod schema for retrieving user dashboard statistics
+ */
+export const GetMyDashboardStatsSchema = z.object({
+  // Optional filtering parameters could be added here in the future
+}).strict();
+
+/**
+ * Zod schema for admin dashboard data
+ */
+export const AdminGetDashboardDataSchema = z.object({
+  // Optional parameters could be added here in the future
+}).strict();
+
+/**
+ * Zod schema for batch getting doctor data
+ */
+export const BatchGetDoctorDataSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+  includeProfile: z.boolean().optional().default(true),
+  includeAvailability: z.boolean().optional().default(true),
+  includeAppointments: z.boolean().optional().default(false),
+  currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  numDays: z.number().int().min(1).max(30).optional().default(1),
+});
+
+/**
+ * Zod schema for batch getting multiple doctors data
+ */
+export const BatchGetDoctorsDataSchema = z.array(
+  z.string().min(1, 'Doctor ID is required')
+).min(1, 'At least one doctor ID is required').max(20, 'Maximum 20 doctor IDs allowed');
+
+/**
+ * Zod schema for admin getting all users
+ */
+export const AdminGetAllUsersSchema = z.object({
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(100).optional().default(10),
+  filter: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'all']).optional().default('all'),
+}).strict().partial();
+
+/**
+ * Zod schema for admin getting all doctors
+ */
+export const AdminGetAllDoctorsSchema = z.object({
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(100).optional().default(10),
+  filter: z.string().optional(),
+  verificationStatus: z.nativeEnum(VerificationStatus).optional(),
+}).strict().partial();
+
+/**
+ * Zod schema for admin getting all appointments
+ */
+export const AdminGetAllAppointmentsSchema = z.object({
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(100).optional().default(10),
+  status: z.nativeEnum(AppointmentStatus).optional(),
+  startDate: isoDateTimeStringSchema.optional(),
+  endDate: isoDateTimeStringSchema.optional(),
+  doctorId: z.string().optional(),
+  patientId: z.string().optional(),
+}).strict().partial();
+
+/**
+ * Zod schema for admin getting doctor by ID
+ */
+export const AdminGetDoctorByIdSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+});
+
+/**
+ * Zod schema for getting mock doctor profile
+ */
+export const GetMockDoctorProfileSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+});
+
+/**
+ * Zod schema for mock API get available time slots
+ */
+export const MockGetAvailableTimeSlotsSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+});
+
+/**
+ * Zod schema for mock API get doctor schedule
+ */
+export const MockGetDoctorScheduleSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format').optional(),
+});

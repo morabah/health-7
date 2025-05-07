@@ -15,11 +15,15 @@ import {
 } from '@/lib/localDb';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Appointment } from '@/types/schemas';
+import { GetMyDashboardStatsSchema, AdminGetDashboardDataSchema } from '@/types/schemas';
 
 /**
  * Get dashboard stats for the current user
  */
-export async function getMyDashboardStats(ctx: { uid: string; role: UserType }): Promise<
+export async function getMyDashboardStats(
+  ctx: { uid: string; role: UserType },
+  payload: {} = {}
+): Promise<
   | ResultOk<{
       upcomingCount: number;
       pastCount: number;
@@ -38,6 +42,15 @@ export async function getMyDashboardStats(ctx: { uid: string; role: UserType }):
     const { uid, role } = ctx;
 
     logInfo('getMyDashboardStats called', { uid, role });
+
+    // Validate with schema
+    const validationResult = GetMyDashboardStatsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
 
     // Get appointments
     const appointments = await getAppointments();
@@ -128,7 +141,10 @@ export async function getMyDashboardStats(ctx: { uid: string; role: UserType }):
 /**
  * Get dashboard data for admin users
  */
-export async function adminGetDashboardData(ctx: { uid: string; role: UserType }): Promise<
+export async function adminGetDashboardData(
+  ctx: { uid: string; role: UserType },
+  payload: {} = {}
+): Promise<
   | ResultOk<{
       adminStats: {
         totalPatients: number;
@@ -144,6 +160,15 @@ export async function adminGetDashboardData(ctx: { uid: string; role: UserType }
     const { uid, role } = ctx;
 
     logInfo('adminGetDashboardData called', { uid, role });
+
+    // Validate with schema
+    const validationResult = AdminGetDashboardDataSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
 
     // Verify admin role
     if (role !== UserType.ADMIN) {

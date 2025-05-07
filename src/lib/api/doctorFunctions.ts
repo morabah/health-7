@@ -20,7 +20,8 @@ import {
   FindDoctorsSchema, 
   SetDoctorAvailabilitySchema,
   GetDoctorPublicProfileSchema,
-  GetDoctorAvailabilitySchema
+  GetDoctorAvailabilitySchema,
+  GetMockDoctorProfileSchema
 } from '@/types/schemas';
 
 /**
@@ -364,75 +365,99 @@ export async function getDoctorAvailability(
  * Get mock doctor profile for testing
  */
 export async function getMockDoctorProfile(
-  userId: string
-): Promise<z.infer<typeof DoctorProfileSchema> & { id: string }> {
-  const uniqueId = `doctor-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
-  const timestamp = nowIso();
+  ctx: { uid: string; role: UserType } | undefined,
+  payload: { userId: string }
+): Promise<ResultOk<z.infer<typeof DoctorProfileSchema> & { id: string }> | ResultErr> {
+  const perf = trackPerformance('getMockDoctorProfile');
+  
+  try {
+    logInfo('getMockDoctorProfile called', { uid: ctx?.uid, role: ctx?.role, ...payload });
+    
+    // Validate with schema
+    const validationResult = GetMockDoctorProfileSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+    
+    const { userId } = validationResult.data;
+    const uniqueId = `doctor-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
+    const timestamp = nowIso();
 
-  return {
-    id: uniqueId,
-    userId,
-    specialty: 'General Medicine',
-    licenseNumber: 'MOCK12345',
-    yearsOfExperience: 5,
-    verificationStatus: VerificationStatus.VERIFIED,
-    bio: 'This is a mock doctor profile for testing',
-    verificationNotes: null,
-    adminNotes: '',
-    profilePictureUrl: null,
-    profilePicturePath: null,
-    licenseDocumentUrl: null,
-    licenseDocumentPath: null,
-    certificateUrl: null,
-    certificatePath: null,
-    education: 'Medical University, MD (2010)',
-    servicesOffered: 'General checkups, Vaccinations, Minor procedures',
-    location: 'New York, NY',
-    languages: ['English', 'Spanish'],
-    consultationFee: 150,
-    rating: 4.8,
-    reviewCount: 24,
-    weeklySchedule: {
-      monday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-      tuesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-      wednesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-      thursday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-      friday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-      saturday: [],
-      sunday: []
-    },
-    educationHistory: [
-      {
-        institution: 'Medical University',
-        degree: 'Doctor of Medicine',
-        field: 'Medicine',
-        startYear: 2006,
-        endYear: 2010,
-        isOngoing: false,
-        description: 'Graduated with honors'
-      }
-    ],
-    experience: [
-      {
-        position: 'Resident Physician',
-        organization: 'City Hospital',
-        startYear: 2010,
-        endYear: 2014,
-        isOngoing: false,
-        description: 'Completed residency in internal medicine'
+    const mockProfile = {
+      id: uniqueId,
+      userId,
+      specialty: 'General Medicine',
+      licenseNumber: 'MOCK12345',
+      yearsOfExperience: 5,
+      verificationStatus: VerificationStatus.VERIFIED,
+      bio: 'This is a mock doctor profile for testing',
+      verificationNotes: null,
+      adminNotes: '',
+      profilePictureUrl: null,
+      profilePicturePath: null,
+      licenseDocumentUrl: null,
+      licenseDocumentPath: null,
+      certificateUrl: null,
+      certificatePath: null,
+      education: 'Medical University, MD (2010)',
+      servicesOffered: 'General checkups, Vaccinations, Minor procedures',
+      location: 'New York, NY',
+      languages: ['English', 'Spanish'],
+      consultationFee: 150,
+      rating: 4.8,
+      reviewCount: 24,
+      weeklySchedule: {
+        monday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        tuesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        wednesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        thursday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        friday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        saturday: [],
+        sunday: []
       },
-      {
-        position: 'General Practitioner',
-        organization: 'Health Clinic',
-        startYear: 2014,
-        endYear: null,
-        isOngoing: true,
-        description: 'Primary care physician'
-      }
-    ],
-    timezone: 'America/New_York',
-    blockedDates: [],
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
+      educationHistory: [
+        {
+          institution: 'Medical University',
+          degree: 'Doctor of Medicine',
+          field: 'Medicine',
+          startYear: 2006,
+          endYear: 2010,
+          isOngoing: false,
+          description: 'Graduated with honors'
+        }
+      ],
+      experience: [
+        {
+          position: 'Resident Physician',
+          organization: 'City Hospital',
+          startYear: 2010,
+          endYear: 2014,
+          isOngoing: false,
+          description: 'Completed residency in internal medicine'
+        },
+        {
+          position: 'General Practitioner',
+          organization: 'Health Clinic',
+          startYear: 2014,
+          endYear: null,
+          isOngoing: true,
+          description: 'Primary care physician'
+        }
+      ],
+      timezone: 'America/New_York',
+      blockedDates: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    
+    perf.stop();
+    return { success: true, ...mockProfile };
+  } catch (error) {
+    logError('getMockDoctorProfile failed', error);
+    perf.stop();
+    return { success: false, error: 'Failed to generate mock doctor profile' };
+  }
 } 

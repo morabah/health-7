@@ -25,42 +25,46 @@ import {
   AdminUpdateUserSchema,
   AdminCreateUserSchema,
   AdminUpdateUserStatusSchema,
-  AdminGetUserDetailSchema
+  AdminGetUserDetailSchema,
+  AdminGetAllUsersSchema,
+  AdminGetAllDoctorsSchema,
+  AdminGetAllAppointmentsSchema,
+  AdminGetDoctorByIdSchema
 } from '@/types/schemas';
 
 /**
  * Admin verify a doctor
  */
-export async function adminVerifyDoctor(ctx: {
-  uid: string;
-  role: UserType;
-}, payload: {
-  doctorId: string;
-  verificationStatus: VerificationStatus;
-  verificationNotes?: string;
-}): Promise<ResultOk<{ message: string }> | ResultErr> {
+export async function adminVerifyDoctor(
+  ctx: { uid: string; role: UserType },
+  payload: {
+    doctorId: string;
+    verificationStatus: VerificationStatus;
+    verificationNotes?: string;
+  }
+): Promise<ResultOk<{ message: string }> | ResultErr> {
   const perf = trackPerformance('adminVerifyDoctor');
   
   try {
+    const { uid, role } = ctx;
+    
     logInfo('adminVerifyDoctor called', {
-      uid: ctx.uid,
-      role: ctx.role,
-      doctorId: payload.doctorId,
-      status: payload.verificationStatus,
-      notes: payload.verificationNotes,
+      uid,
+      role,
+      ...payload
     });
 
     // Only admin can verify doctors
-    if (ctx.role !== UserType.ADMIN) {
+    if (role !== UserType.ADMIN) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Validate input using Zod schema
+    // Validate with schema
     const validationResult = AdminVerifyDoctorSchema.safeParse(payload);
     if (!validationResult.success) {
-      return { 
-        success: false, 
-        error: `Invalid verification request: ${validationResult.error.format()}`
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
       };
     }
 
@@ -137,25 +141,65 @@ export async function adminVerifyDoctor(ctx: {
 /**
  * Admin get all users
  */
-export async function adminGetAllUsers(ctx: {
-  uid: string;
-  role: UserType;
-}): Promise<ResultOk<{ users: z.infer<typeof UserProfileSchema>[] }> | ResultErr> {
+export async function adminGetAllUsers(
+  ctx: { uid: string; role: UserType },
+  payload: {
+    page?: number;
+    limit?: number;
+    filter?: string;
+    status?: string;
+  } = {}
+): Promise<ResultOk<{ users: z.infer<typeof UserProfileSchema>[] }> | ResultErr> {
   const perf = trackPerformance('adminGetAllUsers');
 
   try {
     const { uid, role } = ctx;
 
-    logInfo('adminGetAllUsers called', { uid, role });
+    logInfo('adminGetAllUsers called', { uid, role, ...payload });
 
     // Only admins can access this endpoint
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
     }
 
+    // Validate with schema
+    const validationResult = AdminGetAllUsersSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { page = 1, limit = 10, filter, status = 'all' } = validationResult.data;
+
     const users = await getUsers();
 
-    return { success: true, users };
+    // Apply filters
+    let filteredUsers = [...users];
+
+    // Filter by status if provided
+    if (status && status !== 'all') {
+      const isActive = status === 'active';
+      filteredUsers = filteredUsers.filter(user => user.isActive === isActive);
+    }
+
+    // Filter by search term if provided
+    if (filter) {
+      const searchTerm = filter.toLowerCase();
+      filteredUsers = filteredUsers.filter(
+        user =>
+          user.firstName.toLowerCase().includes(searchTerm) ||
+          user.lastName.toLowerCase().includes(searchTerm) ||
+          (user.email && user.email.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply pagination
+    const start = (page - 1) * limit;
+    const paginatedUsers = filteredUsers.slice(start, start + limit);
+
+    return { success: true, users: paginatedUsers };
   } catch (e) {
     logError('adminGetAllUsers failed', e);
     return { success: false, error: 'Error fetching all users' };
@@ -167,7 +211,15 @@ export async function adminGetAllUsers(ctx: {
 /**
  * Admin get all doctors
  */
-export async function adminGetAllDoctors(ctx: { uid: string; role: UserType }): Promise<
+export async function adminGetAllDoctors(
+  ctx: { uid: string; role: UserType },
+  payload: {
+    page?: number;
+    limit?: number;
+    filter?: string;
+    verificationStatus?: VerificationStatus;
+  } = {}
+): Promise<
   | ResultOk<{
       doctors: (z.infer<typeof DoctorProfileSchema> & {
         id: string;
@@ -183,39 +235,71 @@ export async function adminGetAllDoctors(ctx: { uid: string; role: UserType }): 
   try {
     const { uid, role } = ctx;
 
-    logInfo('adminGetAllDoctors called', { uid, role });
+    logInfo('adminGetAllDoctors called', { uid, role, ...payload });
 
     // Only admins can access this endpoint
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
     }
 
+    // Validate with schema
+    const validationResult = AdminGetAllDoctorsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { page = 1, limit = 10, filter, verificationStatus } = validationResult.data;
+
     const doctors = await getDoctors();
     const users = await getUsers();
 
     // Join doctor profiles with user info
-    const enrichedDoctors = doctors.map(doctor => {
-      const user = users.find(u => u.id === doctor.userId);
+    let enrichedDoctors = doctors.map(doctor => {
+      const user = users.find(u => u.id === doctor.userId) || {
+        id: doctor.userId, 
+        firstName: 'Unknown', 
+        lastName: 'User',
+        email: ''
+      };
+      
       return {
         ...doctor,
-        id: doctor.userId, // Use userId as the id
-        firstName: user?.firstName || '',
-        lastName: user?.lastName || '',
-        email: user?.email || '',
-        // Convert education and servicesOffered to strings if they're arrays
-        education: Array.isArray(doctor.education)
-          ? JSON.stringify(doctor.education)
-          : doctor.education || '',
-        servicesOffered: Array.isArray(doctor.servicesOffered)
-          ? doctor.servicesOffered.join(', ')
-          : doctor.servicesOffered || '',
+        id: doctor.userId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email || '',
       };
     });
 
-    return { success: true, doctors: enrichedDoctors };
+    // Apply filters if provided
+    if (verificationStatus) {
+      enrichedDoctors = enrichedDoctors.filter(
+        doctor => doctor.verificationStatus === verificationStatus
+      );
+    }
+
+    if (filter) {
+      const searchTerm = filter.toLowerCase();
+      enrichedDoctors = enrichedDoctors.filter(
+        doc =>
+          doc.firstName.toLowerCase().includes(searchTerm) ||
+          doc.lastName.toLowerCase().includes(searchTerm) ||
+          (doc.email && doc.email.toLowerCase().includes(searchTerm)) ||
+          (doc.specialty && doc.specialty.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply pagination
+    const start = (page - 1) * limit;
+    const paginatedDoctors = enrichedDoctors.slice(start, start + limit);
+
+    return { success: true, doctors: paginatedDoctors };
   } catch (e) {
     logError('adminGetAllDoctors failed', e);
-    return { success: false, error: 'Error fetching doctors' };
+    return { success: false, error: 'Error fetching all doctors' };
   } finally {
     perf.stop();
   }
@@ -516,36 +600,90 @@ export async function adminCreateUser(
 /**
  * Admin get all appointments
  */
-export async function adminGetAllAppointments(ctx: {
-  uid: string;
-  role: UserType;
-}): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
+export async function adminGetAllAppointments(
+  ctx: { uid: string; role: UserType },
+  payload: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    doctorId?: string;
+    patientId?: string;
+  } = {}
+): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
   const perf = trackPerformance('adminGetAllAppointments');
 
   try {
     const { uid, role } = ctx;
 
-    logInfo('adminGetAllAppointments called', { uid, role });
+    logInfo('adminGetAllAppointments called', { uid, role, ...payload });
 
     // Only admins can access this endpoint
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
     }
 
+    // Validate with schema
+    const validationResult = AdminGetAllAppointmentsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      startDate, 
+      endDate, 
+      doctorId, 
+      patientId 
+    } = validationResult.data;
+
     const appointments = await getAppointments();
 
-    // Sort appointments by date and time (most recent first)
-    appointments.sort((a, b) => {
-      const dateA = `${a.appointmentDate}T${a.startTime}`;
-      const dateB = `${b.appointmentDate}T${b.startTime}`;
+    // Apply filters
+    let filteredAppointments = [...appointments];
 
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
-    });
+    if (status) {
+      filteredAppointments = filteredAppointments.filter(a => a.status === status);
+    }
 
-    return { success: true, appointments };
+    if (startDate) {
+      const start = new Date(startDate);
+      filteredAppointments = filteredAppointments.filter(a => {
+        const appointmentDate = new Date(a.appointmentDate);
+        return appointmentDate >= start;
+      });
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      filteredAppointments = filteredAppointments.filter(a => {
+        const appointmentDate = new Date(a.appointmentDate);
+        return appointmentDate <= end;
+      });
+    }
+
+    if (doctorId) {
+      filteredAppointments = filteredAppointments.filter(a => a.doctorId === doctorId);
+    }
+
+    if (patientId) {
+      filteredAppointments = filteredAppointments.filter(a => a.patientId === patientId);
+    }
+
+    // Apply pagination
+    const start = (page - 1) * limit;
+    const paginatedAppointments = filteredAppointments.slice(start, start + limit);
+
+    return { success: true, appointments: paginatedAppointments };
   } catch (e) {
     logError('adminGetAllAppointments failed', e);
-    return { success: false, error: 'Error fetching appointments' };
+    return { success: false, error: 'Error fetching all appointments' };
   } finally {
     perf.stop();
   }
@@ -646,10 +784,11 @@ export async function adminUpdateUserProfile(
 }
 
 /**
- * Get a doctor by ID with detailed information for admin view
+ * Admin: Get doctor by ID
  */
 export async function adminGetDoctorById(
-  ctx: { uid: string; role: UserType; doctorId: string }
+  ctx: { uid: string; role: UserType },
+  payload: { doctorId: string }
 ): Promise<ResultOk<{ 
   doctor: z.infer<typeof DoctorProfileSchema> & { 
     id: string; 
@@ -661,35 +800,56 @@ export async function adminGetDoctorById(
   const perf = trackPerformance('adminGetDoctorById');
 
   try {
-    const { uid, role, doctorId } = ctx;
+    const { uid, role } = ctx;
 
-    logInfo('adminGetDoctorById called', { uid, role, doctorId });
+    logInfo('adminGetDoctorById called', { uid, role, ...payload });
 
-    // Verify admin permissions
+    // Only admin can access this endpoint
     if (role !== UserType.ADMIN) {
-      logError('adminGetDoctorById: unauthorized', { uid, role });
-      return { success: false, error: 'Unauthorized' };
+      return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
     }
 
-    // Get all doctors (already includes user data)
-    const allDoctorsResponse = await adminGetAllDoctors({ uid, role });
-    
-    if (!allDoctorsResponse.success) {
-      return { success: false, error: 'Failed to retrieve doctors' };
+    // Validate with schema
+    const validationResult = AdminGetDoctorByIdSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
     }
 
-    // Find specific doctor
-    const doctor = allDoctorsResponse.doctors.find((doc) => doc.id === doctorId);
+    // Extract validated data
+    const { doctorId } = validationResult.data;
 
+    // Get data from database
+    const doctors = await getDoctors();
+    const users = await getUsers();
+
+    // Find doctor
+    const doctor = doctors.find(d => d.userId === doctorId);
     if (!doctor) {
-      logError('adminGetDoctorById: doctor not found', { doctorId });
       return { success: false, error: 'Doctor not found' };
     }
 
-    return { success: true, doctor };
+    // Find user info
+    const user = users.find(u => u.id === doctorId);
+    if (!user) {
+      return { success: false, error: 'User not found for doctor' };
+    }
+
+    // Combine doctor and user data
+    const result = {
+      ...doctor,
+      id: doctorId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email || '',
+    };
+
+    return { success: true, doctor: result };
   } catch (e) {
     logError('adminGetDoctorById failed', e);
-    return { success: false, error: 'Error retrieving doctor details' };
+    return { success: false, error: 'Error fetching doctor' };
   } finally {
     perf.stop();
   }
