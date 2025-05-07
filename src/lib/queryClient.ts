@@ -1,13 +1,16 @@
-'use client';
+/**
+ * React Query Client with Extended Cache Management
+ */
 
-import { QueryClient, QueryClientProvider, dehydrate, hydrate } from '@tanstack/react-query';
-import type { ReactNode} from 'react';
-import { createElement, useRef, useEffect } from 'react';
-import { enhancedCache } from './cacheManager';
-import { logInfo } from './logger';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement, ReactNode, useEffect } from 'react';
 import { browserCache, CacheCategory } from './browserCacheManager';
+import { logInfo } from './logger';
 
-// Create a client with enhanced caching options
+// Use a reference to access while avoiding circular imports
+let enhancedCacheRef: any = null;
+
+// Create a fresh Query Client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -49,6 +52,11 @@ export const cacheKeys = {
 // Request deduplication tracking
 const pendingRequeries = new Map<string, Promise<unknown>>();
 
+// Function to set the enhancedCache reference to avoid circular dependencies
+export function setEnhancedCacheRef(cacheInstance: any) {
+  enhancedCacheRef = cacheInstance;
+}
+
 // Cache manager with utility functions
 export const cacheManager = {
   // Invalidate all queries with the given prefix
@@ -60,21 +68,23 @@ export const cacheManager = {
   setQueryData: <T>(key: unknown[], data: T) => {
     queryClient.setQueryData(key, data);
     
-    // Also store in enhanced cache for cross-query reuse
-    const cacheKey = key.map(k => 
-      typeof k === 'object' ? JSON.stringify(k) : String(k)
-    ).join('::');
-    
-    // Determine category based on key
-    let category = CacheCategory.OTHER;
-    const keyStr = String(key[0] || '');
-    
-    if (keyStr.includes('user')) category = CacheCategory.USERS;
-    else if (keyStr.includes('doctor')) category = CacheCategory.DOCTORS;
-    else if (keyStr.includes('appointment')) category = CacheCategory.APPOINTMENTS;
-    else if (keyStr.includes('notification')) category = CacheCategory.NOTIFICATIONS;
-    
-    enhancedCache.set(category, cacheKey, data, { ttl: 3 * 60 * 1000 });
+    // Also store in enhanced cache for cross-query reuse if available
+    if (enhancedCacheRef) {
+      const cacheKey = key.map(k => 
+        typeof k === 'object' ? JSON.stringify(k) : String(k)
+      ).join('::');
+      
+      // Determine category based on key
+      let category = CacheCategory.OTHER;
+      const keyStr = String(key[0] || '');
+      
+      if (keyStr.includes('user')) category = CacheCategory.USERS;
+      else if (keyStr.includes('doctor')) category = CacheCategory.DOCTORS;
+      else if (keyStr.includes('appointment')) category = CacheCategory.APPOINTMENTS;
+      else if (keyStr.includes('notification')) category = CacheCategory.NOTIFICATIONS;
+      
+      enhancedCacheRef.set(category, cacheKey, data, { ttl: 3 * 60 * 1000 });
+    }
   },
   
   // Utility to set doctor data specifically
@@ -82,9 +92,14 @@ export const cacheManager = {
     const key = cacheKeys.doctor(doctorId);
     queryClient.setQueryData(key, { success: true, doctor: data });
     
-    // Also cache in enhanced cache
-    const cacheKey = enhancedCache.createKey('doctor', doctorId);
-    enhancedCache.set(CacheCategory.DOCTORS, cacheKey, data);
+    // Also cache in enhanced cache if available
+    if (enhancedCacheRef) {
+      const cacheKey = doctorId ? `doctor-${doctorId}` : '';
+      enhancedCacheRef.set(CacheCategory.DOCTORS, cacheKey, data);
+    } else {
+      // Fall back to browser cache if enhanced cache not yet available
+      browserCache.setDoctor(doctorId, data);
+    }
   },
   
   // Get data from cache without fetching
@@ -93,18 +108,20 @@ export const cacheManager = {
     const data = queryClient.getQueryData<T>(key);
     if (data) return data;
     
-    // Fall back to enhanced cache if not found
-    const cacheKey = key.map(k => 
-      typeof k === 'object' ? JSON.stringify(k) : String(k)
-    ).join('::');
-    
-    // Try all categories
-    for (const category of Object.values(CacheCategory)) {
-      const cachedData = enhancedCache.get<T>(category, cacheKey);
-      if (cachedData) {
-        // If found in enhanced cache, populate React Query cache too
-        queryClient.setQueryData(key, cachedData);
-        return cachedData;
+    // Fall back to enhanced cache if not found and available
+    if (enhancedCacheRef) {
+      const cacheKey = key.map(k => 
+        typeof k === 'object' ? JSON.stringify(k) : String(k)
+      ).join('::');
+      
+      // Try all categories
+      for (const category of Object.values(CacheCategory)) {
+        const cachedData = enhancedCacheRef.get(category, cacheKey) as T | undefined;
+        if (cachedData) {
+          // If found in enhanced cache, populate React Query cache too
+          queryClient.setQueryData(key, cachedData);
+          return cachedData;
+        }
       }
     }
     
@@ -142,7 +159,7 @@ export const cacheManager = {
   // Clear entire cache
   clearCache: () => {
     queryClient.clear();
-    enhancedCache.clearAll();
+    enhancedCacheRef.clearAll();
   },
   
   // Invalidate common entity groups

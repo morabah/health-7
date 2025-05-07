@@ -10,9 +10,13 @@
 import type { CacheOptions } from './lruCache';
 import { LRUCache } from './lruCache';
 import { logInfo, logError } from './logger';
-import { cacheManager as reactQueryCache } from './queryClient';
-import { CacheCategory } from './browserCacheManager';
-import { browserCache } from './browserCacheManager';
+import { browserCache, CacheCategory } from './browserCacheManager';
+
+// Import after browserCacheManager to avoid circular dependencies
+import { cacheManager as reactQueryCache, setEnhancedCacheRef } from './queryClient';
+
+// Re-export CacheCategory to maintain backward compatibility
+export { CacheCategory };
 
 // TTL settings for different data types (in milliseconds)
 const TTL_CONFIG = {
@@ -294,8 +298,8 @@ export function setDoctorData(doctorId: string, data: unknown, options: CacheOpt
   }
 }
 
-// Export a unified cache interface
-export const enhancedCache = {
+// Create the enhancedCache object with all utility functions
+const enhancedCache = {
   set: setCacheData,
   get: getCacheData,
   has: hasCacheData,
@@ -304,18 +308,18 @@ export const enhancedCache = {
   clearAll: clearAllCaches,
   getStats: getCacheStats,
   pruneExpired: pruneAllExpired,
-  startAutoPruning,
-  stopAutoPruning,
+  startAutoPruning: startAutoPruning,
+  stopAutoPruning: stopAutoPruning,
   createKey: createCacheKey,
   migrateFromReactQuery: migrateReactQueryToLRUCache,
   setDoctorData,
   category: CacheCategory
 };
 
+// Register the enhancedCache with the queryClient to avoid circular dependencies
+setEnhancedCacheRef(enhancedCache);
+
 // Auto-start pruning when this module is loaded
 startAutoPruning();
-
-// Re-export CacheCategory for use in other modules
-export { CacheCategory };
 
 export default enhancedCache; 

@@ -59,23 +59,28 @@ export default function CompleteAppointmentModal({
 
   if (!appt) return null;
 
+  // Create unique IDs for accessibility
+  const notesId = "appointment-notes";
+  const notesErrorId = "appointment-notes-error";
+  const notesDescriptionId = "notes-description";
+
   // Create a no-op function for when the modal should not close
   const handleClose = !isSubmitting ? onClose : () => {};
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Complete Appointment" className="max-w-lg">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-label="Complete appointment form">
         <div className="space-y-4">
           {/* Appointment Summary */}
           <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md">
             <h3 className="font-medium mb-3 flex items-center">
-              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              <Calendar className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />
               Appointment Details
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="flex items-start gap-2">
-                <User className="h-4 w-4 text-slate-500 mt-0.5" />
+                <User className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                 <div>
                   <div className="text-slate-500">Patient</div>
                   <div className="font-medium">{appt.patientName || 'Unknown Patient'}</div>
@@ -83,7 +88,7 @@ export default function CompleteAppointmentModal({
               </div>
 
               <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
+                <Clock className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                 <div>
                   <div className="text-slate-500">Date & Time</div>
                   <div className="font-medium">
@@ -94,7 +99,7 @@ export default function CompleteAppointmentModal({
 
               {appt.reason && (
                 <div className="sm:col-span-2 flex items-start gap-2">
-                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
+                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                   <div>
                     <div className="text-slate-500">Reason for Visit</div>
                     <div className="font-medium">{appt.reason}</div>
@@ -106,41 +111,57 @@ export default function CompleteAppointmentModal({
 
           <div>
             <label
-              htmlFor="appointment-notes"
+              htmlFor={notesId}
               className="block text-sm font-medium mb-1 flex items-center"
             >
-              <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-              Appointment Notes
+              <CheckCircle className="h-4 w-4 mr-2 text-green-500" aria-hidden="true" />
+              Appointment Notes <span className="text-red-500 ml-1" aria-hidden="true">*</span>
             </label>
             <Textarea
-              id="appointment-notes"
+              id={notesId}
               placeholder="Enter detailed notes about the appointment..."
               value={notes}
               onChange={handleChange}
               rows={6}
               disabled={isSubmitting}
               error={error || ''}
+              required
+              aria-required="true"
+              aria-invalid={error ? "true" : "false"}
+              aria-describedby={error ? notesErrorId : notesDescriptionId}
               className="w-full"
             />
             {error && (
-              <div className="mt-1 text-sm text-red-500 flex items-center">
-                <AlertCircle className="h-4 w-4 mr-1" />
+              <div className="mt-1 text-sm text-red-500 flex items-center" id={notesErrorId} role="alert">
+                <AlertCircle className="h-4 w-4 mr-1" aria-hidden="true" />
                 {error}
               </div>
             )}
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500" id={notesDescriptionId}>
               These notes will be saved to the patient&apos;s medical record.
             </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              aria-label="Cancel completion"
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              variant="primary" 
+              disabled={isSubmitting}
+              aria-label="Complete appointment"
+              aria-busy={isSubmitting ? "true" : "false"}
+            >
               {isSubmitting ? (
                 <>
-                  <Spinner className="mr-2" />
+                  <Spinner className="mr-2" aria-hidden="true" />
                   Completing...
                 </>
               ) : (

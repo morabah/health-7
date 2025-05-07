@@ -27,20 +27,36 @@ interface DoctorCardProps {
   };
   className?: string;
   compact?: boolean;
-  showBookButton?: boolean;
-  showViewProfileButton?: boolean;
-  actionHref?: string;
-  variant?: 'default' | 'neomorphic' | 'health';
+  variant?: 'default' | 'modern' | 'health';
+  onClick?: () => void;
+  hideBookButton?: boolean;
 }
 
+/**
+ * DoctorCard component for displaying doctor information
+ * 
+ * @example
+ * <DoctorCard 
+ *   doctor={{
+ *     id: "123",
+ *     firstName: "John",
+ *     lastName: "Doe",
+ *     specialty: "Cardiologist",
+ *     location: "New York, NY",
+ *     consultationFee: 150,
+ *     rating: 4.8,
+ *     reviewCount: 124,
+ *     isVerified: true
+ *   }}
+ * />
+ */
 const DoctorCard: React.FC<DoctorCardProps> = ({
   doctor,
   className,
   compact = false,
-  showBookButton = true,
-  showViewProfileButton = true,
-  actionHref,
-  variant = 'default'
+  variant = 'default',
+  onClick,
+  hideBookButton = false
 }) => {
   const {
     id,
@@ -59,493 +75,364 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
     servicesOffered
   } = doctor;
 
-  // Default action href is the doctor profile page
-  const href = actionHref || `/doctor-profile/${id}`;
-  const bookingHref = `/book-appointment/${id}`;
+  const fullName = `${firstName} ${lastName}`;
   
-  // Full name with Dr. prefix
-  const fullName = `Dr. ${firstName} ${lastName}`;
-
-  // Card variants
-  const cardVariants = {
-    default: "",
-    neomorphic: "shadow-[5px_5px_10px_0px_rgba(0,0,0,0.1),-5px_-5px_10px_0px_rgba(255,255,255,0.8)] dark:shadow-[5px_5px_10px_0px_rgba(0,0,0,0.3),-5px_-5px_10px_0px_rgba(30,41,59,0.5)] bg-slate-100 dark:bg-slate-800",
-    health: "bg-gradient-to-br from-blue-50 to-slate-50 dark:from-slate-800 dark:to-slate-700 border-l-4 border-primary"
-  };
-
-  // Health variant has a different layout
-  if (variant === 'health' && !compact) {
+  // Modern health-focused doctor card
+  if (variant === 'health') {
     return (
       <Card 
-        variant="default"
-        bordered
-        className={twMerge(
-          "overflow-hidden transition-all duration-200 h-full", 
-          cardVariants[variant],
+        className={twMerge(clsx(
+          'overflow-hidden transition-all duration-200 hover:shadow-lg',
+          onClick ? 'cursor-pointer' : '',
           className
-        )}
+        ))}
+        variant="health"
+        onClick={onClick}
       >
-        <div className="p-0">
-          {/* Top Section with Image */}
-          <div className="relative w-full h-32 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20">
-            <div className="absolute -bottom-12 left-4">
-              <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-slate-700 shadow-md">
+        <div className="flex flex-col">
+          {/* Doctor image and quick stats */}
+          <div className="flex flex-col items-center relative px-4 pt-6 pb-4">
+            <div className="relative w-24 h-24 mb-3">
+              {profilePictureUrl ? (
                 <Image
-                  src={profilePictureUrl || "/images/default-doctor.png"}
+                  src={profilePictureUrl}
                   alt={fullName}
                   fill
-                  className="object-cover"
+                  className="rounded-full object-cover border-2 border-white shadow-md"
                 />
-              </div>
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                  <User className="w-10 h-10 text-slate-400 dark:text-slate-500" />
+                </div>
+              )}
+              {isVerified && (
+                <div className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1" aria-label="Verified doctor">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+              )}
             </div>
-            
-            {isVerified && (
-              <div className="absolute top-3 right-3 bg-white dark:bg-slate-700 text-primary dark:text-primary-400 p-1 rounded-full shadow">
-                <CheckCircle className="h-5 w-5" />
+
+            <h3 className="text-xl font-bold text-center">
+              {fullName}
+            </h3>
+
+            {specialty && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                {specialty}
+              </p>
+            )}
+
+            {/* Rating */}
+            {rating && (
+              <div className="flex items-center mt-2">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="font-medium ml-1">{rating}</span>
+                {reviewCount && (
+                  <span className="text-sm text-slate-500 ml-1">({reviewCount} reviews)</span>
+                )}
               </div>
             )}
           </div>
-          
-          {/* Doctor Info */}
-          <div className="pt-14 px-4 pb-4">
-            <div className="flex items-start justify-between">
+
+          {/* Doctor details */}
+          <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/30">
+            {/* Location */}
+            {location && (
+              <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-2">
+                <MapPin className="w-4 h-4 mr-2 text-slate-400" />
+                <span>{location}</span>
+              </div>
+            )}
+
+            {/* Experience */}
+            {experience && (
+              <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-2">
+                <Award className="w-4 h-4 mr-2 text-slate-400" />
+                <span>{typeof experience === 'number' ? `${experience} years experience` : experience}</span>
+              </div>
+            )}
+
+            {/* Languages */}
+            {languages && languages.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-3 mb-2">
+                {languages.map((language) => (
+                  <Badge key={language} variant="secondary" appearance="subtle" size="sm">{language}</Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Services offered */}
+            {servicesOffered && servicesOffered.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5">Services:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {servicesOffered.slice(0, 3).map((service) => (
+                    <Badge key={service} variant="secondary" appearance="outline" size="sm" className="bg-white dark:bg-slate-800">{service}</Badge>
+                  ))}
+                  {servicesOffered.length > 3 && (
+                    <Badge variant="secondary" appearance="subtle" size="sm">+{servicesOffered.length - 3} more</Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="p-4 flex flex-col space-y-2">
+            {consultationFee && (
+              <p className="text-center mb-2">
+                <span className="text-lg font-bold text-primary">${consultationFee}</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400"> per consultation</span>
+              </p>
+            )}
+            
+            {!hideBookButton && (
+              <Link href={`/book-appointment/${id}`} className="w-full">
+                <Button variant="primary" className="w-full" aria-label={`Book appointment with ${fullName}`}>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Book Appointment
+                </Button>
+              </Link>
+            )}
+            
+            <Link href={`/doctor-profile/${id}`} className="w-full">
+              <Button variant="secondary" className="w-full">
+                <User className="w-4 h-4 mr-2" />
+                View Profile
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Modern variant with subtle design
+  if (variant === 'modern') {
+    return (
+      <Card 
+        className={twMerge(clsx(
+          'overflow-hidden transition-all duration-200 hover:shadow-md hover:border-primary/30',
+          onClick ? 'cursor-pointer' : '',
+          className
+        ))}
+        variant="outlined"
+        onClick={onClick}
+      >
+        <div className="flex flex-col md:flex-row">
+          {/* Doctor image and quick stats */}
+          <div className="md:w-1/3 p-4 flex flex-col items-center md:items-start">
+            <div className="relative w-20 h-20 mb-3">
+              {profilePictureUrl ? (
+                <Image
+                  src={profilePictureUrl}
+                  alt={fullName}
+                  fill
+                  className="rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                  <User className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                </div>
+              )}
+              {isVerified && (
+                <div className="absolute bottom-0 right-0 bg-green-500 text-white rounded-full p-0.5" aria-label="Verified doctor">
+                  <CheckCircle className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+
+            {rating && (
+              <div className="flex items-center mt-1">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="font-medium ml-1">{rating}</span>
+                {reviewCount && (
+                  <span className="text-xs text-slate-500 ml-1">({reviewCount})</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Doctor details */}
+          <div className="md:w-2/3 p-4">
+            <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-1">
-                  <Link href={href} className="hover:text-primary dark:hover:text-primary-400 transition-colors">
-                    {fullName}
-                  </Link>
+                <h3 className="text-lg font-bold">
+                  {fullName}
+                  {isVerified && (
+                    <span className="inline-block ml-2 md:hidden">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    </span>
+                  )}
                 </h3>
-                
                 {specialty && (
-                  <p className="text-primary-600 dark:text-primary-400 text-sm mt-1">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     {specialty}
                   </p>
                 )}
               </div>
               
-              {rating !== undefined && (
-                <div className="flex items-center bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded-full text-sm">
-                  <Star className="h-3.5 w-3.5 mr-1 fill-current" />
-                  <span className="font-medium">{rating.toFixed(1)}</span>
-                  {reviewCount && (
-                    <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">({reviewCount})</span>
-                  )}
+              {consultationFee && !compact && (
+                <div className="text-right">
+                  <span className="text-lg font-bold text-primary">${consultationFee}</span>
                 </div>
               )}
             </div>
-            
-            {/* Key Details in Pills */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {location && (
-                <div className="inline-flex items-center text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full text-slate-600 dark:text-slate-300">
-                  <MapPin className="h-3 w-3 mr-1 text-slate-400" />
-                  <span className="truncate max-w-[150px]">{location}</span>
-                </div>
-              )}
-              
-              {experience && (
-                <div className="inline-flex items-center text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full text-slate-600 dark:text-slate-300">
-                  <Award className="h-3 w-3 mr-1 text-slate-400" />
-                  <span>
-                    {typeof experience === 'number' 
-                      ? `${experience} yrs` 
-                      : experience}
-                  </span>
-                </div>
-              )}
-              
-              {consultationFee !== undefined && (
-                <div className="inline-flex items-center text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-green-600 dark:text-green-400 font-medium">
-                  ${consultationFee.toFixed(2)}
-                </div>
-              )}
-            </div>
-            
-            {/* Services - Show only a few */}
-            {servicesOffered && Array.isArray(servicesOffered) && servicesOffered.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-                <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-                  Services Offered
-                </h4>
+
+            {/* Location */}
+            {location && (
+              <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-3">
+                <MapPin className="w-4 h-4 mr-1 text-slate-400" />
+                <span>{location}</span>
+              </div>
+            )}
+
+            {/* Experience */}
+            {experience && !compact && (
+              <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-2">
+                <Award className="w-4 h-4 mr-1 text-slate-400" />
+                <span>{typeof experience === 'number' ? `${experience} years experience` : experience}</span>
+              </div>
+            )}
+
+            {/* Services offered */}
+            {servicesOffered && servicesOffered.length > 0 && !compact && (
+              <div className="mt-3">
                 <div className="flex flex-wrap gap-1">
-                  {servicesOffered.slice(0, 3).map((service, idx) => (
-                    <Badge 
-                      key={idx} 
-                      variant="secondary" 
-                      appearance="subtle" 
-                      size="xs"
-                    >
-                      {service}
-                    </Badge>
+                  {servicesOffered.slice(0, 3).map((service) => (
+                    <Badge key={service} variant="secondary" appearance="subtle" size="sm">{service}</Badge>
                   ))}
                   {servicesOffered.length > 3 && (
-                    <Badge 
-                      variant="default" 
-                      appearance="subtle" 
-                      size="xs"
-                    >
-                      +{servicesOffered.length - 3} more
-                    </Badge>
+                    <Badge variant="secondary" appearance="subtle" size="sm">+{servicesOffered.length - 3}</Badge>
                   )}
                 </div>
               </div>
             )}
-            
-            {/* Action Buttons */}
-            {(showBookButton || showViewProfileButton) && (
-              <div className="mt-5 flex gap-2">
-                {showViewProfileButton && (
-                  <Link href={href} className="flex-1">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      iconLeft={<User className="h-4 w-4" />}
-                    >
-                      Profile
-                    </Button>
-                  </Link>
-                )}
-                
-                {showBookButton && (
-                  <Link href={bookingHref} className="flex-1">
-                    <Button
-                      variant="primary"
-                      className="w-full"
-                      iconLeft={<Calendar className="h-4 w-4" />}
-                    >
+
+            {/* Action buttons */}
+            {!compact && (
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                {!hideBookButton && (
+                  <Link href={`/book-appointment/${id}`}>
+                    <Button size="sm" aria-label={`Book appointment with ${fullName}`}>
+                      <Calendar className="w-4 h-4 mr-1" />
                       Book
                     </Button>
                   </Link>
                 )}
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
-    );
-  }
-  
-  // Neomorphic variant has subtle styling changes
-  if (variant === 'neomorphic' && !compact) {
-    return (
-      <Card 
-        variant="default"
-        className={twMerge(
-          "overflow-hidden transition-all duration-200 h-full border border-slate-200/50 dark:border-slate-700/50", 
-          cardVariants[variant],
-          className
-        )}
-      >
-        {/* Card content with conditional layouts based on compact prop */}
-        <div className="p-5">
-          {/* Doctor Image */}
-          <div className="flex items-center mb-4">
-            <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 mr-3 shadow-inner">
-              <Image
-                src={profilePictureUrl || "/images/default-doctor.png"}
-                alt={fullName}
-                fill
-                className="object-cover"
-              />
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-1">
-                <Link href={href} className="hover:text-primary dark:hover:text-primary-400 transition-colors">
-                  {fullName}
-                </Link>
-              </h3>
-              
-              {specialty && (
-                <p className="text-primary-600 dark:text-primary-400 text-sm">
-                  {specialty}
-                </p>
-              )}
-            </div>
-            
-            {isVerified && (
-              <div className="ml-auto bg-white dark:bg-slate-700 text-primary dark:text-primary-400 p-1 rounded-full shadow-[inset_1px_1px_2px_rgba(0,0,0,0.1)]">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-            )}
-          </div>
-          
-          {/* Key stats in a grid */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {rating !== undefined && (
-              <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2 shadow-inner">
-                <div className="flex items-center text-yellow-500 dark:text-yellow-400">
-                  <Star className="h-3.5 w-3.5 fill-current" />
-                  <span className="font-bold ml-1">{rating.toFixed(1)}</span>
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">Rating</span>
-              </div>
-            )}
-            
-            {experience && (
-              <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2 shadow-inner">
-                <div className="flex items-center text-slate-700 dark:text-slate-300">
-                  <Award className="h-3.5 w-3.5" />
-                  <span className="font-bold ml-1">
-                    {typeof experience === 'number' ? experience : '5+'}
-                  </span>
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">Years</span>
-              </div>
-            )}
-            
-            {consultationFee !== undefined && (
-              <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-700/50 rounded-xl p-2 shadow-inner">
-                <span className="font-bold text-green-600 dark:text-green-400">${consultationFee}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">Fee</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Location */}
-          {location && (
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mb-4">
-              <MapPin className="h-4 w-4 mr-2 flex-shrink-0 text-slate-400" />
-              <span className="truncate">{location}</span>
-            </div>
-          )}
-          
-          {/* Services */}
-          {servicesOffered && Array.isArray(servicesOffered) && servicesOffered.length > 0 && (
-            <div className="mt-3 mb-4">
-              <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-                Services
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {servicesOffered.slice(0, 3).map((service, idx) => (
-                  <Badge 
-                    key={idx} 
-                    variant="secondary" 
-                    appearance="subtle" 
-                    size="xs"
-                  >
-                    {service}
-                  </Badge>
-                ))}
-                {servicesOffered.length > 3 && (
-                  <Badge 
-                    variant="default" 
-                    appearance="subtle" 
-                    size="xs"
-                  >
-                    +{servicesOffered.length - 3}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Action Buttons */}
-          {(showBookButton || showViewProfileButton) && (
-            <div className="flex gap-2 mt-4">
-              {showViewProfileButton && (
-                <Link href={href} className="flex-1">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    iconLeft={<User className="h-4 w-4" />}
-                  >
+                
+                <Link href={`/doctor-profile/${id}`}>
+                  <Button variant="secondary" size="sm">
+                    <User className="w-4 h-4 mr-1" />
                     Profile
                   </Button>
                 </Link>
-              )}
-              
-              {showBookButton && (
-                <Link href={bookingHref} className="flex-1">
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    iconLeft={<Calendar className="h-4 w-4" />}
-                  >
-                    Book
-                  </Button>
-                </Link>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </Card>
     );
   }
 
-  // Default card style
+  // Default variant
   return (
     <Card 
-      variant="default"
-      bordered
-      className={twMerge(
-        "overflow-hidden transition-all duration-200 h-full", 
-        compact ? "hover:shadow-md" : "hover:shadow-lg hover:-translate-y-1", 
+      className={twMerge(clsx(
+        'overflow-hidden',
+        onClick ? 'cursor-pointer' : '',
         className
-      )}
+      ))}
+      onClick={onClick}
     >
-      {/* Card content with conditional layouts based on compact prop */}
-      <div className={clsx(
-        "p-5",
-        compact ? "flex items-center" : "block"
-      )}>
-        {/* Doctor Image */}
-        <div className={clsx(
-          "relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800", 
-          compact ? "w-16 h-16 flex-shrink-0 mr-4" : "w-full aspect-[4/3] mb-4"
-        )}>
-          <Image
-            src={profilePictureUrl || "/images/default-doctor.png"}
-            alt={fullName}
-            fill
-            className="object-cover"
-          />
-          
-          {isVerified && (
-            <div className="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-tl-lg">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-          )}
-        </div>
-        
-        {/* Doctor Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className={clsx(
-                "font-bold text-slate-900 dark:text-white line-clamp-1", 
-                compact ? "text-base" : "text-lg"
-              )}>
-                <Link href={href} className="hover:text-primary dark:hover:text-primary-400 transition-colors">
-                  {fullName}
-                </Link>
-              </h3>
-              
-              {specialty && (
-                <p className="text-primary-600 dark:text-primary-400 text-sm mt-1">
-                  {specialty}
-                </p>
-              )}
-            </div>
-            
-            {rating !== undefined && !compact && (
-              <div className="flex items-center bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded text-sm">
-                <Star className="h-3.5 w-3.5 mr-1 fill-current" />
-                <span className="font-medium">{rating.toFixed(1)}</span>
-                {reviewCount && (
-                  <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">({reviewCount})</span>
-                )}
+      <div className="flex flex-col sm:flex-row">
+        {/* Doctor image */}
+        <div className="sm:w-1/4 p-4 flex justify-center sm:justify-start">
+          <div className="relative w-20 h-20">
+            {profilePictureUrl ? (
+              <Image
+                src={profilePictureUrl}
+                alt={fullName}
+                fill
+                className="rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                <User className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+              </div>
+            )}
+            {isVerified && (
+              <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1" aria-label="Verified doctor">
+                <CheckCircle className="w-4 h-4" />
               </div>
             )}
           </div>
-          
+        </div>
+
+        {/* Doctor details */}
+        <div className="sm:w-3/4 p-4 pt-0 sm:pt-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold">
+                {fullName}
+              </h3>
+              
+              {specialty && (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {specialty}
+                </p>
+              )}
+              
+              {/* Rating */}
+              {rating && (
+                <div className="flex items-center mt-1">
+                  <Star className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm ml-1">{rating}</span>
+                  {reviewCount && (
+                    <span className="text-xs text-slate-500 ml-1">({reviewCount} reviews)</span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {consultationFee && (
+              <div className="mt-2 sm:mt-0 sm:text-right">
+                <span className="text-primary font-bold">${consultationFee}</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400"> per visit</span>
+              </div>
+            )}
+          </div>
+
           {/* Location */}
           {location && (
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mt-2">
-              <MapPin className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
-              <span className="truncate">{location}</span>
+            <div className="flex items-center text-sm text-slate-500 dark:text-slate-400 mt-2">
+              <MapPin className="w-4 h-4 mr-1" />
+              <span>{location}</span>
             </div>
           )}
-          
-          {/* Languages or Other Info - Show only in non-compact mode */}
-          {!compact && languages && languages.length > 0 && (
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mt-2">
-              <MessageSquare className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
-              <span className="truncate">{languages.join(', ')}</span>
-            </div>
-          )}
-          
-          {/* Experience */}
-          {!compact && experience && (
-            <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mt-2">
-              <Award className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
-              <span>
-                {typeof experience === 'number' 
-                  ? `${experience} years experience` 
-                  : experience}
-              </span>
-            </div>
-          )}
-          
-          {/* Consultation Fee - Show only in non-compact mode */}
-          {!compact && consultationFee !== undefined && (
-            <div className="flex items-center text-sm mt-2">
-              <span className="font-medium text-green-600 dark:text-green-400">
-                ${consultationFee.toFixed(2)}
-              </span>
-              <span className="text-slate-500 dark:text-slate-400 ml-1">per visit</span>
-            </div>
-          )}
-          
-          {/* Availability Badge */}
-          {availableSoon && (
-            <div className="mt-2">
-              <Badge variant="success" size="sm" appearance="subtle" dot>
-                Available soon
-              </Badge>
-            </div>
-          )}
-          
-          {/* Services - Show only in non-compact mode */}
-          {!compact && servicesOffered && Array.isArray(servicesOffered) && servicesOffered.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-              <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-                Services Offered
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {servicesOffered.slice(0, 3).map((service, idx) => (
-                  <Badge 
-                    key={idx} 
-                    variant="secondary" 
-                    appearance="subtle" 
-                    size="xs"
-                  >
-                    {service}
-                  </Badge>
-                ))}
-                {servicesOffered.length > 3 && (
-                  <Badge 
-                    variant="default" 
-                    appearance="subtle" 
-                    size="xs"
-                  >
-                    +{servicesOffered.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
+
+          {/* Action buttons */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!hideBookButton && !compact && (
+              <Link href={`/book-appointment/${id}`}>
+                <Button size="sm" aria-label={`Book appointment with ${fullName}`}>
+                  <Calendar className="w-4 h-4 mr-1" />
+                  Book Appointment
+                </Button>
+              </Link>
+            )}
+            
+            {!compact && (
+              <Link href={`/doctor-profile/${id}`}>
+                <Button variant="secondary" size="sm">
+                  <User className="w-4 h-4 mr-1" />
+                  View Profile
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
-      
-      {/* Action Buttons - Only in non-compact mode */}
-      {!compact && (showBookButton || showViewProfileButton) && (
-        <div className="px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex gap-2">
-          {showViewProfileButton && (
-            <Link href={href} className="flex-1">
-              <Button
-                variant="outline"
-                className="w-full"
-                iconLeft={<User className="h-4 w-4" />}
-              >
-                View Profile
-              </Button>
-            </Link>
-          )}
-          
-          {showBookButton && (
-            <Link href={bookingHref} className="flex-1">
-              <Button
-                variant="primary"
-                className="w-full"
-                iconLeft={<Calendar className="h-4 w-4" />}
-              >
-                Book Now
-              </Button>
-            </Link>
-          )}
-        </div>
-      )}
     </Card>
   );
 };

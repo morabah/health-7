@@ -7,7 +7,8 @@
 
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 import { normalizeError, getUserFriendlyMessage } from '@/lib/errors/errorUtils';
 import { AppError } from '@/lib/errors/errorClasses';
 import { reportError } from '@/lib/errors/errorMonitoring';

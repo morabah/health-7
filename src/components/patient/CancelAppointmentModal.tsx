@@ -57,6 +57,7 @@ export default function CancelAppointmentModal({
       await onConfirm(appt.id, reason.trim());
       // Success is handled in the parent component
     } catch (error) {
+      // Convert the error to a string message for display
       setError(error instanceof Error ? error.message : 'Failed to cancel appointment');
       setLoading(false);
     }
@@ -64,12 +65,17 @@ export default function CancelAppointmentModal({
 
   if (!appt) return null;
 
+  // Generate ID for accessibility
+  const reasonId = "patient-cancel-reason";
+  const errorId = "patient-cancel-error";
+
   return (
     <Transition.Root appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
         className="relative z-50"
         onClose={() => !loading && onClose()}
+        aria-labelledby="cancel-dialog-title"
       >
         <Transition.Child
           as={Fragment}
@@ -95,14 +101,14 @@ export default function CancelAppointmentModal({
           >
             <Dialog.Panel className="w-full max-w-md rounded-lg bg-white dark:bg-slate-800 p-6 shadow-xl">
               <div className="flex items-center space-x-2 text-danger mb-4">
-                <XCircle className="h-6 w-6" />
-                <Dialog.Title className="text-lg font-medium">
+                <XCircle className="h-6 w-6" aria-hidden="true" />
+                <Dialog.Title id="cancel-dialog-title" className="text-lg font-medium">
                   Cancel Appointment
                 </Dialog.Title>
               </div>
 
               {error && (
-                <Alert variant="error" className="mb-4">
+                <Alert variant="error" className="mb-4" role="alert" id={errorId}>
                   {error}
                 </Alert>
               )}
@@ -115,13 +121,16 @@ export default function CancelAppointmentModal({
                 </p>
 
                 <Textarea
-                  id="cancellation-reason"
+                  id={reasonId}
                   label="Reason for cancellation"
                   placeholder="Please provide a reason for cancelling this appointment..."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   disabled={loading}
                   required
+                  aria-required="true"
+                  aria-invalid={error ? "true" : "false"}
+                  aria-describedby={error ? errorId : undefined}
                   rows={3}
                   className="mb-4"
                 />
@@ -131,6 +140,7 @@ export default function CancelAppointmentModal({
                     variant="secondary"
                     onClick={onClose}
                     disabled={loading}
+                    aria-label="Keep appointment"
                   >
                     Keep Appointment
                   </Button>
@@ -138,6 +148,8 @@ export default function CancelAppointmentModal({
                     variant="danger"
                     onClick={handleConfirm}
                     isLoading={loading}
+                    aria-label="Confirm appointment cancellation"
+                    aria-busy={loading ? "true" : "false"}
                   >
                     Confirm Cancellation
                   </Button>

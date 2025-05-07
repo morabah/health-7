@@ -345,8 +345,8 @@ export default function DoctorRegisterPage() {
             </div>
             
             <div className="mt-6">
-              <label className="block mb-2 text-sm font-medium">Verification Documents</label>
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center">
+              <label htmlFor="verification-docs" className="block mb-2 text-sm font-medium">Verification Documents</label>
+              <div id="verification-docs" className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center">
                 <Upload className="w-12 h-12 mx-auto mb-4 text-slate-400" />
                 <p className="text-slate-600 dark:text-slate-300 mb-2">
                   Upload your medical license and credentials

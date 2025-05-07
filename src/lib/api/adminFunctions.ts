@@ -216,8 +216,11 @@ export async function adminGetUserDetail(ctx: {
   userId: string;
 }): Promise<
   | ResultOk<{
-      user: z.infer<typeof UserProfileSchema> | null;
-      doctorProfile: z.infer<typeof DoctorProfileSchema> | null;
+      success: boolean;
+      user: Partial<z.infer<typeof UserProfileSchema>> & { 
+        doctorProfile?: Partial<z.infer<typeof DoctorProfileSchema>> | null 
+      };
+      hasData: boolean;
     }>
   | ResultErr
 > {
@@ -236,16 +239,35 @@ export async function adminGetUserDetail(ctx: {
       return { success: false, error: 'User not found' };
     }
 
-    let doctorProfile = null;
+    // For doctors, fetch their profile data
     if (user.userType === UserType.DOCTOR) {
       const doctors = await getDoctors();
-      doctorProfile = doctors.find(d => d.userId === ctx.userId) || null;
+      const doctorProfile = doctors.find(d => d.userId === ctx.userId);
+
+      if (doctorProfile) {
+        // Return user with doctor profile
+        return {
+          success: true,
+          hasData: true,
+          user: {
+            ...user,
+            doctorProfile: {
+              ...doctorProfile,
+              verificationStatus: doctorProfile.verificationStatus || 'pending'
+            }
+          }
+        };
+      }
     }
 
+    // Return user without doctor profile for non-doctors or if doctor profile not found
     return {
       success: true,
-      user,
-      doctorProfile,
+      hasData: true,
+      user: {
+        ...user,
+        doctorProfile: null
+      }
     };
   } catch (error) {
     logError('adminGetUserDetail failed', error);
@@ -400,6 +422,7 @@ export async function adminCreateUser(
       await saveDoctors([
         ...doctors,
         {
+          id: newUserId,
           userId: newUserId,
           specialty: userData.specialty || '',
           licenseNumber: userData.licenseNumber || '',
@@ -509,7 +532,7 @@ export async function adminUpdateUserProfile(
     const { uid, role } = ctx;
     const { userId, firstName, lastName, email, phone, address, accountStatus } = payload;
 
-    logInfo('adminUpdateUserProfile called', { uid, role, userId, ...payload });
+    logInfo('adminUpdateUserProfile called', { uid, role, ...payload });
 
     // Validate admin role
     if (role !== UserType.ADMIN) {
@@ -532,7 +555,10 @@ export async function adminUpdateUserProfile(
     if (lastName !== undefined) user.lastName = lastName;
     if (email !== undefined) user.email = email;
     if (phone !== undefined) user.phone = phone;
-    if (address !== undefined) user.address = address;
+    if (address !== undefined) {
+      // @ts-expect-error -- Some user types might have address field, use type assertion if needed
+      user.address = address;
+    }
     if (accountStatus !== undefined) {
       // Handle status updates
       const validStatuses = ['active', 'suspended', 'deactivated'];

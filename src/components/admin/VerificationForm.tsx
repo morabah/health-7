@@ -50,10 +50,18 @@ export default function VerificationForm({
       setSuccess(true);
     } catch (error: unknown) {
       logError('Error updating verification status', { error, status });
+      // Set a user-friendly error message if needed
     } finally {
       setLoading(false);
     }
   };
+
+  // Create IDs for accessibility
+  const notesId = "verification-notes";
+  const notesErrorId = "verification-notes-error";
+  const statusId = "verification-status";
+  const successId = "verification-success";
+  const warningId = "verification-warning";
 
   return (
     <Card className="mt-6">
@@ -61,30 +69,31 @@ export default function VerificationForm({
         <h2 className="text-lg font-semibold">Verification Decision</h2>
       </div>
       
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="p-4 space-y-4" aria-label="Doctor verification form">
         {success && (
-          <Alert variant="success" className="mb-4">
+          <Alert variant="success" className="mb-4" id={successId} role="status">
             <CheckCircle className="h-4 w-4 mr-2" />
             Doctor verification status updated successfully.
           </Alert>
         )}
         
         {status === VerificationStatus.VERIFIED && disableVerify && (
-          <Alert variant="warning" className="mb-4">
+          <Alert variant="warning" className="mb-4" id={warningId} role="alert">
             <AlertTriangle className="h-4 w-4 mr-2" />
             You must complete all checklist items before verifying this doctor.
           </Alert>
         )}
         
         <div>
-          <label htmlFor="status" className="block text-sm font-medium mb-1">
+          <label htmlFor={statusId} className="block text-sm font-medium mb-1">
             Verification Status
           </label>
           <Select
-            id="status"
+            id={statusId}
             value={status}
             onChange={(e) => setStatus(e.target.value as VerificationStatus)}
             className="w-full"
+            aria-required="true"
           >
             <option value={VerificationStatus.PENDING}>Pending Verification</option>
             <option value={VerificationStatus.VERIFIED}>Verified</option>
@@ -93,11 +102,11 @@ export default function VerificationForm({
         </div>
         
         <div>
-          <label htmlFor="notes" className="block text-sm font-medium mb-1">
-            Notes {status === VerificationStatus.REJECTED && <span className="text-danger">*</span>}
+          <label htmlFor={notesId} className="block text-sm font-medium mb-1">
+            Notes {status === VerificationStatus.REJECTED && <span className="text-danger" aria-hidden="true">*</span>}
           </label>
           <Textarea
-            id="notes"
+            id={notesId}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder={
@@ -106,10 +115,13 @@ export default function VerificationForm({
                 : 'Optional notes about the verification decision...'
             }
             required={status === VerificationStatus.REJECTED}
+            aria-required={status === VerificationStatus.REJECTED ? "true" : "false"}
+            aria-describedby={status === VerificationStatus.REJECTED && !notes.trim() ? notesErrorId : undefined}
+            aria-invalid={status === VerificationStatus.REJECTED && !notes.trim() ? "true" : "false"}
             rows={4}
           />
           {status === VerificationStatus.REJECTED && !notes.trim() && (
-            <p className="mt-1 text-sm text-danger">
+            <p className="mt-1 text-sm text-danger" id={notesErrorId} role="alert">
               Notes are required when rejecting a verification request.
             </p>
           )}
@@ -121,9 +133,10 @@ export default function VerificationForm({
             disabled={!canSubmit() || loading}
             isLoading={loading}
             variant={status === VerificationStatus.VERIFIED ? 'primary' : status === VerificationStatus.REJECTED ? 'danger' : 'secondary'}
+            aria-label={`Confirm ${status === VerificationStatus.VERIFIED ? 'verification' : status === VerificationStatus.REJECTED ? 'rejection' : 'pending status'}`}
           >
-            {status === VerificationStatus.VERIFIED && <CheckCircle className="h-4 w-4 mr-2" />}
-            {status === VerificationStatus.REJECTED && <XCircle className="h-4 w-4 mr-2" />}
+            {status === VerificationStatus.VERIFIED && <CheckCircle className="h-4 w-4 mr-2" aria-hidden="true" />}
+            {status === VerificationStatus.REJECTED && <XCircle className="h-4 w-4 mr-2" aria-hidden="true" />}
             Confirm Decision
           </Button>
         </div>

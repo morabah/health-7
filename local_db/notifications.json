@@ -1555,5 +1555,25 @@
     "isRead": false,
     "createdAt": "2025-05-06T21:46:30.614Z",
     "relatedId": "tr8fxu4us9gvnz6pwtxr7p"
+  },
+  {
+    "id": "8yohe3n6sig6ryicalot5e",
+    "userId": "nh35k2nhsycrdm4l6zazq",
+    "title": "Verification Status Updated",
+    "message": "Your verification status has been updated to verified. Notes: Verification Checklist:\n✓ Identity verified\n✓ License valid and current\n✓ Medical credentials verified\n✓ Contact information confirmed\n✓ Specialty credentials verified\n\nAdmin Notes:\nApproved through the standard verification process.",
+    "isRead": false,
+    "createdAt": "2025-05-07T06:24:31.669Z",
+    "type": "verification_status_change",
+    "relatedId": "nh35k2nhsycrdm4l6zazq"
+  },
+  {
+    "id": "notif-dfbfe2ldpzn3kwgs0r0li2",
+    "userId": "u-002",
+    "title": "Account Status Update",
+    "message": "Your account has been activated.",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-07T06:25:22.708Z",
+    "relatedId": null
   }
 ]

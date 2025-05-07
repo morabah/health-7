@@ -7,39 +7,32 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
-import Spinner from '@/components/ui/Spinner';
-import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import {
   CalendarDays,
   Clock,
-  ChevronLeft,
-  CheckCircle,
-  MapPin,
-  VideoIcon,
-  Calendar,
-  AlertOctagon,
   Check,
+  MapPin,
   Video,
+  AlertOctagon,
+  CheckCircle,
 } from 'lucide-react';
-import { logInfo, logValidation, logError } from '@/lib/logger';
+import { logError } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import { useDoctorProfile, useDoctorAvailability, useBookAppointment } from '@/data/sharedLoaders';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
-import type { DoctorProfile, TimeSlot } from '@/types/schemas';
+import type { TimeSlot } from '@/types/schemas';
 import { 
   BookingWorkflowErrorBoundary, 
   TimeSlotSelectionErrorBoundary,
-  BookingPaymentErrorBoundary
 } from '@/components/error-boundaries';
-import useErrorHandler from '@/hooks/useErrorHandler';
-import useBookingError, { BookingError, BookingErrorCode } from '@/hooks/useBookingError';
+import useBookingError from '@/hooks/useBookingError';
 import { callApi } from '@/lib/apiClient';
 import { SlotUnavailableError, ValidationError, AuthError, ApiError, AppointmentError } from '@/lib/errors/errorClasses';
 import { UserType } from '@/types/enums';
 import { BookAppointmentPreloader } from '@/lib/preloadStrategies';
-import { enhancedCache, CacheCategory } from '@/lib/cacheManager';
+import enhancedCache, { CacheCategory } from '@/lib/cacheManager';
 import { trackPerformance } from '@/lib/performance';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -132,7 +125,6 @@ function BookAppointmentPageContent() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { BookingError } = useBookingError();
   const queryClient = useQueryClient();
   
   // Track performance
@@ -804,27 +796,21 @@ function BookAppointmentPageContent() {
       return (
         <button
           key={`${slot.startTime}-${slot.endTime}`}
-          onClick={() => handleTimeSlotSelect(slot.startTime, slot.endTime)}
           type="button"
+          onClick={() => handleTimeSlotSelect(slot.startTime, slot.endTime)}
+          disabled={false}
           className={`
-            relative p-4 rounded-md border border-slate-200 dark:border-slate-700 transition-all
+            w-full h-full p-3 rounded-lg text-center border transition-colors
             ${selectedTimeSlot === slot.startTime
-              ? 'bg-primary border-primary text-white shadow-sm'
-              : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'
+              ? 'bg-primary/10 border-primary text-primary'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary/50'
             }
           `}
+          aria-label={`Select time slot ${slot.startTime} to ${slot.endTime}`}
+          aria-selected={selectedTimeSlot === slot.startTime}
+          aria-disabled={false}
         >
-          <div className="flex items-center justify-between">
-            <span className={`text-base font-medium ${selectedTimeSlot === slot.startTime ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-              {slot.startTime}
-            </span>
-            {selectedTimeSlot === slot.startTime && (
-              <CheckCircle className="h-4 w-4 text-white" />
-            )}
-          </div>
-          <div className={`text-xs mt-1 ${selectedTimeSlot === slot.startTime ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
-            to {slot.endTime}
-          </div>
+          <span className="font-medium">{slot.startTime}</span>
         </button>
       );
     };
@@ -832,25 +818,26 @@ function BookAppointmentPageContent() {
     const renderTimeSlotSection = (title: string, slots: typeof availableTimeSlots, icon: React.ReactNode) => {
       if (slots.length === 0) return null;
       
-    return (
-        <div className="mb-5">
+      return (
+        <div className="mb-6">
           <div className="flex items-center mb-3">
-            <div className="rounded-full bg-primary/10 dark:bg-primary/20 p-1.5 mr-2">
+            <div className="w-6 h-6 mr-2 flex-shrink-0">
               {icon}
             </div>
-            <h3 className="text-sm font-medium text-slate-800 dark:text-white">
-              {title}
+            <h3 id={`time-slots-${title.toLowerCase()}`} className="text-sm font-medium text-slate-900 dark:text-white">
+              {title} ({slots.length} slots)
             </h3>
-            <div className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-              ({slots.length} {slots.length === 1 ? 'slot' : 'slots'})
-            </div>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div 
+            role="radiogroup" 
+            aria-labelledby={`time-slots-${title.toLowerCase()}`}
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+          >
             {slots.map(renderTimeBlock)}
           </div>
-      </div>
-    );
+        </div>
+      );
     };
 
   return (
@@ -948,7 +935,7 @@ function BookAppointmentPageContent() {
     return (
       <Card className="mt-5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
         <div className="p-5 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
+          <h2 id="appointment-type-heading" className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
             </svg>
@@ -962,75 +949,87 @@ function BookAppointmentPageContent() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setAppointmentType(AppointmentType.VIDEO)}
-              className={`
-                relative p-4 rounded-md border transition-all
-                ${appointmentType === AppointmentType.VIDEO
-                  ? 'bg-primary/5 border-primary text-primary-700 dark:text-primary-400'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                }
-              `}
+            <div
+              role="radiogroup"
+              aria-labelledby="appointment-type-heading"
+              className="contents"
             >
-              <div className="flex items-start">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center mr-3
+              <button
+                type="button"
+                onClick={() => setAppointmentType(AppointmentType.VIDEO)}
+                className={`
+                  relative p-4 rounded-md border transition-all
                   ${appointmentType === AppointmentType.VIDEO
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    ? 'bg-primary/5 border-primary text-primary-700 dark:text-primary-400'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
                   }
-                `}>
-                  <Video className="h-5 w-5" />
-                  </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-slate-900 dark:text-white">Video Visit</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Connect from anywhere through secure video chat
-                  </p>
-                  </div>
-                {appointmentType === AppointmentType.VIDEO && (
-                  <span className="absolute top-3 right-3 text-primary">
-                    <Check className="h-5 w-5" />
-                  </span>
-                    )}
-                  </div>
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => setAppointmentType(AppointmentType.IN_PERSON)}
-              className={`
-                relative p-4 rounded-md border transition-all
-                ${appointmentType === AppointmentType.IN_PERSON
-                  ? 'bg-primary/5 border-primary text-primary-700 dark:text-primary-400'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                }
-              `}
-            >
-              <div className="flex items-start">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center mr-3
+                `}
+                role="radio"
+                aria-checked={appointmentType === AppointmentType.VIDEO}
+                aria-label="Video Visit"
+              >
+                <div className="flex items-start">
+                  <div className={`
+                    w-10 h-10 rounded-full flex items-center justify-center mr-3
+                    ${appointmentType === AppointmentType.VIDEO
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    }
+                  `}>
+                    <Video className="h-5 w-5" />
+                    </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-slate-900 dark:text-white">Video Visit</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Connect from anywhere through secure video chat
+                    </p>
+                    </div>
+                  {appointmentType === AppointmentType.VIDEO && (
+                    <span className="absolute top-3 right-3 text-primary">
+                      <Check className="h-5 w-5" />
+                    </span>
+                      )}
+                    </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setAppointmentType(AppointmentType.IN_PERSON)}
+                className={`
+                  relative p-4 rounded-md border transition-all
                   ${appointmentType === AppointmentType.IN_PERSON
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    ? 'bg-primary/5 border-primary text-primary-700 dark:text-primary-400'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
                   }
-                `}>
-                  <MapPin className="h-5 w-5" />
+                `}
+                role="radio"
+                aria-checked={appointmentType === AppointmentType.IN_PERSON}
+                aria-label="In-Person Visit"
+              >
+                <div className="flex items-start">
+                  <div className={`
+                    w-10 h-10 rounded-full flex items-center justify-center mr-3
+                    ${appointmentType === AppointmentType.IN_PERSON
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    }
+                  `}>
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-slate-900 dark:text-white">In-Person Visit</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Visit the clinic for a face-to-face appointment
+                    </p>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-slate-900 dark:text-white">In-Person Visit</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Visit the clinic for a face-to-face appointment
-                  </p>
-              </div>
-                {appointmentType === AppointmentType.IN_PERSON && (
-                  <span className="absolute top-3 right-3 text-primary">
-                    <Check className="h-5 w-5" />
-                  </span>
-            )}
-        </div>
-            </button>
+                  {appointmentType === AppointmentType.IN_PERSON && (
+                    <span className="absolute top-3 right-3 text-primary">
+                      <Check className="h-5 w-5" />
+                    </span>
+              )}
+          </div>
+              </button>
+            </div>
           </div>
         </div>
       </Card>
@@ -1244,13 +1243,13 @@ function BookAppointmentPageContent() {
                   </div>
           
           <div>
-            <label className="flex items-center">
+            <label className="flex items-center" htmlFor="emergency-checkbox">
               <input
+                id="emergency-checkbox"
                 type="checkbox"
                 checked={isEmergency}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIsEmergency(e.target.checked)}
                 className="h-4 w-4 text-primary focus:ring-primary border-slate-300 dark:border-slate-600 rounded"
-                aria-label="Mark as urgent"
               />
               <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
                 This is urgent (within 24-48 hours)

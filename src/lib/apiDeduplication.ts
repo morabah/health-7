@@ -8,14 +8,8 @@
  */
 
 import { CacheCategory } from './browserCacheManager';
-import { enhancedCache } from './cacheManager';
-import { logInfo } from './logger';
-import { 
-  clearStoredNetworkActivity, 
-  getStoredNetworkActivity, 
-  setStoredNetworkActivity 
-} from '@/lib/localStorage';
-import { performance, measure } from '@/lib/performance';
+import enhancedCache from './cacheManager';
+import { logInfo, logError } from './logger';
 
 // Types
 type RequestKey = string;
@@ -126,7 +120,7 @@ function createRequestKey(method: string, args: unknown[]): RequestKey {
     
     // Regular case - stringify all arguments
     return `${method}:${JSON.stringify(args)}`;
-  } catch {
+  } catch (e) {
     // Fallback for arguments that can't be stringified
     return `${method}:${args.length}:${Date.now()}`;
   }
@@ -231,7 +225,7 @@ export function deduplicatedApiCall<T>(
   
   // First, check if we have a result in the LRU cache
   const category = METHOD_TO_CATEGORY[method] || CacheCategory.OTHER;
-  const cachedResult = enhancedCache.get<T>(category, requestKey);
+  const cachedResult = enhancedCache?.get<T>(category, requestKey);
   
   if (cachedResult) {
     // Update stats for deduplication from LRU cache
@@ -291,7 +285,7 @@ export function deduplicatedApiCall<T>(
   
   // Store the result in the LRU cache when it resolves
   promise.then(result => {
-    enhancedCache.set(category, requestKey, result, {
+    enhancedCache?.set(category, requestKey, result, {
       ttl: ttlMs,
       priority: 'normal',
       tag: `api:${method}`
@@ -310,30 +304,4 @@ export function deduplicatedApiCall<T>(
   });
   
   return promise;
-}
-
-export function apiDeduplicate<T>(
-  key: string,
-  apiFn: () => Promise<T>,
-  options: ApiDeduplicateOptions = {}
-): Promise<T> {
-  const {
-    dedupTime = 2000,
-    logPerformance = false,
-    debug = false,
-  } = options;
-
-  // ... existing code ...
-}
-
-export function preloadApiCall<T>(
-  key: string,
-  apiFn: () => Promise<T>,
-  options: ApiDeduplicateOptions = {}
-) {
-  try {
-    // ... existing code ...
-  } catch {
-    // Handle silently
-  }
 } 

@@ -10,7 +10,7 @@
 import { UserType as UserRole } from '@/types/enums';
 import { logInfo, logError, logWarn } from './logger';
 import { cacheKeys, cacheManager } from './queryClient';
-import { enhancedCache, CacheCategory } from './cacheManager';
+import enhancedCache, { CacheCategory } from './cacheManager';
 import { callApi } from './apiClient';
 import { queryOptions } from '@tanstack/react-query';
 import { DataError } from './errors/errorClasses';
@@ -329,127 +329,95 @@ export function getMemoryCacheStats(): typeof memoryCacheStats {
  * Get optimized users with filtering and caching
  */
 export async function getOptimizedUsers(options: FilterOptions = {}): Promise<User[]> {
-  const cacheKey = enhancedCache.createKey('users', JSON.stringify(options));
-  
   try {
-    // Try enhanced LRU cache first
-    const lruCachedData = enhancedCache.get<User[]>(CacheCategory.USERS, cacheKey);
-    if (lruCachedData) {
-      logInfo('Using LRU cached users data');
-      return lruCachedData;
+    // Generate a cache key based on the options
+    const cacheKey = enhancedCache?.createKey('users', JSON.stringify(options));
+    
+    // First check the LRU cache for a recent copy
+    if (cacheKey) {
+      const lruCachedData = enhancedCache?.get<User[]>(CacheCategory.USERS, cacheKey);
+      if (lruCachedData) {
+        logInfo('Retrieved users from LRU cache');
+        return lruCachedData;
+      }
     }
     
-    // Try memory cache next (legacy support)
-    const cachedData = getMemoryCacheData<User[]>(`users-${JSON.stringify(options)}`);
+    // Try to get from memory cache
+    const memoryCacheKey = `users:${JSON.stringify(options)}`;
+    const cachedData = getMemoryCacheData<User[]>(memoryCacheKey);
+    
     if (cachedData) {
-      logInfo('Using memory cached users data');
-      // Store in new LRU cache for future
-      enhancedCache.set(CacheCategory.USERS, cacheKey, cachedData);
+      logInfo('Retrieved users from memory cache');
+      
+      // Also store in LRU cache for cross-component usage
+      if (cacheKey) {
+        enhancedCache?.set(CacheCategory.USERS, cacheKey, cachedData);
+      }
+      
       return cachedData;
     }
     
-    // Try React Query cache next
-    const queryData = cacheManager.getQueryData<{ success: boolean; users: User[] }>(
-      cacheKeys.users(options.filters)
-    );
+    // Fall back to API call
+    const response = await callApi('getAllUsers', { 
+      uid: 'admin',  // Admin-level operation
+      role: 'admin'
+    }, {
+      filters: options.filters,
+      limit: options.limit,
+      offset: options.offset,
+      sortBy: options.sortBy,
+      sortOrder: options.sortOrder
+    });
     
-    if (queryData?.success && queryData.users) {
-      logInfo('Using React Query cached users data');
+    if (response && response.success && Array.isArray(response.users)) {
+      // Process data to ensure consistent structure
+      const processedData = processUsersData(response.users, options);
       
-      // Apply filtering, sorting, and pagination in-memory
-      let filteredData = [...queryData.users];
-      
-      // Apply filters
-      if (options.filters) {
-        Object.entries(options.filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            filteredData = filteredData.filter(item => {
-              if (typeof value === 'string' && typeof item[key] === 'string') {
-                return item[key].toLowerCase().includes(value.toLowerCase());
-              }
-              return item[key] === value;
-            });
-          }
-        });
-      }
-      
-      // Apply sorting
-      if (options.sortBy) {
-        filteredData.sort((a, b) => {
-          const aValue = a[options.sortBy!];
-          const bValue = b[options.sortBy!];
-          
-          return compareValues(aValue, bValue, options.sortOrder === 'desc');
-        });
-      }
-      
-      // Apply pagination
-      if (options.offset !== undefined || options.limit !== undefined) {
-        const start = options.offset || 0;
-        const end = options.limit ? start + options.limit : undefined;
-        filteredData = filteredData.slice(start, end);
-      }
-      
-      // Cache processed results in the enhanced LRU cache
-      enhancedCache.set(CacheCategory.USERS, cacheKey, filteredData);
-      
-      // Also update legacy cache for backward compatibility
-      setMemoryCacheData(`users-${JSON.stringify(options)}`, filteredData);
-      
-      return filteredData;
-    }
-    
-    // Fetch fresh data
-    logInfo('Fetching fresh users data');
-    
-    // Use callApiWithOptions with skipOptimized to prevent recursion
-    const response = await callApi<{ success: boolean; users: User[] }>(
-      'getAllUsers', 
-      { skipOptimized: true } // Add skipOptimized flag to prevent recursion
-    );
-    
-    if (!response.success || !response.users || !Array.isArray(response.users)) {
-      // Instead of throwing, return an empty array when API fails
-      logWarn('API request for users failed, returning empty array', {
-        success: response.success,
-        hasUsers: !!response.users,
-        isArray: Array.isArray(response.users)
+      // Cache data for future requests
+      setMemoryCacheData(memoryCacheKey, processedData, {
+        ttl: CACHE_TTL_CONFIG.users
       });
       
-      // Store empty array in cache to prevent repeated failed requests
+      // Also store in LRU cache for cross-component usage
+      if (cacheKey) {
+        enhancedCache?.set(CacheCategory.USERS, cacheKey, processedData);
+      }
+      
+      return processedData;
+    }
+    
+    // If no users data in response, return an empty array
+    if (response && response.success) {
       const emptyData: User[] = [];
-      enhancedCache.set(CacheCategory.USERS, cacheKey, emptyData, { ttl: 10000 }); // 10 second TTL for empty results
+      
+      // Cache the empty result (with shorter TTL)
+      setMemoryCacheData(memoryCacheKey, emptyData, {
+        ttl: 10000 // 10 seconds for empty responses
+      });
+      
+      // Also store in LRU cache
+      if (cacheKey) {
+        enhancedCache?.set(CacheCategory.USERS, cacheKey, emptyData, { ttl: 10000 }); // 10 second TTL for empty results
+      }
+      
       return emptyData;
     }
     
-    const users = response.users;
+    // Handle errors or invalid responses
+    const fallbackData = fallbackToLocalDb() as User[];
     
-    // Set in React Query cache
-    cacheManager.setQueryData(cacheKeys.users(options.filters), { success: true, users });
+    // Cache the fallback data
+    setMemoryCacheData(memoryCacheKey, fallbackData, { ttl: 10000 });
     
-    // Process and return data
-    const processedData = processUsersData(users, options);
+    // Store in LRU cache
+    if (cacheKey) {
+      enhancedCache?.set(CacheCategory.USERS, cacheKey, fallbackData);
+    }
     
-    // Store in enhanced LRU cache
-    enhancedCache.set(CacheCategory.USERS, cacheKey, processedData);
-    
-    // Also update legacy cache for backward compatibility
-    setMemoryCacheData(`users-${JSON.stringify(options)}`, processedData);
-    
-    return processedData;
+    return fallbackData;
   } catch (error) {
-    // Enhanced error logging with context
-    const errorContext = {
-      operation: 'getOptimizedUsers',
-      cacheKey,
-      filterOptions: options,
-      errorType: error instanceof Error ? error.name : typeof error
-    };
-    
-    logError('Error in getOptimizedUsers', { error, ...errorContext });
-    
-    // Return empty array instead of retrying to prevent infinite loops
-    return [];
+    logError('Error getting optimized users data', { error });
+    throw new DataFetchError('Failed to fetch users', 'USERS_FETCH_ERROR', { error });
   }
 }
 
@@ -735,248 +703,192 @@ export async function getOptimizedNotifications(
   options: FilterOptions = {},
   cacheOptions: Partial<CacheOptions> = {}
 ): Promise<Notification[]> {
-  const cacheKey = enhancedCache.createKey('notifications', userId, JSON.stringify(options));
-  
-  let recoveryAttempted = false;
-  
   try {
+    // Check if throttled
     const now = Date.now();
+    const timeSinceLastRequest = now - notificationRequestTracker.lastRequestTime;
     
-    // Check if we're making too many requests in a short time
-    const requestInterval = now - notificationRequestTracker.lastRequestTime;
-    if (requestInterval < 300 && !cacheOptions.forceRefresh) { // 300ms minimum between normal requests
+    // Debounce requests that are too close together
+    if (timeSinceLastRequest < notificationRequestTracker.backoffInterval) {
       notificationRequestTracker.consecutiveRequests++;
       
-      // If we have too many consecutive requests, use in-memory super-cache with longer TTL
-      if (notificationRequestTracker.consecutiveRequests > 5) {
-        const cachedData = notificationRequestTracker.inMemoryCache.get(cacheKey);
-        if (cachedData && now - cachedData.timestamp < 10000) { // Special 10s TTL for rapid requests
-          // Don't log this to avoid log spam
-          return cachedData.data;
-        }
+      // Return from in-memory notification cache if very recent
+      const cachedNotifications = notificationRequestTracker.inMemoryCache.get(userId);
+      if (cachedNotifications && (now - cachedNotifications.timestamp < 5000)) {
+        return cachedNotifications.data;
       }
-    } else {
-      // Reset consecutive request counter if enough time has passed
-      notificationRequestTracker.consecutiveRequests = 0;
     }
     
-    // Update last request time
+    // Generate a cache key based on userId and options
+    const cacheKey = enhancedCache?.createKey('notifications', userId, JSON.stringify(options));
+    
+    // Set defaults for cache options
+    const mergedCacheOptions: Required<CacheOptions> = {
+      ...DEFAULT_CACHE_OPTIONS,
+      ...cacheOptions
+    };
+    
+    // Always use LRU cache first (fastest)
+    if (cacheKey && !mergedCacheOptions.forceRefresh) {
+      const lruCachedData = enhancedCache?.get<Notification[]>(
+        CacheCategory.NOTIFICATIONS, 
+        cacheKey
+      );
+      
+      if (lruCachedData) {
+        logInfo('Retrieved notifications from LRU cache', { userId });
+        
+        // Update the in-memory notification tracker
+        notificationRequestTracker.inMemoryCache.set(userId, {
+          data: lruCachedData,
+          timestamp: now
+        });
+        
+        return lruCachedData;
+      }
+    }
+    
+    // Then check our memory cache
+    const memoryCacheKey = `notifications:${userId}:${JSON.stringify(options)}`;
+    
+    if (!mergedCacheOptions.forceRefresh) {
+      const cachedData = getMemoryCacheData<Notification[]>(memoryCacheKey);
+      
+      if (cachedData) {
+        logInfo('Retrieved notifications from memory cache', { userId });
+        
+        // Also store in LRU cache for cross-component usage
+        if (cacheKey) {
+          enhancedCache?.set(CacheCategory.NOTIFICATIONS, cacheKey, cachedData);
+        }
+        
+        // Update the in-memory notification tracker
+        notificationRequestTracker.inMemoryCache.set(userId, {
+          data: cachedData,
+          timestamp: now
+        });
+        
+        return cachedData;
+      }
+    }
+    
+    // Attempt to get data from API with deduplication
     notificationRequestTracker.lastRequestTime = now;
     
-    // First, try the enhanced LRU cache
-    const lruCachedData = enhancedCache.get<Notification[]>(
-      CacheCategory.NOTIFICATIONS, 
-      cacheKey,
-      { forceRefresh: cacheOptions.forceRefresh }
-    );
+    // Call the API
+    const response = await callApi('getMyNotifications', {
+      uid: userId,
+      role: getUserRole(userId)
+    });
     
-    if (lruCachedData) {
-      logInfo('Using LRU cached notifications data');
-      return lruCachedData;
+    // Update backoff parameters based on success/failure
+    if (response && response.success) {
+      // Reset backoff on success
+      notificationRequestTracker.backoffInterval = Math.max(0, notificationRequestTracker.backoffInterval - 500);
+      notificationRequestTracker.consecutiveRequests = 0;
+    } else {
+      // Increase backoff on failure
+      notificationRequestTracker.backoffInterval = Math.min(30000, notificationRequestTracker.backoffInterval + 1000);
+      notificationRequestTracker.consecutiveRequests++;
     }
     
-    // Next try the legacy memory cache
-    const cachedData = getMemoryCacheData<Notification[]>(
-      `notifications-${userId}-${JSON.stringify(options)}`, 
-      cacheOptions
-    );
-    
-    if (cachedData) {
-      logInfo('Using memory cached notifications data');
-      // Store in enhanced LRU cache for future
-      enhancedCache.set(CacheCategory.NOTIFICATIONS, cacheKey, cachedData);
-      return cachedData;
-    }
-    
-    // Next, try to get data from React Query cache
-    const queryData = cacheManager.getQueryData<ApiResponse<Notification[]>>(
-      cacheKeys.notifications(userId)
-    );
-    
-    if (queryData?.success && 'notifications' in queryData && Array.isArray(queryData.notifications)) {
-      logInfo('Using React Query cached notifications data');
+    // Process and cache successful results
+    if (response && response.success && Array.isArray(response.notifications)) {
+      // Process notifications to ensure consistent structure
+      const processedData = processNotificationsData(response.notifications, options);
       
-      // Process the data (filtering, sorting, pagination)
-      const processedData = processNotificationsData(queryData.notifications, options);
+      // Cache processed data
+      setMemoryCacheData(memoryCacheKey, processedData, {
+        ttl: CACHE_TTL_CONFIG.notifications
+      });
       
-      // Store in enhanced LRU cache
-      enhancedCache.set(
-        CacheCategory.NOTIFICATIONS, 
-        cacheKey, 
-        processedData, 
-        { priority: 'normal' }
-      );
-      
-      // Also update legacy cache for backward compatibility
-      setMemoryCacheData(
-        `notifications-${userId}-${JSON.stringify(options)}`, 
-        processedData, 
-        { ttl: CACHE_TTL_CONFIG.notifications }
-      );
-      
-      return processedData;
-    }
-    
-    // No cached data found, need to fetch fresh
-    logInfo('Fetching fresh notifications data');
-    
-    // Get user role from users collection if we need it for API call
-    let userRole: UserRole = UserRole.PATIENT;
-    try {
-      const users = await getOptimizedUsers();
-      const user = users.find(u => u.id === userId);
-      if (user && 'userType' in user) {
-        userRole = user.userType as UserRole;
-      }
-    } catch (error) {
-      logError('Error getting user role for notifications, using default', error);
-    }
-    
-    // Call API to get notifications with proper UserType
-    const result = await callApi<ApiResponse<Notification[]>>(
-      'getMyNotifications',
-      {
-        uid: userId,
-        role: userRole
-      }
-    );
-    
-    if (result.success && 'notifications' in result && Array.isArray(result.notifications)) {
-      // Set in both caches
-      cacheManager.setQueryData(cacheKeys.notifications(userId), result);
-      
-      // Process and return data
-      const processedData = processNotificationsData(result.notifications, options);
-      
-      // Store in enhanced LRU cache 
-      enhancedCache.set(
-        CacheCategory.NOTIFICATIONS, 
-        cacheKey, 
-        processedData, 
-        { priority: 'normal' }
-      );
-      
-      // Also update legacy cache for backward compatibility
-      setMemoryCacheData(
-        `notifications-${userId}-${JSON.stringify(options)}`, 
-        processedData, 
-        { ttl: CACHE_TTL_CONFIG.notifications }
-      );
-      
-      // Also update the super-cache for rapid requests
-      notificationRequestTracker.inMemoryCache.set(cacheKey, {
+      // Update the in-memory notification tracker
+      notificationRequestTracker.inMemoryCache.set(userId, {
         data: processedData,
         timestamp: now
       });
       
+      // Also store in LRU cache for cross-component usage
+      if (cacheKey) {
+        enhancedCache?.set(
+          CacheCategory.NOTIFICATIONS, 
+          cacheKey, 
+          processedData,
+          { ttl: CACHE_TTL_CONFIG.notifications }
+        );
+      }
+      
       return processedData;
     }
     
-    // API notification fetch failed, attempting database fallback
-    logWarn('API notification fetch failed, attempting database fallback', {
-      userId,
-      apiSuccess: result.success,
-      hasNotifications: 'notifications' in result ? !!result.notifications : false
-    });
-    
-    recoveryAttempted = true;
-    const notificationsResponse = await callApi<{ success: boolean; notifications: Notification[] }>('getAllNotifications');
-    
-    if (!notificationsResponse.success || !notificationsResponse.notifications || !Array.isArray(notificationsResponse.notifications)) {
-      throw new DataFetchError(
-        'Invalid response from notifications data source',
-        'INVALID_NOTIFICATION_DATA',
-        { dataType: typeof notificationsResponse.notifications, userId, cacheKey },
-        false
-      );
+    // For no-data responses
+    if (response && response.success) {
+      const emptyData: Notification[] = [];
+      
+      // Cache empty responses with shorter TTL
+      setMemoryCacheData(memoryCacheKey, emptyData, {
+        ttl: 5000 // 5 seconds
+      });
+      
+      // Update the in-memory notification tracker
+      notificationRequestTracker.inMemoryCache.set(userId, {
+        data: emptyData,
+        timestamp: now
+      });
+      
+      // Also store in LRU cache
+      if (cacheKey) {
+        enhancedCache?.set(
+          CacheCategory.NOTIFICATIONS, 
+          cacheKey, 
+          emptyData, 
+          { ttl: 5000 } // 5 seconds TTL
+        );
+      }
+      
+      return emptyData;
     }
     
-    const notifications = notificationsResponse.notifications;
-    
-    // Filter notifications for this user
-    const userNotifications = notifications.filter(notif => 
-      typeof notif === 'object' && notif !== null && 'userId' in notif && notif.userId === userId
-    );
-    
-    // Set in both caches
-    cacheManager.setQueryData(cacheKeys.notifications(userId), { 
-      success: true, 
-      notifications: userNotifications 
-    });
-    
-    // Process and return data
-    const processedData = processNotificationsData(userNotifications, options);
-    
-    // Store in enhanced LRU cache
-    enhancedCache.set(
-      CacheCategory.NOTIFICATIONS, 
-      cacheKey, 
-      processedData, 
-      { priority: 'normal' }
-    );
-    
-    // Also update legacy cache for backward compatibility
-    setMemoryCacheData(
-      `notifications-${userId}-${JSON.stringify(options)}`, 
-      processedData, 
-      { ttl: CACHE_TTL_CONFIG.notifications }
-    );
-    
-    // Also update the super-cache for rapid requests
-    notificationRequestTracker.inMemoryCache.set(cacheKey, {
-      data: processedData,
-      timestamp: Date.now()
-    });
-    
-    return processedData;
-  } catch (error) {
-    // Enhanced error handling with context
-    const errorContext = {
-      operation: 'getOptimizedNotifications',
-      userId,
-      cacheKey,
-      filterOptions: options,
-      recoveryAttempted,
-      backoffInterval: notificationRequestTracker.backoffInterval,
-      errorType: error instanceof Error ? error.name : typeof error
-    };
-    
-    // Set backoff on error to prevent rapid retries
-    notificationRequestTracker.backoffInterval = Math.min(
-      (notificationRequestTracker.backoffInterval || 1000) * 2, // Exponential backoff
-      30000 // Max 30-second backoff
-    );
-    
-    logError('Error in getOptimizedNotifications', { error, ...errorContext });
-    
-    // Try to serve stale data on error as a last resort
-    try {
-      // First try LRU cache with force refresh option (to get expired data)
-      const staleData = enhancedCache.get<Notification[]>(
-        CacheCategory.NOTIFICATIONS, 
-        cacheKey, 
-        { forceRefresh: true }
+    // If API failed but we have stale data, use it
+    if (cacheKey) {
+      const staleData = enhancedCache?.get<Notification[]>(
+        CacheCategory.NOTIFICATIONS,
+        cacheKey,
+        { forceRefresh: false }
       );
       
       if (staleData) {
-        logWarn('Serving stale notification data from LRU cache due to error', { userId });
+        // Cache stale data with shorter TTL
+        setMemoryCacheData(memoryCacheKey, staleData, {
+          ttl: 5000 // 5 seconds
+        });
+        
+        // Update the in-memory notification tracker
+        notificationRequestTracker.inMemoryCache.set(userId, {
+          data: staleData,
+          timestamp: now
+        });
+        
         return staleData;
       }
-      
-      // Fall back to legacy in-memory cache if needed
-      const legacyStaleData = notificationRequestTracker.inMemoryCache.get(cacheKey);
-      if (legacyStaleData) {
-        logWarn('Serving stale notification data from legacy cache due to error', { 
-          age: Date.now() - legacyStaleData.timestamp,
-          userId
-        });
-        return legacyStaleData.data;
-      }
-    } catch (fallbackError) {
-      // Just swallow this error - we'll return empty array below
     }
     
+    // Fallback to empty data if nothing else works
     return [];
+  } catch (error) {
+    logError('Error getting optimized notifications', { error, userId });
+    
+    // If other notification fetches were successful recently,
+    // return their data instead of throwing
+    const recentNotifications = notificationRequestTracker.inMemoryCache.get(userId);
+    if (recentNotifications) {
+      return recentNotifications.data;
+    }
+    
+    throw new DataFetchError('Failed to fetch notifications', 'NOTIFICATIONS_FETCH_ERROR', {
+      userId,
+      error
+    });
   }
 }
 

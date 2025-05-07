@@ -16,7 +16,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
   hoverable?: boolean;
-  variant?: 'default' | 'flat' | 'elevated' | 'outlined' | 'gradient' | 'neomorphic';
+  variant?: 'default' | 'flat' | 'elevated' | 'outlined' | 'gradient' | 'neomorphic' | 'health';
   bordered?: boolean;
   compact?: boolean;
   onClick?: () => void;
@@ -72,7 +72,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       elevated: 'bg-white dark:bg-slate-800 shadow-md',
       outlined: 'bg-white dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700',
       gradient: 'bg-gradient-to-b from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 shadow-sm',
-      neomorphic: 'bg-slate-100 dark:bg-slate-800 shadow-[8px_8px_16px_0px_rgba(0,0,0,0.1),-8px_-8px_16px_0px_rgba(255,255,255,0.8)] dark:shadow-[8px_8px_16px_0px_rgba(0,0,0,0.3),-8px_-8px_16px_0px_rgba(30,41,59,0.5)]'
+      neomorphic: 'bg-slate-100 dark:bg-slate-800 shadow-[8px_8px_16px_0px_rgba(0,0,0,0.1),-8px_-8px_16px_0px_rgba(255,255,255,0.8)] dark:shadow-[8px_8px_16px_0px_rgba(0,0,0,0.3),-8px_-8px_16px_0px_rgba(30,41,59,0.5)]',
+      health: 'bg-white dark:bg-slate-800 border-t-4 border-t-primary dark:border-t-primary/80 shadow-lg rounded-lg overflow-hidden transition-all duration-200'
     };
 
     return (

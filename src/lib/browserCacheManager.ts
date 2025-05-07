@@ -279,26 +279,14 @@ function checkAndCleanupStorage(): void {
   }
 }
 
-// Create a unified browser cache interface
+// Create a browserCache object to export consistent interface
+// This helps avoid circular dependencies by providing a single interface
 export const browserCache = {
-  // Initialize the browser cache
   init: initBrowserCache,
-  
-  // Get data from browser cache
   get: getBrowserCacheData,
-  
-  // Set data in browser cache
   set: setBrowserCacheData,
-  
-  // Set doctor data specifically
   setDoctor: setDoctorDataInBrowser,
-  
-  // Get doctor data specifically
   getDoctor: getDoctorDataFromBrowser,
-  
-  // Clear all browser cache
   clear: clearAllBrowserCache,
-  
-  // Prune expired entries
   prune: pruneExpiredEntries
 }; 

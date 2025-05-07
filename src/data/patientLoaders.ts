@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { callApi } from '@/lib/apiClient';
 import { UserType } from '@/types/enums';
-import { AuthError } from '@/lib/errors/errorClasses';
+import { AuthError, ApiError } from '@/lib/errors/errorClasses';
 import type { z } from 'zod';
-import type { UpdateProfileSchema } from '@/types/schemas';
+import type { UpdateProfileSchema, Appointment } from '@/types/schemas';
+import { logError } from '@/lib/logger';
 
 /**
  * Hook to fetch patient profile data
@@ -65,21 +66,23 @@ export const useUpdatePatientProfile = () => {
 /**
  * Hook to fetch patient appointments
  */
-export const usePatientAppointments = () => {
+export function usePatientAppointments() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   return useQuery({
-    queryKey: ['patientAppointments', user?.uid],
+    queryKey: ['appointments', user?.uid],
     queryFn: async () => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      return callApi('getMyAppointments', { 
-        uid: user.uid, 
-        role: UserType.PATIENT 
-      });
+      if (!user?.uid) {
+        throw new AuthError('You must be logged in to view appointments');
+      }
+      
+      return callApi('getMyAppointments', { uid: user.uid, role: user.role });
     },
-    enabled: !!user?.uid
+    enabled: !!user?.uid,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
-};
+}
 
 /**
  * Hook to get appointment details by ID for the current patient
@@ -111,28 +114,29 @@ export function useAppointmentDetails(appointmentId: string) {
  * Hook to cancel an appointment
  */
 export function useCancelAppointment() {
-  const user = useAuth().user;
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ appointmentId, reason }: { appointmentId: string; reason?: string }) => {
-      if (!user) {
-        throw new AuthError('User not authenticated');
+    mutationFn: async ({ appointmentId, reason }: { appointmentId: string; reason: string }) => {
+      if (!user?.uid) {
+        throw new AuthError('You must be logged in to cancel an appointment');
       }
       
-      // Create the context object separate from the data payload
-      const context = {
-        uid: user.uid,
-        role: UserType.PATIENT
-      };
+      const response = await callApi<{ success: boolean; message?: string }>('cancelAppointment', 
+        { uid: user.uid, role: user.role },
+        { appointmentId, reason }
+      );
       
-      // Pass context as first argument and data as second argument
-      return await callApi('cancelAppointment', context, { appointmentId, reason });
+      return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
-      queryClient.invalidateQueries({ queryKey: ['appointment'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      // Invalidate appointments query to refetch the list
+      queryClient.invalidateQueries({ queryKey: ['appointments', user?.uid] });
+    },
+    onError: (error) => {
+      logError('Failed to cancel appointment', { error });
+      throw error; // Re-throw for UI handling
     },
   });
 } 

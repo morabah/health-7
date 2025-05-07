@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { callApi } from '@/lib/apiClient';
 import { useAuth } from '@/context/AuthContext';
 import { logError } from '@/lib/logger';
-import { enhancedCache, CacheCategory } from '@/lib/cacheManager';
+import enhancedCache, { CacheCategory } from '@/lib/cacheManager';
 import type { Notification } from '@/types/schemas';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
@@ -71,7 +71,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     
     // Check cache first
     const cacheKey = `notifications:${user.uid}`;
-    const cachedData = enhancedCache.get<{success: boolean, notifications: Notification[]}>(
+    const cachedData = enhancedCache?.get<{success: boolean, notifications: Notification[]}>(
       CacheCategory.NOTIFICATIONS,
       cacheKey
     );
@@ -92,7 +92,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           setNotifications(response.notifications);
           
           // Cache the result
-          enhancedCache.set(
+          enhancedCache?.set(
             CacheCategory.NOTIFICATIONS,
             cacheKey,
             response,
@@ -133,7 +133,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
         
         // Also update cache
         const cacheKey = `notifications:${user.uid}`;
-        const cachedData = enhancedCache.get<{success: boolean, notifications: Notification[]}>(
+        const cachedData = enhancedCache?.get<{success: boolean, notifications: Notification[]}>(
           CacheCategory.NOTIFICATIONS,
           cacheKey
         );
@@ -148,7 +148,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
             )
           };
           
-          enhancedCache.set(
+          enhancedCache?.set(
             CacheCategory.NOTIFICATIONS,
             cacheKey,
             updatedCache,
@@ -176,7 +176,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
         
         // Also update cache
         const cacheKey = `notifications:${user.uid}`;
-        const cachedData = enhancedCache.get<{success: boolean, notifications: Notification[]}>(
+        const cachedData = enhancedCache?.get<{success: boolean, notifications: Notification[]}>(
           CacheCategory.NOTIFICATIONS,
           cacheKey
         );
@@ -189,7 +189,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
             )
           };
           
-          enhancedCache.set(
+          enhancedCache?.set(
             CacheCategory.NOTIFICATIONS,
             cacheKey,
             updatedCache,

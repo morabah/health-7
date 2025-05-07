@@ -6,6 +6,9 @@ import { UserType } from '@/types/enums';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/context/AuthContext';
 import { AuthError } from '@/lib/errors/errorClasses';
+import { ValidationError } from '@/lib/errors/errorClasses';
+import { logError } from '@/lib/logger';
+import { AppointmentType } from '@/types/enums';
 
 /**
  * Helper function to get user role as UserType
@@ -114,127 +117,124 @@ export const useMarkAllNotificationsRead = () => {
 };
 
 /**
- * Hook to find doctors based on search criteria
+ * Hook to fetch a doctor's public profile
  */
-export const useFindDoctors = () => {
-  const user = useCurrentUser();
-
-  return useMutation({
-    mutationFn: async (searchParams?: { specialty?: string; location?: string; name?: string }) => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      return callApi(
-        'findDoctors',
-        {
-          uid: user.uid,
-          role: getUserRole(user.role),
-        },
-        searchParams
+export function useDoctorProfile(doctorId: string) {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['doctor', doctorId],
+    queryFn: async () => {
+      return callApi('getDoctorPublicProfile', 
+        user ? { uid: user.uid, role: user.role } : undefined,
+        { doctorId }
       );
     },
+    enabled: !!doctorId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
-};
+}
 
 /**
- * Hook to get a doctor's public profile
+ * Hook to fetch a doctor's availability
  */
-export const useDoctorProfile = (doctorId: string) => {
-  const user = useCurrentUser();
-
-  return useQuery({
-    queryKey: ['doctorProfile', doctorId],
-    queryFn: async () => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      
-      // Create separate context and payload objects
-      const ctx = {
-        uid: user.uid,
-        role: getUserRole(user.role)
-      };
-      
-      const payload = { doctorId };
-      
-      // Pass context as first param and payload as second param
-      return callApi('getDoctorPublicProfile', ctx, payload);
-    },
-    enabled: !!user?.uid && !!doctorId,
-  });
-};
-
-/**
- * Hook to get a doctor's availability
- */
-export const useDoctorAvailability = (doctorId: string) => {
-  const user = useCurrentUser();
-
+export function useDoctorAvailability(doctorId: string) {
+  const { user } = useAuth();
+  
   return useQuery({
     queryKey: ['doctorAvailability', doctorId],
     queryFn: async () => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      
-      // Create separate context and payload objects
-      const ctx = {
-        uid: user.uid,
-        role: getUserRole(user.role)
-      };
-      
-      const payload = { doctorId };
-      
-      // Pass context as first param and payload as second param
-      return callApi('getDoctorAvailability', ctx, payload);
+      return callApi('getDoctorAvailability', 
+        user ? { uid: user.uid, role: user.role } : undefined,
+        { doctorId }
+      );
     },
-    enabled: !!user?.uid && !!doctorId,
+    enabled: !!doctorId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
-};
+}
 
 /**
- * Hook to get available appointment slots
+ * Hook to fetch available time slots for a doctor on a specific date
  */
-export const useAvailableSlots = () => {
-  const user = useCurrentUser();
-
-  return useMutation({
-    mutationFn: async (data: { doctorId: string; date: string }) => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-
-      // Ensure the user context is correctly passed as a separate first parameter
-      const ctx = { uid: user.uid, role: getUserRole(user.role) };
-
-      // Call the API with context as first param and payload as second param
-      return callApi('getAvailableSlots', ctx, data);
+export function useAvailableSlots(doctorId: string, date: string) {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['availableSlots', doctorId, date],
+    queryFn: async () => {
+      return callApi('getAvailableSlots', 
+        user ? { uid: user.uid, role: user.role } : undefined,
+        { doctorId, date }
+      );
     },
-    // Prevent retries to reduce API load
-    retry: false,
-    // Add caching to reduce redundant calls
-    gcTime: 1000 * 60 * 5, // Cache for 5 minutes
+    enabled: !!doctorId && !!date,
+    staleTime: 60 * 1000, // 1 minute
   });
-};
+}
 
 /**
- * Hook to book an appointment
+ * Hook to find doctors based on search criteria
  */
-export const useBookAppointment = () => {
-  const user = useCurrentUser();
+export function useFindDoctors(searchParams: Record<string, any> = {}) {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['findDoctors', searchParams],
+    queryFn: async () => {
+      return callApi('findDoctors', 
+        user ? { uid: user.uid, role: user.role } : undefined,
+        searchParams
+      );
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
 
+// Define the appointment payload interface locally since it's not exported from schemas
+interface BookAppointmentParams {
+  doctorId: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+  appointmentType: AppointmentType;
+  reason?: string;
+}
+
+/**
+ * Hook to book an appointment with a doctor
+ */
+export function useBookAppointment() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: async (data: {
-      doctorId: string;
-      appointmentDate: string;
-      startTime: string;
-      endTime: string;
-      reason?: string;
-      appointmentType: string;
-    }) => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      // Only pass booking data; context is handled by apiClient
-      return callApi('bookAppointment', { ...data });
+    mutationFn: async (payload: BookAppointmentParams) => {
+      if (!user?.uid) {
+        throw new AuthError('You must be logged in to book an appointment');
+      }
+      
+      // Validate payload
+      if (!payload.doctorId || !payload.appointmentDate || !payload.startTime || !payload.endTime) {
+        throw new ValidationError('Missing required appointment fields');
+      }
+      
+      return callApi('bookAppointment', 
+        { uid: user.uid, role: user.role },
+        payload
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
+    onError: (error) => {
+      logError('Failed to book appointment', { error });
+      // Re-throw so UI can handle it
+      throw error;
+    }
   });
-};
+}
 
 /**
  * Hook to send a direct message to another user

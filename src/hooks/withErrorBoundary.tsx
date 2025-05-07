@@ -1,5 +1,7 @@
-import React, { ComponentType } from 'react';
-import AppErrorBoundary, { FallbackProps } from '@/components/error/AppErrorBoundary';
+import type { ComponentType } from 'react';
+import React from 'react';
+import type { FallbackProps } from '@/components/error/AppErrorBoundary';
+import AppErrorBoundary from '@/components/error/AppErrorBoundary';
 
 interface WithErrorBoundaryOptions {
   /**

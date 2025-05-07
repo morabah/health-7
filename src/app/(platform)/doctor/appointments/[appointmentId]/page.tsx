@@ -61,9 +61,8 @@ interface AppointmentData {
 }
 
 export default function AppointmentDetailPage({ params }: AppointmentDetailPageProps) {
-  // For Next.js App Router in React 18, we need to use React.use() to safely access params
-  const unwrappedParams = React.use(params as any) as { appointmentId: string };
-  const appointmentId = unwrappedParams.appointmentId;
+  // Fix: Don't use React.use() - directly access the appointmentId from params
+  const appointmentId = params.appointmentId;
   
   return (
     <AppErrorBoundary componentName="AppointmentDetailPage">

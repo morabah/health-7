@@ -59,19 +59,26 @@ export default function CancelAppointmentModal({
 
   if (!appt) return null;
 
+  // Create unique IDs for accessibility
+  const reasonId = "cancellation-reason";
+  const reasonErrorId = "cancellation-reason-error";
+
+  // Ensure onClose is always a function even when we want to disable it during submission
+  const handleClose = !isSubmitting ? onClose : () => {};
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={!isSubmitting ? onClose : undefined}
+      onClose={handleClose}
       title="Cancel Appointment"
       className="max-w-lg"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-label="Cancel appointment form">
         <div className="space-y-4">
           {/* Warning Alert */}
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 p-4 rounded-md text-sm">
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 p-4 rounded-md text-sm" role="alert">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <div>
                 <p className="font-medium">Are you sure you want to cancel this appointment?</p>
                 <p className="mt-1">This action cannot be undone and the patient will be notified.</p>
@@ -82,13 +89,13 @@ export default function CancelAppointmentModal({
           {/* Appointment Summary */}
           <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md">
             <h3 className="font-medium mb-3 flex items-center">
-              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              <Calendar className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />
               Appointment Details
             </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="flex items-start gap-2">
-                <User className="h-4 w-4 text-slate-500 mt-0.5" />
+                <User className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                 <div>
                   <div className="text-slate-500">Patient</div>
                   <div className="font-medium">{appt.patientName || 'Unknown Patient'}</div>
@@ -96,7 +103,7 @@ export default function CancelAppointmentModal({
               </div>
               
               <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
+                <Clock className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                 <div>
                   <div className="text-slate-500">Date & Time</div>
                   <div className="font-medium">
@@ -107,7 +114,7 @@ export default function CancelAppointmentModal({
               
               {appt.reason && (
                 <div className="sm:col-span-2 flex items-start gap-2">
-                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
+                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
                   <div>
                     <div className="text-slate-500">Reason for Visit</div>
                     <div className="font-medium">{appt.reason}</div>
@@ -118,27 +125,31 @@ export default function CancelAppointmentModal({
           </div>
 
           <div>
-            <label htmlFor="cancellation-reason" className="block text-sm font-medium mb-1 flex items-center">
-              <XCircle className="h-4 w-4 mr-2 text-red-500" />
-              Reason for Cancellation
+            <label htmlFor={reasonId} className="block text-sm font-medium mb-1 flex items-center">
+              <XCircle className="h-4 w-4 mr-2 text-red-500" aria-hidden="true" />
+              Reason for Cancellation <span className="text-red-500 ml-1" aria-hidden="true">*</span>
             </label>
             <Textarea
-              id="cancellation-reason"
+              id={reasonId}
               placeholder="Please explain why you need to cancel this appointment..."
               value={reason}
               onChange={handleChange}
               rows={4}
               disabled={isSubmitting}
-              error={error ? true : false}
+              error={error || ""}
               className="w-full"
+              required
+              aria-required="true"
+              aria-invalid={error ? "true" : "false"}
+              aria-describedby={error ? reasonErrorId : undefined}
             />
             {error && (
-              <div className="mt-1 text-sm text-red-500 flex items-center">
-                <AlertCircle className="h-4 w-4 mr-1" />
+              <div className="mt-1 text-sm text-red-500 flex items-center" id={reasonErrorId} role="alert">
+                <AlertCircle className="h-4 w-4 mr-1" aria-hidden="true" />
                 {error}
               </div>
             )}
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500" id="reason-description">
               This reason will be shared with the patient.
             </p>
           </div>
@@ -147,10 +158,16 @@ export default function CancelAppointmentModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Keep Appointment
             </Button>
-            <Button type="submit" variant="danger" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              variant="danger" 
+              disabled={isSubmitting}
+              aria-label="Cancel appointment"
+              aria-busy={isSubmitting ? "true" : "false"}
+            >
               {isSubmitting ? (
                 <>
-                  <Spinner className="mr-2" size="sm" />
+                  <Spinner className="mr-2" aria-hidden="true" />
                   Cancelling...
                 </>
               ) : (

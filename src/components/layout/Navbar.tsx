@@ -17,7 +17,7 @@ import { APP_ROUTES } from '@/lib/router';
 import type { Notification } from '@/types/schemas';
 import UserSwitcher from '@/components/ui/UserSwitcher';
 import { logError } from '@/lib/logger';
-import { enhancedCache, CacheCategory } from '@/lib/cacheManager';
+import enhancedCache, { CacheCategory } from '@/lib/cacheManager';
 
 // Format the last active timestamp
 const formatLastActive = (timestamp: number): string => {
@@ -90,7 +90,7 @@ export default function Navbar() {
     
     // Check if notifications are in the LRU cache first
     const cacheKey = `notifications:${user.uid}`;
-    const cachedNotifications = enhancedCache.get<{success: boolean, notifications: Notification[]}>(
+    const cachedNotifications = enhancedCache?.get<{success: boolean, notifications: Notification[]}>(
       CacheCategory.NOTIFICATIONS,
       cacheKey
     );
@@ -121,7 +121,7 @@ export default function Navbar() {
         setNotificationsFetchFailed(false);
         
         // Store in LRU cache for faster access
-        enhancedCache.set(
+        enhancedCache?.set(
           CacheCategory.NOTIFICATIONS,
           cacheKey,
           response,

@@ -42,6 +42,7 @@ interface DoctorDetailResponse {
     email?: string;
     verificationStatus?: string;
     doctorProfile?: Record<string, unknown>;
+    userType?: string;
   };
 }
 
@@ -128,15 +129,25 @@ const DoctorVerificationPage = () => {
     logInfo('DoctorVerificationPage mounted', { doctorId });
     // If doctor data is available and successful, extract documents
     const typedData = doctorData as DoctorDetailResponse;
-    if (
-      typedData &&
-      typedData.success &&
-      typedData.user &&
-      typedData.user.doctorProfile &&
-      typeof typedData.user.doctorProfile === 'object'
-    ) {
-      const profile = typedData.user.doctorProfile as Record<string, unknown>;
+    
+    if (typedData && typedData.success && typedData.user) {
+      const userProfile = typedData.user;
+      
+      // Check if this is a doctor user
+      if (userProfile.userType !== 'doctor') {
+        logError('Not a doctor account', { userId: doctorId, userType: userProfile.userType });
+        return;
+      }
+      
+      // Check if doctorProfile exists
+      if (!userProfile.doctorProfile) {
+        logError('Doctor profile not found', { userId: doctorId });
+        return;
+      }
+      
+      const profile = userProfile.doctorProfile as Record<string, unknown>;
       const docs: Document[] = [];
+      
       if (typeof profile.licenseDocumentUrl === 'string' && profile.licenseDocumentUrl) {
         docs.push({
           title: 'Medical License',
@@ -144,6 +155,7 @@ const DoctorVerificationPage = () => {
           type: 'license',
         });
       }
+      
       if (typeof profile.certificateUrl === 'string' && profile.certificateUrl) {
         docs.push({
           title: 'Medical Certificate',
@@ -151,6 +163,7 @@ const DoctorVerificationPage = () => {
           type: 'certificate',
         });
       }
+      
       setDocuments(docs);
     }
   }, [doctorId, doctorData]);
@@ -272,42 +285,106 @@ const DoctorVerificationPage = () => {
     );
   }
 
-  // Error state
+  // Render appropriate error states
   if (doctorError) {
     return (
-      <div className="p-6">
-        <Alert variant="error">
-          Error loading doctor:{' '}
-          {typeof doctorError === 'string' ? doctorError : 'Failed to load doctor information'}
+      <div className="space-y-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/admin/doctors')}
+          className="mb-4"
+        >
+          <ChevronLeft className="w-4 h-4 mr-2" /> Back to Doctors
+        </Button>
+        
+        <Alert variant="warning">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 mr-3" />
+            <div>
+              <h3 className="font-bold">Doctor not found or doctor profile not available</h3>
+              <p>The doctor profile you're looking for cannot be loaded. This may be because:</p>
+              <ul className="list-disc ml-5 mt-2 space-y-1">
+                <li>The doctor ID is invalid or doesn't exist</li>
+                <li>The user account exists but doesn't have an associated doctor profile</li>
+                <li>The user account is not registered as a doctor</li>
+                <li>You don't have permission to view this doctor profile</li>
+              </ul>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/admin/users')}
+                  className="mr-3"
+                >
+                  View All Users
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => refetch()}
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
         </Alert>
-        <div className="mt-4">
-          <Button variant="secondary" as={Link} href="/admin/doctors">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Doctors
-          </Button>
-        </div>
       </div>
     );
   }
 
-  // Doctor not found state
-  if (!doctor || !doctorProfile) {
+  // Check if doctor data is valid
+  if (!typedData?.success || !typedData?.user || !typedData?.user?.doctorProfile) {
     return (
-      <div className="p-6">
-        <Alert variant="warning">Doctor not found or doctor profile not available</Alert>
-        <div className="mt-4">
-          <Button variant="secondary" as={Link} href="/admin/doctors">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Doctors
-          </Button>
-        </div>
+      <div className="space-y-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/admin/doctors')}
+          className="mb-4"
+        >
+          <ChevronLeft className="w-4 h-4 mr-2" /> Back to Doctors
+        </Button>
+        
+        <Alert variant="warning">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 mr-3" />
+            <div>
+              <h3 className="font-bold">Doctor profile not available</h3>
+              <p>The doctor profile data is incomplete or unavailable. This may be because:</p>
+              <ul className="list-disc ml-5 mt-2 space-y-1">
+                <li>The user is not registered as a doctor</li>
+                <li>The doctor profile has not been created yet</li>
+                <li>There was an error loading the doctor profile data</li>
+              </ul>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/admin/users')}
+                  className="mr-3"
+                >
+                  View User Details
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => refetch()}
+                >
+                  Reload Data
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Alert>
       </div>
     );
   }
 
   // Determine current verification status
   const currentStatus =
-    typeof doctor.verificationStatus === 'string'
+    doctor && typeof doctor.verificationStatus === 'string'
       ? doctor.verificationStatus.toLowerCase() === 'pending'
         ? VerificationStatus.PENDING
         : doctor.verificationStatus.toLowerCase() === 'verified'
@@ -421,17 +498,17 @@ const DoctorVerificationPage = () => {
                   <div className="flex items-center">
                     <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
                       <span className="text-lg font-bold text-primary-800 dark:text-primary-300">
-                        {typeof doctor.firstName === 'string' ? doctor.firstName.charAt(0) : ''}
-                        {typeof doctor.lastName === 'string' ? doctor.lastName.charAt(0) : ''}
+                        {doctor && typeof doctor.firstName === 'string' ? doctor.firstName.charAt(0) : ''}
+                        {doctor && typeof doctor.lastName === 'string' ? doctor.lastName.charAt(0) : ''}
                       </span>
                     </div>
                     <div className="ml-4">
                       <h3 className="text-xl font-semibold">
-                        Dr. {typeof doctor.firstName === 'string' ? doctor.firstName : ''}{' '}
-                        {typeof doctor.lastName === 'string' ? doctor.lastName : ''}
+                        Dr. {doctor && typeof doctor.firstName === 'string' ? doctor.firstName : ''}{' '}
+                        {doctor && typeof doctor.lastName === 'string' ? doctor.lastName : ''}
                       </h3>
                       <p className="text-slate-500 dark:text-slate-400">
-                        {typeof doctorProfile.specialty === 'string'
+                        {doctorProfile && typeof doctorProfile.specialty === 'string'
                           ? doctorProfile.specialty
                           : 'Unknown Specialty'}
                       </p>
@@ -443,14 +520,14 @@ const DoctorVerificationPage = () => {
                   <div className="text-sm">
                     <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
                       <span className="font-medium text-slate-500 dark:text-slate-400">Email</span>
-                      <span>{typeof doctor.email === 'string' ? doctor.email : 'No email'}</span>
+                      <span>{doctor && typeof doctor.email === 'string' ? doctor.email : 'No email'}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
                       <span className="font-medium text-slate-500 dark:text-slate-400">
                         License Number
                       </span>
                       <span>
-                        {typeof doctorProfile.licenseNumber === 'string'
+                        {doctorProfile && typeof doctorProfile.licenseNumber === 'string'
                           ? doctorProfile.licenseNumber
                           : 'Not provided'}
                       </span>
@@ -460,7 +537,7 @@ const DoctorVerificationPage = () => {
                         Experience
                       </span>
                       <span>
-                        {typeof doctorProfile.yearsOfExperience === 'number'
+                        {doctorProfile && typeof doctorProfile.yearsOfExperience === 'number'
                           ? `${doctorProfile.yearsOfExperience} years`
                           : 'Not specified'}
                       </span>
@@ -478,7 +555,7 @@ const DoctorVerificationPage = () => {
                       Specialty
                     </h5>
                     <p className="text-slate-800 dark:text-slate-200">
-                      {typeof doctorProfile.specialty === 'string'
+                      {doctorProfile && typeof doctorProfile.specialty === 'string'
                         ? doctorProfile.specialty
                         : 'Not specified'}
                     </p>
@@ -487,7 +564,7 @@ const DoctorVerificationPage = () => {
                       Years of Experience
                     </h5>
                     <p className="text-slate-800 dark:text-slate-200">
-                      {typeof doctorProfile.yearsOfExperience === 'number'
+                      {doctorProfile && typeof doctorProfile.yearsOfExperience === 'number'
                         ? `${doctorProfile.yearsOfExperience} years`
                         : 'Not specified'}
                     </p>
@@ -499,7 +576,7 @@ const DoctorVerificationPage = () => {
                     </h5>
                     <p className="text-slate-800 dark:text-slate-200">
                       License Number:{' '}
-                      {typeof doctorProfile.licenseNumber === 'string'
+                      {doctorProfile && typeof doctorProfile.licenseNumber === 'string'
                         ? doctorProfile.licenseNumber
                         : 'Not provided'}
                     </p>
@@ -508,7 +585,7 @@ const DoctorVerificationPage = () => {
                       Bio
                     </h5>
                     <p className="text-slate-800 dark:text-slate-200">
-                      {typeof doctorProfile.bio === 'string' && doctorProfile.bio
+                      {doctorProfile && typeof doctorProfile.bio === 'string' && doctorProfile.bio
                         ? doctorProfile.bio
                         : 'No bio provided.'}
                     </p>
@@ -517,7 +594,7 @@ const DoctorVerificationPage = () => {
               </div>
 
               {/* Additional Information */}
-              {typeof doctorProfile.education === 'object' &&
+              {doctorProfile && typeof doctorProfile.education === 'object' &&
                 doctorProfile.education &&
                 Array.isArray(doctorProfile.education) && (
                   <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-6">

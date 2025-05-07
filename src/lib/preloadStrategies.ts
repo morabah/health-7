@@ -9,7 +9,7 @@
 
 import { prefetchApiQuery } from './enhancedApiClient';
 import { cacheKeys, cacheManager } from './queryClient';
-import { enhancedCache, CacheCategory } from './cacheManager';
+import enhancedCache, { CacheCategory } from './cacheManager';
 import { callApi } from './apiClient';
 import { UserType } from '@/types/enums';
 import { logInfo, logError } from './logger';

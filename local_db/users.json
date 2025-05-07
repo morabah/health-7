@@ -33,11 +33,11 @@
     "firstName": "Nelson",
     "lastName": "Wisozk",
     "userType": "doctor",
-    "isActive": false,
+    "isActive": true,
     "emailVerified": true,
     "phoneVerified": true,
     "createdAt": "2025-02-03T20:35:44.184Z",
-    "updatedAt": "2025-05-05T19:25:22.721Z",
+    "updatedAt": "2025-05-07T06:25:22.687Z",
     "id": "u-002",
     "userId": "u-002"
   },
