@@ -20,6 +20,13 @@ import {
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { UserProfileSchema, DoctorProfileSchema, Appointment, Notification } from '@/types/schemas';
+import { 
+  AdminVerifyDoctorSchema, 
+  AdminUpdateUserSchema,
+  AdminCreateUserSchema,
+  AdminUpdateUserStatusSchema,
+  AdminGetUserDetailSchema
+} from '@/types/schemas';
 
 /**
  * Admin verify a doctor
@@ -27,39 +34,44 @@ import type { UserProfileSchema, DoctorProfileSchema, Appointment, Notification 
 export async function adminVerifyDoctor(ctx: {
   uid: string;
   role: UserType;
+}, payload: {
   doctorId: string;
-  status: string | VerificationStatus;
-  notes?: string;
+  verificationStatus: VerificationStatus;
+  verificationNotes?: string;
 }): Promise<ResultOk<{ message: string }> | ResultErr> {
-  logInfo('adminVerifyDoctor called', {
-    uid: ctx.uid,
-    role: ctx.role,
-    doctorId: ctx.doctorId,
-    status: ctx.status,
-    notes: ctx.notes,
-  });
-
-  // Only admin can verify doctors
-  if (ctx.role !== UserType.ADMIN) {
-    return { success: false, error: 'Unauthorized' };
-  }
-
+  const perf = trackPerformance('adminVerifyDoctor');
+  
   try {
-    // Validate status value
-    let verificationStatus: VerificationStatus;
-    if (Object.values(VerificationStatus).includes(ctx.status as VerificationStatus)) {
-      verificationStatus = ctx.status as VerificationStatus;
-    } else {
-      return { success: false, error: `Invalid verification status: ${ctx.status}` };
+    logInfo('adminVerifyDoctor called', {
+      uid: ctx.uid,
+      role: ctx.role,
+      doctorId: payload.doctorId,
+      status: payload.verificationStatus,
+      notes: payload.verificationNotes,
+    });
+
+    // Only admin can verify doctors
+    if (ctx.role !== UserType.ADMIN) {
+      return { success: false, error: 'Unauthorized' };
     }
 
+    // Validate input using Zod schema
+    const validationResult = AdminVerifyDoctorSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid verification request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { doctorId, verificationStatus, verificationNotes } = validationResult.data;
     const timestamp = nowIso();
 
     // Get all doctors
     const doctors = await getDoctors();
 
     // Find the doctor by ID
-    const doctorIndex = doctors.findIndex(d => d.userId === ctx.doctorId || d.userId === ctx.doctorId);
+    const doctorIndex = doctors.findIndex(d => d.userId === doctorId);
 
     if (doctorIndex === -1) {
       return { success: false, error: 'Doctor not found' };
@@ -73,8 +85,8 @@ export async function adminVerifyDoctor(ctx: {
       doctor.verificationStatus = verificationStatus;
 
       // Add notes if provided
-      if (ctx.notes) {
-        doctor.verificationNotes = ctx.notes;
+      if (verificationNotes) {
+        doctor.verificationNotes = verificationNotes;
       }
 
       doctor.updatedAt = timestamp;
@@ -92,7 +104,7 @@ export async function adminVerifyDoctor(ctx: {
         id: generateId(),
         userId: doctor.userId,
         title: 'Verification Status Updated',
-        message: `Your verification status has been updated to ${verificationStatus.toLowerCase()}. ${ctx.notes ? `Notes: ${ctx.notes}` : ''}`,
+        message: `Your verification status has been updated to ${verificationStatus.toLowerCase()}. ${verificationNotes ? `Notes: ${verificationNotes}` : ''}`,
         isRead: false,
         createdAt: timestamp,
         type: NotificationType.VERIFICATION_STATUS_CHANGE,
@@ -102,7 +114,7 @@ export async function adminVerifyDoctor(ctx: {
       notifications.push(newNotification);
       await saveNotifications(notifications);
 
-      logInfo(`Doctor ${ctx.doctorId} verification status updated to ${verificationStatus}`);
+      logInfo(`Doctor ${doctorId} verification status updated to ${verificationStatus}`);
 
       return {
         success: true,
@@ -117,6 +129,8 @@ export async function adminVerifyDoctor(ctx: {
   } catch (error) {
     logError('Error updating doctor verification status', error);
     return { success: false, error: 'Failed to update doctor verification status' };
+  } finally {
+    perf.stop();
   }
 }
 
@@ -210,11 +224,10 @@ export async function adminGetAllDoctors(ctx: { uid: string; role: UserType }): 
 /**
  * Admin get user detail
  */
-export async function adminGetUserDetail(ctx: {
-  uid: string;
-  role: UserType;
-  userId: string;
-}): Promise<
+export async function adminGetUserDetail(
+  ctx: { uid: string; role: UserType },
+  payload: { userId: string }
+): Promise<
   | ResultOk<{
       success: boolean;
       user: Partial<z.infer<typeof UserProfileSchema>> & { 
@@ -224,16 +237,31 @@ export async function adminGetUserDetail(ctx: {
     }>
   | ResultErr
 > {
-  logInfo('adminGetUserDetail called', { uid: ctx.uid, role: ctx.role, userId: ctx.userId });
-
-  // Only admins can access this endpoint
-  if (ctx.role !== UserType.ADMIN) {
-    return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
-  }
+  const perf = trackPerformance('adminGetUserDetail');
 
   try {
+    const { uid, role } = ctx;
+    
+    logInfo('adminGetUserDetail called', { uid, role, userId: payload.userId });
+
+    // Only admins can access this endpoint
+    if (role !== UserType.ADMIN) {
+      return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
+    }
+
+    // Validate with Zod schema
+    const validationResult = AdminGetUserDetailSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid request: ${validationResult.error.format()}` 
+      };
+    }
+
+    const { userId } = validationResult.data;
+
     const users = await getUsers();
-    const user = users.find(u => u.id === ctx.userId);
+    const user = users.find(u => u.id === userId);
 
     if (!user) {
       return { success: false, error: 'User not found' };
@@ -242,7 +270,7 @@ export async function adminGetUserDetail(ctx: {
     // For doctors, fetch their profile data
     if (user.userType === UserType.DOCTOR) {
       const doctors = await getDoctors();
-      const doctorProfile = doctors.find(d => d.userId === ctx.userId);
+      const doctorProfile = doctors.find(d => d.userId === userId);
 
       if (doctorProfile) {
         // Return user with doctor profile
@@ -272,6 +300,8 @@ export async function adminGetUserDetail(ctx: {
   } catch (error) {
     logError('adminGetUserDetail failed', error);
     return { success: false, error: 'Error fetching user details' };
+  } finally {
+    perf.stop();
   }
 }
 
@@ -290,20 +320,24 @@ export async function adminUpdateUserStatus(
 
   try {
     const { uid, role } = ctx;
-    const { userId, status, reason } = payload;
 
-    logInfo('adminUpdateUserStatus called', { uid, role, userId, status, reason });
+    logInfo('adminUpdateUserStatus called', { uid, role, ...payload });
 
     // Validate admin role
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Only admins can update user status' };
     }
 
-    // Validate status value
-    const validStatuses = ['active', 'suspended', 'deactivated'];
-    if (!validStatuses.includes(status)) {
-      return { success: false, error: 'Invalid status value' };
+    // Validate payload with Zod schema
+    const validationResult = AdminUpdateUserStatusSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid request: ${validationResult.error.format()}` 
+      };
     }
+
+    const { userId, status, reason } = validationResult.data;
 
     // Update user status
     const users = await getUsers();
@@ -382,14 +416,20 @@ export async function adminCreateUser(
       return { success: false, error: 'Only admins can create users' };
     }
 
-    // Basic validation
-    if (!userData.email || !userData.firstName || !userData.lastName || !userData.userType) {
-      return { success: false, error: 'Missing required fields' };
+    // Validate the user data with Zod schema
+    const validationResult = AdminCreateUserSchema.safeParse(userData);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid user data: ${validationResult.error.format()}` 
+      };
     }
+
+    const validatedData = validationResult.data;
 
     // Check if email already exists
     const users = await getUsers();
-    if (users.some(u => u.email === userData.email)) {
+    if (users.some(u => u.email === validatedData.email)) {
       return { success: false, error: 'Email already in use' };
     }
 
@@ -400,11 +440,11 @@ export async function adminCreateUser(
     // Create the user record
     const newUser = {
       id: newUserId,
-      email: userData.email,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      userType: userData.userType,
-      isActive: userData.isActive ?? true,
+      email: validatedData.email,
+      firstName: validatedData.firstName,
+      lastName: validatedData.lastName,
+      userType: validatedData.userType,
+      isActive: validatedData.isActive ?? true,
       emailVerified: true, // Auto-verified for admin-created accounts
       phoneVerified: false,
       phone: null,
@@ -417,16 +457,16 @@ export async function adminCreateUser(
     await saveUsers([...users, newUser]);
 
     // Add appropriate profile based on user type
-    if (userData.userType === UserType.DOCTOR) {
+    if (validatedData.userType === UserType.DOCTOR) {
       const doctors = await getDoctors();
       await saveDoctors([
         ...doctors,
         {
           id: newUserId,
           userId: newUserId,
-          specialty: userData.specialty || '',
-          licenseNumber: userData.licenseNumber || '',
-          yearsOfExperience: userData.yearsOfExperience || 0,
+          specialty: validatedData.specialty || '',
+          licenseNumber: validatedData.licenseNumber || '',
+          yearsOfExperience: validatedData.yearsOfExperience || 0,
           bio: null,
           verificationStatus: VerificationStatus.PENDING,
           verificationNotes: null,
@@ -530,7 +570,6 @@ export async function adminUpdateUserProfile(
 
   try {
     const { uid, role } = ctx;
-    const { userId, firstName, lastName, email, phone, address, accountStatus } = payload;
 
     logInfo('adminUpdateUserProfile called', { uid, role, ...payload });
 
@@ -538,6 +577,18 @@ export async function adminUpdateUserProfile(
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Only admins can update user profiles' };
     }
+
+    // Validate with Zod schema
+    const validationResult = AdminUpdateUserSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return { 
+        success: false, 
+        error: `Invalid request: ${validationResult.error.format()}` 
+      };
+    }
+
+    const validatedData = validationResult.data;
+    const { userId } = validatedData;
 
     // Update user information
     const users = await getUsers();
@@ -551,21 +602,16 @@ export async function adminUpdateUserProfile(
     // Update fields that are provided
     const user = { ...users[userIndex] };
     
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
-    if (email !== undefined) user.email = email;
-    if (phone !== undefined) user.phone = phone;
-    if (address !== undefined) {
+    if (validatedData.firstName !== undefined) user.firstName = validatedData.firstName;
+    if (validatedData.lastName !== undefined) user.lastName = validatedData.lastName;
+    if (validatedData.email !== undefined) user.email = validatedData.email;
+    if (validatedData.phone !== undefined) user.phone = validatedData.phone;
+    if (validatedData.address !== undefined) {
       // @ts-expect-error -- Some user types might have address field, use type assertion if needed
-      user.address = address;
+      user.address = validatedData.address;
     }
-    if (accountStatus !== undefined) {
-      // Handle status updates
-      const validStatuses = ['active', 'suspended', 'deactivated'];
-      if (!validStatuses.includes(accountStatus)) {
-        return { success: false, error: 'Invalid status value' };
-      }
-      user.isActive = accountStatus === 'active';
+    if (validatedData.accountStatus !== undefined) {
+      user.isActive = validatedData.accountStatus === 'active';
     }
 
     user.updatedAt = nowIso();
@@ -582,7 +628,7 @@ export async function adminUpdateUserProfile(
       userId,
       title: 'Profile Updated',
       message: 'Your profile information has been updated by an administrator.',
-      type: NotificationType.ACCOUNT_STATUS_CHANGE,
+      type: NotificationType.PROFILE_UPDATE,
       isRead: false,
       createdAt: now,
       relatedId: null,

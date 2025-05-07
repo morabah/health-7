@@ -1,157 +1,13 @@
 {
   "summary": {
     "totalEndpoints": 28,
-    "perfectEndpoints": 5,
+    "perfectEndpoints": 10,
     "goodEndpoints": 1,
     "mediumEndpoints": 0,
-    "poorEndpoints": 22,
-    "averageScore": 21.428571428571427
+    "poorEndpoints": 17,
+    "averageScore": 42.142857142857146
   },
   "results": [
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminVerifyDoctor",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminGetAllUsers",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminGetAllDoctors",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminGetUserDetail",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminUpdateUserStatus",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminCreateUser",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminGetAllAppointments",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminUpdateUserProfile",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
-      "endpoint": "adminGetDoctorById",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
     {
       "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/dashboardFunctions.ts",
       "endpoint": "getMyDashboardStats",
@@ -345,8 +201,72 @@
       }
     },
     {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/appointmentFunctions.ts",
-      "endpoint": "getMyAppointments",
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminVerifyDoctor",
+      "score": 20,
+      "issues": [
+        "Add Zod schema validation to validate input data"
+      ],
+      "details": {
+        "usesSchemaValidation": false,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": false,
+        "validatesBeforeProcessing": false,
+        "returnsValidationErrors": false,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminGetAllUsers",
+      "score": 20,
+      "issues": [
+        "Add Zod schema validation to validate input data"
+      ],
+      "details": {
+        "usesSchemaValidation": false,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": false,
+        "validatesBeforeProcessing": false,
+        "returnsValidationErrors": false,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminGetAllDoctors",
+      "score": 20,
+      "issues": [
+        "Add Zod schema validation to validate input data"
+      ],
+      "details": {
+        "usesSchemaValidation": false,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": false,
+        "validatesBeforeProcessing": false,
+        "returnsValidationErrors": false,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminGetAllAppointments",
+      "score": 20,
+      "issues": [
+        "Add Zod schema validation to validate input data"
+      ],
+      "details": {
+        "usesSchemaValidation": false,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": false,
+        "validatesBeforeProcessing": false,
+        "returnsValidationErrors": false,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminGetDoctorById",
       "score": 20,
       "issues": [
         "Add Zod schema validation to validate input data"
@@ -370,6 +290,62 @@
       "details": {
         "usesSchemaValidation": true,
         "importsFromCentralSchema": false,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminGetUserDetail",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminUpdateUserStatus",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminCreateUser",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
+      "endpoint": "adminUpdateUserProfile",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
         "usesZodSafeParse": true,
         "validatesBeforeProcessing": true,
         "returnsValidationErrors": true,
@@ -407,6 +383,20 @@
     {
       "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/appointmentFunctions.ts",
       "endpoint": "completeAppointment",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/appointmentFunctions.ts",
+      "endpoint": "getMyAppointments",
       "score": 100,
       "issues": [],
       "details": {

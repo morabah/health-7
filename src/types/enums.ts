@@ -73,6 +73,10 @@ export enum NotificationType {
   SYSTEM_ALERT = 'system_alert',
   SYSTEM = 'system',          // Used in seedLocalDb.mjs
   OTHER = 'other',
+  PROFILE_UPDATE = 'profile_update',
+  APPOINTMENT_CREATED = 'appointment_created',
+  APPOINTMENT_CANCELLED = 'appointment_cancelled',
+  MESSAGE = 'message',
 }
 
 /** Account statuses for users */

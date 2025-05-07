@@ -930,8 +930,25 @@ export const GetMyAppointmentsSchema = z.object({
  */
 export const AdminUpdateUserSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  isActive: z.boolean().optional(),
-  // Add other fields that an admin can update
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
+  email: z.string().email('Invalid email format').optional(),
+  phone: z.string().nullable().optional(),
+  address: z.string().max(500, 'Address is too long').nullable().optional(),
+  accountStatus: z.enum(['active', 'suspended', 'deactivated'], {
+    errorMap: () => ({ message: 'Status must be one of: active, suspended, deactivated' }),
+  }).optional(),
+});
+
+/**
+ * Zod schema for admin user status updates
+ */
+export const AdminUpdateUserStatusSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  status: z.enum(['active', 'suspended', 'deactivated'], {
+    errorMap: () => ({ message: 'Status must be one of: active, suspended, deactivated' }),
+  }),
+  reason: z.string().max(500, 'Reason cannot exceed 500 characters').optional(),
 });
 
 /**
@@ -951,7 +968,16 @@ export const AdminCreateUserSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   userType: z.nativeEnum(UserType),
-  // ... add any other required fields
+  isActive: z.boolean().optional().default(true),
+  // Patient-specific fields
+  dateOfBirth: isoDateTimeStringSchema.optional(),
+  gender: genderSchema.optional(),
+  bloodType: z.nativeEnum(BloodType).optional(),
+  medicalHistory: z.string().max(4000).optional(),
+  // Doctor-specific fields
+  specialty: z.string().optional(),
+  licenseNumber: z.string().optional(),
+  yearsOfExperience: z.number().int().min(0).max(70).optional(),
 });
 
 export const isoDateOrDateTimeStringSchema = z.string().refine(
@@ -1065,3 +1091,10 @@ export const DoctorRegistrationSchema = z.object({
 // Export TypeScript types inferred from the schemas
 export type PatientRegistrationPayload = z.infer<typeof PatientRegistrationSchema>;
 export type DoctorRegistrationPayload = z.infer<typeof DoctorRegistrationSchema>;
+
+/**
+ * Zod schema for admin retrieving user details
+ */
+export const AdminGetUserDetailSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+});
