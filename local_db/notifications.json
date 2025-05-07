@@ -1825,5 +1825,15 @@
     "isRead": false,
     "createdAt": "2025-05-07T21:11:14.615Z",
     "relatedId": "xuv5ym25y1gse5imt851u"
+  },
+  {
+    "id": "notif-906hrz3l4mujje43l1xclj",
+    "userId": "u-000",
+    "title": "Account Status Update",
+    "message": "Your account has been deactivated. Bulk deactivate by admin",
+    "type": "account_status_change",
+    "isRead": false,
+    "createdAt": "2025-05-07T22:38:56.582Z",
+    "relatedId": null
   }
 ]

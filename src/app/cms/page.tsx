@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { logInfo } from '@/lib/logger';
 import type { LogEventPayload, ValidationEventPayload } from '@/lib/eventBus';
 import { appEventBus } from '@/lib/eventBus';
@@ -31,13 +30,9 @@ export default function CMSPage() {
   const handleMockLogin = (role: string | null) => {
     if (typeof window !== 'undefined' && window.__mockLogin) {
       if (role) {
-      window.__mockLogin(role);
+        window.__mockLogin(role);
         setAuthMessage(`Logged in as ${role}`);
-      logValidation(
-        '4.3',
-        'success',
-          `Navbar connected to local AuthContext with role ${role}`
-      );
+        logValidation('4.3', 'success', `Navbar connected to local AuthContext with role ${role}`);
       } else {
         // Handle logout case
         const auth = window.__authContext;
@@ -87,35 +82,6 @@ export default function CMSPage() {
   const handleClearLogs = () => {
     setLogs([]);
   };
-
-  // Admin menu items
-  const menuItems = [
-    {
-      label: 'User Management',
-      href: '/cms/users',
-      description: 'Manage patients, doctors and admin users',
-    },
-    {
-      label: 'Content Management',
-      href: '/cms/content',
-      description: 'Manage site content and announcements',
-    },
-    {
-      label: 'Doctor Verification',
-      href: '/cms/doctor-verification',
-      description: 'Review and verify doctor applications',
-    },
-    {
-      label: 'API Validation',
-      href: '/cms/validation',
-      description: 'Test API functionality and endpoints',
-    },
-    {
-      label: 'Database Validation',
-      href: '/cms-validation',
-      description: 'Validate system data integrity',
-    },
-  ];
 
   return (
     <div className="p-8">
@@ -208,12 +174,18 @@ export default function CMSPage() {
           <h2 className="text-xl font-bold mb-4">Users</h2>
           <div className="space-y-2">
             <div>
-              <Link href="/cms/users" className="text-primary-600 hover:underline flex items-center">
+              <Link
+                href="/cms/users"
+                className="text-primary-600 hover:underline flex items-center"
+              >
                 <Users className="h-4 w-4 mr-2" /> Manage Users
               </Link>
             </div>
             <div>
-              <Link href="/admin/users/invites" className="text-primary-600 hover:underline flex items-center">
+              <Link
+                href="/admin/users/invites"
+                className="text-primary-600 hover:underline flex items-center"
+              >
                 <UserPlus className="h-4 w-4 mr-2" /> Invite Users
               </Link>
             </div>
@@ -224,12 +196,18 @@ export default function CMSPage() {
           <h2 className="text-xl font-bold mb-4">Doctors</h2>
           <div className="space-y-2">
             <div>
-              <Link href="/cms/doctors" className="text-primary-600 hover:underline flex items-center">
+              <Link
+                href="/cms/doctors"
+                className="text-primary-600 hover:underline flex items-center"
+              >
                 <BadgeCheck className="h-4 w-4 mr-2" /> Verify Doctors
               </Link>
             </div>
             <div>
-              <Link href="/doctor/schedule" className="text-primary-600 hover:underline flex items-center">
+              <Link
+                href="/doctor/schedule"
+                className="text-primary-600 hover:underline flex items-center"
+              >
                 <Calendar className="h-4 w-4 mr-2" /> Manage Schedules
               </Link>
             </div>
@@ -240,7 +218,10 @@ export default function CMSPage() {
           <h2 className="text-xl font-bold mb-4">Appointments</h2>
           <div className="space-y-2">
             <div>
-              <Link href="/admin/appointments" className="text-primary-600 hover:underline flex items-center">
+              <Link
+                href="/admin/appointments"
+                className="text-primary-600 hover:underline flex items-center"
+              >
                 <CalendarClock className="h-4 w-4 mr-2" /> View All Appointments
               </Link>
             </div>
@@ -255,7 +236,8 @@ export default function CMSPage() {
             <div>
               <h2 className="text-lg font-semibold mb-1">Validation Tools</h2>
               <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Run system validation tests to ensure all API functions, data integrity and core features are working correctly.
+                Run system validation tests to ensure all API functions, data integrity and core
+                features are working correctly.
               </p>
             </div>
           </Link>

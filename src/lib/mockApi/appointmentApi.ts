@@ -5,7 +5,7 @@
  * Uses local database to simulate backend behavior
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { Appointment } from '@/types/schemas';
 import { AppointmentStatus, AppointmentType } from '@/types/enums';
 import { getDoctors, getAppointments, saveAppointments, getUsers } from '@/lib/localDb';
@@ -15,10 +15,10 @@ import {
   getAvailableSlotsForDate,
 } from '@/utils/availabilityUtils';
 import { logInfo, logError } from '@/lib/logger';
-import { 
+import {
   BookAppointmentSchema,
   MockGetAvailableTimeSlotsSchema,
-  MockGetDoctorScheduleSchema
+  MockGetDoctorScheduleSchema,
 } from '@/types/schemas';
 
 // Extended BookAppointment type for mock API purposes
@@ -47,7 +47,7 @@ export async function bookAppointment(
 
     const { doctorId, appointmentDate, startTime, endTime, reason, appointmentType } =
       validationResult.data;
-    
+
     // For mock API, we need the patientId from the payload
     const patientId = payload.patientId;
 
@@ -130,7 +130,8 @@ export async function bookAppointment(
       createdAt: now,
       updatedAt: now,
       appointmentType,
-      videoCallUrl: appointmentType === AppointmentType.VIDEO ? 'https://video-call-link.example.com' : null,
+      videoCallUrl:
+        appointmentType === AppointmentType.VIDEO ? 'https://video-call-link.example.com' : null,
     };
 
     // Save the appointment
@@ -154,14 +155,14 @@ export async function bookAppointment(
  * Gets available time slots for a doctor on a specific date
  * This is a mock implementation that simulates the Cloud Function
  */
-export async function getAvailableTimeSlots(payload: { doctorId: string, date: string }) {
+export async function getAvailableTimeSlots(payload: { doctorId: string; date: string }) {
   try {
     // Validate with schema
     const validationResult = MockGetAvailableTimeSlotsSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
-        message: `Invalid request: ${validationResult.error.format()}`
+        message: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -195,14 +196,18 @@ export async function getAvailableTimeSlots(payload: { doctorId: string, date: s
  * Gets doctor's weekly schedule
  * This is a mock implementation that simulates the Cloud Function
  */
-export async function getDoctorSchedule(payload: { doctorId: string, startDate: string, endDate?: string }) {
+export async function getDoctorSchedule(payload: {
+  doctorId: string;
+  startDate: string;
+  endDate?: string;
+}) {
   try {
     // Validate with schema
     const validationResult = MockGetDoctorScheduleSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
-        message: `Invalid request: ${validationResult.error.format()}`
+        message: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 

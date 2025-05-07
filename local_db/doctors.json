@@ -358,6 +358,11 @@
       ],
       "thursday": [
         {
+          "startTime": "08:00",
+          "endTime": "09:00",
+          "isAvailable": true
+        },
+        {
           "startTime": "10:00",
           "endTime": "11:00",
           "isAvailable": true
@@ -414,7 +419,7 @@
       "2025-07-03T20:35:44.187Z"
     ],
     "createdAt": "2025-03-30T20:35:44.187Z",
-    "updatedAt": "2025-05-06T13:05:56.066Z",
+    "updatedAt": "2025-05-07T22:39:45.690Z",
     "id": "u-005"
   },
   {

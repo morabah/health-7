@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Spinner from '@/components/ui/Spinner';
 import { useAuth } from '@/context/AuthContext';
@@ -38,10 +38,10 @@ interface ProtectedPageProps {
  * Shows a spinner while loading, redirects to login if not authenticated,
  * and redirects to unauthorized page if user doesn't have required role
  */
-export default function ProtectedPage({ 
-  children, 
+export default function ProtectedPage({
+  children,
   allowedRoles,
-  redirectIfAuth = false
+  redirectIfAuth = false,
 }: ProtectedPageProps) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function ProtectedPage({
     if (isRedirecting() || redirectAttempted.current) {
       return;
     }
-    
+
     // Add time-based throttling for redirects (10 second cooldown)
     const now = Date.now();
     if (now - lastRedirectTime.current < 10000) {
@@ -69,18 +69,18 @@ export default function ProtectedPage({
     // For auth pages: If user is logged in and profile is ready, redirect to dashboard
     if (redirectIfAuth && user && profile) {
       const dashboardPath = roleToDashboard(profile.userType);
-      
+
       // Avoid redirecting if we're already on the target path
       if (pathname !== dashboardPath) {
         redirectAttempted.current = true;
         setRedirecting(true);
         lastRedirectTime.current = now;
-        
+
         logInfo('ProtectedPage: Redirecting authenticated user to dashboard', {
           from: pathname,
-          to: dashboardPath
+          to: dashboardPath,
         });
-        
+
         router.replace(dashboardPath);
       }
       return;
@@ -89,12 +89,12 @@ export default function ProtectedPage({
     // If no user is logged in (after loading), redirect to login
     if (!user) {
       logInfo('ProtectedPage: Redirecting to login', { pathname });
-      
+
       // Set both local and global redirect flags
       redirectAttempted.current = true;
       setRedirecting(true);
       lastRedirectTime.current = now;
-      
+
       // Redirect to login with next parameter
       const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : '';
       router.replace(`/login${nextParam}`);
@@ -105,26 +105,26 @@ export default function ProtectedPage({
     if (allowedRoles && allowedRoles.length > 0 && profile) {
       const userType = profile.userType;
       const hasRequiredRole = userType && allowedRoles.includes(userType as UserType);
-      
+
       if (!hasRequiredRole) {
         logInfo('ProtectedPage: Unauthorized access', {
           userType: userType || 'unknown',
           requiredRoles: allowedRoles,
         });
-        
+
         logError('ProtectedPage: User lacks required role', {
           userType,
-          requiredRoles: allowedRoles
+          requiredRoles: allowedRoles,
         });
-        
+
         // Redirect to their appropriate dashboard
         const dashboardPath = roleToDashboard(userType);
-        
+
         // Set redirect flags
         redirectAttempted.current = true;
         setRedirecting(true);
         lastRedirectTime.current = now;
-        
+
         router.replace(dashboardPath);
         return;
       }

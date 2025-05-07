@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UserType } from '@/types/enums';
+import Image from 'next/image';
 
 interface DoctorItemProps {
   doctor: {
@@ -25,9 +25,11 @@ export default function DoctorItem({ doctor }: DoctorItemProps) {
       <div className="flex items-center">
         <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden">
           {doctor.profilePictureUrl ? (
-            <img 
-              src={doctor.profilePictureUrl} 
+            <Image
+              src={doctor.profilePictureUrl}
               alt={`Dr. ${doctor.firstName} ${doctor.lastName}`}
+              width={48}
+              height={48}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -37,30 +39,31 @@ export default function DoctorItem({ doctor }: DoctorItemProps) {
             </span>
           )}
         </div>
-        
+
         <div className="ml-4 flex-1">
           <h3 className="font-semibold text-lg">
             Dr. {doctor.firstName} {doctor.lastName}
           </h3>
-          
+
           <div className="text-sm text-gray-600 dark:text-gray-300">
             {doctor.specialty}
             {doctor.yearsOfExperience && (
               <span className="ml-2">
-                • {doctor.yearsOfExperience} {doctor.yearsOfExperience === 1 ? 'year' : 'years'} experience
+                • {doctor.yearsOfExperience} {doctor.yearsOfExperience === 1 ? 'year' : 'years'}{' '}
+                experience
               </span>
             )}
           </div>
-          
+
           {doctor.rating && (
             <div className="flex items-center mt-1">
               <div className="flex items-center">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <svg 
+                  <svg
                     key={i}
                     className={`w-4 h-4 ${
-                      i < Math.floor(doctor.rating || 0) 
-                        ? 'text-yellow-400' 
+                      i < Math.floor(doctor.rating || 0)
+                        ? 'text-yellow-400'
                         : 'text-gray-300 dark:text-gray-600'
                     }`}
                     fill="currentColor"
@@ -76,19 +79,21 @@ export default function DoctorItem({ doctor }: DoctorItemProps) {
             </div>
           )}
         </div>
-        
+
         {doctor.verificationStatus && (
-          <div className={`text-xs px-2 py-1 rounded-full ${
-            doctor.verificationStatus === 'VERIFIED' 
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-              : doctor.verificationStatus === 'PENDING' 
-                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-          }`}>
+          <div
+            className={`text-xs px-2 py-1 rounded-full ${
+              doctor.verificationStatus === 'VERIFIED'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : doctor.verificationStatus === 'PENDING'
+                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}
+          >
             {doctor.verificationStatus.charAt(0) + doctor.verificationStatus.slice(1).toLowerCase()}
           </div>
         )}
       </div>
     </div>
   );
-} 
+}

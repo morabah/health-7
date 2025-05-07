@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { logInfo, logError } from '@/lib/logger';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { ArrowLeft, Play, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Play, CheckCircle, XCircle } from 'lucide-react';
 import { localApi } from '@/lib/localApiFunctions';
-import { UserType, AppointmentStatus, AppointmentType } from '@/types/enums';
+import { UserType, AppointmentType } from '@/types/enums';
 
 // Define test types
 type TestResult = {
   name: string;
   success: boolean;
   message: string;
-  data?: any;
+  data?: unknown;
   error?: string;
 };
 
@@ -39,28 +39,30 @@ export default function ApiTestPage() {
         try {
           const result = await localApi.login({
             email: 'user0@demo.health',
-            password: 'Password123!'
+            password: 'Password123!',
           });
-          
+
           return {
             name: 'Login',
             success: result.success,
             message: result.success ? 'Successfully logged in' : `Login failed: ${result.error}`,
-            data: result.success ? {
-              userId: result.user.id,
-              userType: result.userProfile.userType
-            } : undefined,
-            error: result.success ? undefined : result.error
+            data: result.success
+              ? {
+                  userId: result.user.id,
+                  userType: result.userProfile.userType,
+                }
+              : undefined,
+            error: result.success ? undefined : result.error,
           };
         } catch (error) {
           return {
             name: 'Login',
             success: false,
             message: 'Login test threw an exception',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           };
         }
-      }
+      },
     },
     {
       name: 'Get User Profile',
@@ -69,67 +71,76 @@ export default function ApiTestPage() {
         try {
           const result = await localApi.getMyUserProfile({
             uid: 'u-000',
-            role: UserType.DOCTOR
+            role: UserType.DOCTOR,
           });
-          
+
           return {
             name: 'Get User Profile',
             success: result.success,
-            message: result.success ? 'Successfully retrieved user profile' : `Failed to get profile: ${result.error}`,
-            data: result.success ? {
-              firstName: result.userProfile.firstName,
-              lastName: result.userProfile.lastName,
-              userType: result.userProfile.userType
-            } : undefined,
-            error: result.success ? undefined : result.error
+            message: result.success
+              ? 'Successfully retrieved user profile'
+              : `Failed to get profile: ${result.error}`,
+            data: result.success
+              ? {
+                  firstName: result.userProfile.firstName,
+                  lastName: result.userProfile.lastName,
+                  userType: result.userProfile.userType,
+                }
+              : undefined,
+            error: result.success ? undefined : result.error,
           };
         } catch (error) {
           return {
             name: 'Get User Profile',
             success: false,
             message: 'Get profile test threw an exception',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           };
         }
-      }
+      },
     },
     {
       name: 'Find Doctors',
       description: 'Test doctor search functionality',
       run: async () => {
         try {
-          const result = await localApi.findDoctors({
-            uid: 'u-007',
-            role: UserType.PATIENT
-          }, {
-            specialty: 'Cardiology'
-          });
-          
+          const result = await localApi.findDoctors(
+            {
+              uid: 'u-007',
+              role: UserType.PATIENT,
+            },
+            {
+              specialty: 'Cardiology',
+            }
+          );
+
           return {
             name: 'Find Doctors',
             success: result.success,
-            message: result.success 
-              ? `Found ${result.doctors.length} doctors` 
+            message: result.success
+              ? `Found ${result.doctors.length} doctors`
               : `Doctor search failed: ${result.error}`,
-            data: result.success ? {
-              count: result.doctors.length,
-              doctors: result.doctors.map(d => ({
-                id: d.id,
-                name: `${d.firstName} ${d.lastName}`,
-                specialty: d.specialty
-              }))
-            } : undefined,
-            error: result.success ? undefined : result.error
+            data: result.success
+              ? {
+                  count: result.doctors.length,
+                  doctors: result.doctors.map(d => ({
+                    id: d.id,
+                    name: `${d.firstName} ${d.lastName}`,
+                    specialty: d.specialty,
+                  })),
+                }
+              : undefined,
+            error: result.success ? undefined : result.error,
           };
         } catch (error) {
           return {
             name: 'Find Doctors',
             success: false,
             message: 'Find doctors test threw an exception',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           };
         }
-      }
+      },
     },
     {
       name: 'Get Appointments',
@@ -138,35 +149,37 @@ export default function ApiTestPage() {
         try {
           const result = await localApi.getMyAppointments({
             uid: 'u-000',
-            role: UserType.DOCTOR
+            role: UserType.DOCTOR,
           });
-          
+
           return {
             name: 'Get Appointments',
             success: result.success,
-            message: result.success 
-              ? `Retrieved ${result.appointments.length} appointments` 
+            message: result.success
+              ? `Retrieved ${result.appointments.length} appointments`
               : `Failed to get appointments: ${result.error}`,
-            data: result.success ? {
-              count: result.appointments.length,
-              appointments: result.appointments.map(a => ({
-                id: a.id,
-                status: a.status,
-                date: a.appointmentDate,
-                patientName: a.patientName
-              }))
-            } : undefined,
-            error: result.success ? undefined : result.error
+            data: result.success
+              ? {
+                  count: result.appointments.length,
+                  appointments: result.appointments.map(a => ({
+                    id: a.id,
+                    status: a.status,
+                    date: a.appointmentDate,
+                    patientName: a.patientName,
+                  })),
+                }
+              : undefined,
+            error: result.success ? undefined : result.error,
           };
         } catch (error) {
           return {
             name: 'Get Appointments',
             success: false,
             message: 'Get appointments test threw an exception',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           };
         }
-      }
+      },
     },
     {
       name: 'Book Appointment',
@@ -175,42 +188,47 @@ export default function ApiTestPage() {
         try {
           const now = new Date();
           const futureDate = new Date(now.setDate(now.getDate() + 7)).toISOString().split('T')[0];
-          
-          const result = await localApi.bookAppointment({
-            uid: 'u-007',
-            role: UserType.PATIENT
-          }, {
-            doctorId: 'u-000',
-            appointmentDate: futureDate,
-            startTime: '10:00',
-            endTime: '10:30',
-            reason: 'API Test Appointment',
-            appointmentType: AppointmentType.IN_PERSON
-          });
-          
+
+          const result = await localApi.bookAppointment(
+            {
+              uid: 'u-007',
+              role: UserType.PATIENT,
+            },
+            {
+              doctorId: 'u-000',
+              appointmentDate: futureDate,
+              startTime: '10:00',
+              endTime: '10:30',
+              reason: 'API Test Appointment',
+              appointmentType: AppointmentType.IN_PERSON,
+            }
+          );
+
           return {
             name: 'Book Appointment',
             success: result.success,
-            message: result.success 
-              ? `Successfully booked appointment with ID: ${result.appointment.id}` 
+            message: result.success
+              ? `Successfully booked appointment with ID: ${result.appointment.id}`
               : `Failed to book appointment: ${result.error}`,
-            data: result.success ? {
-              appointmentId: result.appointment.id,
-              status: result.appointment.status,
-              date: result.appointment.appointmentDate,
-            } : undefined,
-            error: result.success ? undefined : result.error
+            data: result.success
+              ? {
+                  appointmentId: result.appointment.id,
+                  status: result.appointment.status,
+                  date: result.appointment.appointmentDate,
+                }
+              : undefined,
+            error: result.success ? undefined : result.error,
           };
         } catch (error) {
           return {
             name: 'Book Appointment',
             success: false,
             message: 'Book appointment test threw an exception',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           };
         }
-      }
-    }
+      },
+    },
   ];
 
   // Run a specific test
@@ -223,12 +241,15 @@ export default function ApiTestPage() {
       setResults(prev => [...prev, result]);
     } catch (error) {
       logError(`API test failed: ${test.name}`, error);
-      setResults(prev => [...prev, {
-        name: test.name,
-        success: false,
-        message: 'Test failed with unhandled exception',
-        error: error instanceof Error ? error.message : String(error)
-      }]);
+      setResults(prev => [
+        ...prev,
+        {
+          name: test.name,
+          success: false,
+          message: 'Test failed with unhandled exception',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      ]);
     } finally {
       setRunning(null);
     }
@@ -269,16 +290,16 @@ export default function ApiTestPage() {
           <p className="mb-4 text-gray-600 dark:text-gray-300">
             Click on a test to run it individually, or run all tests at once.
           </p>
-          
+
           <div className="flex flex-wrap gap-2 mb-4">
             <Button onClick={runAllTests} disabled={running !== null}>
               <Play className="w-4 h-4 mr-2" />
               Run All Tests
             </Button>
           </div>
-          
+
           <div className="grid gap-4 mt-6">
-            {apiTests.map((test) => (
+            {apiTests.map(test => (
               <Card key={test.name} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div className="flex justify-between items-center">
                   <div>
@@ -315,8 +336,8 @@ export default function ApiTestPage() {
           <h2 className="text-xl font-semibold mb-4">Test Results</h2>
           <div className="grid gap-4">
             {results.map((result, index) => (
-              <div 
-                key={`${result.name}-${index}`} 
+              <div
+                key={`${result.name}-${index}`}
                 className={`border-b border-gray-200 py-3 ${expandedResult === result.name ? 'bg-gray-50' : ''}`}
               >
                 <button
@@ -332,18 +353,20 @@ export default function ApiTestPage() {
                     )}
                     <span className="font-medium">{result.name}</span>
                   </div>
-                  <span className={`text-sm px-2 py-1 rounded-full ${
-                    result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span
+                    className={`text-sm px-2 py-1 rounded-full ${
+                      result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}
+                  >
                     {result.success ? 'Success' : 'Failed'}
                   </span>
                 </button>
-                
+
                 {expandedResult === `${result.name}-${index}` && (
                   <div className="px-4 py-3 text-sm">
                     <p className="mb-2">{result.message}</p>
-                    
-                    {result.data && (
+
+                    {result.data != null && (
                       <div className="mb-2">
                         <h4 className="font-semibold mb-1">Data:</h4>
                         <pre className="bg-gray-100 p-2 rounded overflow-x-auto">
@@ -351,7 +374,7 @@ export default function ApiTestPage() {
                         </pre>
                       </div>
                     )}
-                    
+
                     {result.error && (
                       <div className="text-red-600">
                         <h4 className="font-semibold mb-1">Error:</h4>
@@ -367,4 +390,4 @@ export default function ApiTestPage() {
       )}
     </div>
   );
-} 
+}

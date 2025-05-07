@@ -2,7 +2,6 @@ import '@/styles/globals.css'; // tailwind + tokens
 import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
 import { ClientLayout } from '@/components/layout/ClientLayout';
-import { setupErrorHandling } from '@/lib/errorSystem';
 
 // Configure the Inter font
 const inter = Inter({

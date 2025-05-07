@@ -2,7 +2,7 @@
 
 /**
  * Fix Schema Validation Script
- * 
+ *
  * This script directly fixes the schema validation in the adminGetDoctorById function
  * by modifying the file and ensuring proper format for validation detection.
  */
@@ -18,7 +18,7 @@ const FUNCTION_TO_FIX = 'adminGetDoctorById';
 
 // Read file content
 console.log(`Reading file: ${TARGET_FILE}`);
-let fileContent = fs.readFileSync(TARGET_FILE, 'utf8');
+const fileContent = fs.readFileSync(TARGET_FILE, 'utf8');
 
 // Create regex to find the function
 const functionRegex = new RegExp(
@@ -26,13 +26,11 @@ const functionRegex = new RegExp(
   'g'
 );
 
-const updatedContent = fileContent.replace(
-  functionRegex,
-  (match, start, authPart, rest) => {
-    console.log('Function found, updating validation...');
-    
-    // Insert validation block with clear markers that the audit tool will detect
-    return `${start}${authPart}
+const updatedContent = fileContent.replace(functionRegex, (match, start, authPart, rest) => {
+  console.log('Function found, updating validation...');
+
+  // Insert validation block with clear markers that the audit tool will detect
+  return `${start}${authPart}
     // Validate with schema
     const validationResult = AdminGetDoctorByIdSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -46,8 +44,7 @@ const updatedContent = fileContent.replace(
     const { doctorId } = validationResult.data;
 
     ${rest}`;
-  }
-);
+});
 
 // Write back the content
 if (fileContent !== updatedContent) {
