@@ -1493,12 +1493,24 @@ These changes improve code maintainability, reduce potential runtime errors, and
   - `adminCreateUser` - Uses `AdminCreateUserSchema`
   - `adminUpdateUserProfile` - Uses `AdminUpdateUserSchema`
 
+### Phase 3 (Completed)
+- Implemented central schema validation for notification-related API endpoints
+  - `getMyNotifications` - Uses `GetMyNotificationsSchema`
+  - `markNotificationRead` - Uses `MarkNotificationReadSchema`
+  - `sendDirectMessage` - Uses `SendDirectMessageSchema`
+- Implemented central schema validation for doctor-related API endpoints
+  - `findDoctors` - Uses `FindDoctorsSchema`
+  - `getDoctorPublicProfile` - Uses `GetDoctorPublicProfileSchema`
+  - `setDoctorAvailability` - Uses `SetDoctorAvailabilitySchema`
+  - `getDoctorAvailability` - Uses `GetDoctorAvailabilitySchema`
+
 ### Validation Score Progress
 - Initial Score: 15/100 average, 2 perfect endpoints (7%)
 - After Phase 1: 24/100 average, 6 perfect endpoints (21%)
 - After Phase 2: 42/100 average, 10 perfect endpoints (36%)
+- After Phase 3: 68/100 average, 17 perfect endpoints (61%)
 
-### Next Steps (Phase 3)
-- Implement schema validation for notification-related API endpoints
-- Implement schema validation for doctor-related API endpoints
+### Next Steps (Phase 4)
 - Implement schema validation for dashboard-related API endpoints
+- Implement schema validation for mock API endpoints
+- Implement schema validation for remaining admin API endpoints
