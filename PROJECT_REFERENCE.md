@@ -1367,52 +1367,45 @@ These changes improve code maintainability, reduce potential runtime errors, and
 #### Key Findings:
 
 1. **Zod Schemas as Source of Truth:**
-
    - Located in `src/types/schemas.ts` as the central repository
    - Types are correctly inferred from Zod schemas using `z.infer<typeof SchemaName>`
    - Comprehensive validation rules with detailed error messages
 
 2. **Backend Validation Implementation:**
-
-   - Successfully implemented central schema validation in `bookAppointment` and `cancelAppointment` functions
+   - Successfully implemented central schema validation in all six appointment-related functions
    - Created API contract validation tools: `validateDbSchemas.ts` and `validateApiEndpoints.ts`
    - Both tools provide detailed reports on schema adherence with recommendations
 
 3. **Data Type Consistency:**
-
    - TypeScript types are properly derived from Zod schemas
    - Example: `type UserProfile = z.infer<typeof UserProfileSchema> & { id: string }`
    - Common patterns like ISO date string validation are centralized
 
 4. **Testing Support:**
-
    - Comprehensive tests in `db_schema_validation.test.ts` verify database integrity
    - Tests validate real data against schemas with detailed reporting
 
 5. **Validation Utils:**
-
    - `dataValidationUtils.ts` provides helper functions to validate collection data
    - Collection data is validated before operations and errors are logged
 
 6. **API Schema Audit Results:**
    - Created tools to audit schema validation usage in API endpoints
    - Latest validation report found 28 API endpoints:
-     - 2 Perfect Score (100%) - BookAppointment, CancelAppointment
-     - 2 Good Score (80-99%) - CompleteAppointment (90%), mockApi.BookAppointment (80%)
+     - 6 Perfect Score (100%) - All appointment-related endpoints (bookAppointment, cancelAppointment, completeAppointment, getMyAppointments, getAppointmentDetails, getAvailableSlots)
+     - 1 Good Score (80-99%) - mockApi.BookAppointment (80%)
      - 0 Medium Score (50-79%)
-     - 24 Poor Score (<50%)
-   - Average score across all endpoints: 15/100
+     - 21 Poor Score (<50%)
+   - Average score across all endpoints: 24/100 (improved from initial 15/100)
 
 #### Recommendations:
 
 1. **High Priority:**
-
    - Import schema definitions from `src/types/schemas.ts` in all API endpoints instead of defining inline
    - Implement consistent schema validation pattern using `schema.safeParse()` at the beginning of each function
    - Add runtime validation for API responses to ensure type safety
 
 2. **Medium Priority:**
-
    - Standardize error handling for schema validation failures
    - Implement automatic validation in the API layer so individual functions don't need to validate
    - Create a higher-order function that wraps API endpoints with validation
@@ -1425,17 +1418,15 @@ These changes improve code maintainability, reduce potential runtime errors, and
 #### Action Plan:
 
 1. **Phase 1 (Immediate):**
-
    - ✅ Create validation audit tools (completed)
    - ✅ Fix critical appointment booking functions (completed)
-   - Fix the remaining appointment-related functions:
-     - completeAppointment (use CompleteAppointmentSchema from central repo)
-     - getMyAppointments
-     - getAppointmentDetails
-     - getAvailableSlots
+   - ✅ Fix the remaining appointment-related functions (completed):
+     - ✅ completeAppointment (use CompleteAppointmentSchema from central repo)
+     - ✅ getMyAppointments (added filtering and pagination support)
+     - ✅ getAppointmentDetails (use GetAppointmentDetailsSchema from central repo)
+     - ✅ getAvailableSlots (use GetAvailableSlotsSchema from central repo)
 
 2. **Phase 2 (Next Sprint):**
-
    - Fix admin-related API functions (9 endpoints)
    - Add API response validation to ensure returned data matches schemas
    - Update all validation tests with additional edge cases
@@ -1444,3 +1435,41 @@ These changes improve code maintainability, reduce potential runtime errors, and
    - Create a validation middleware or decorator pattern
    - Implement runtime type checking in production for critical operations
    - Set up continuous monitoring for schema violations
+
+### Implementation Details
+
+1. **Schema Validation Pattern:**
+   The following pattern is consistently applied across appointment-related functions:
+   ```typescript
+   // Validate with Zod schema from central schema definitions
+   const result = SchemaName.safeParse(payload);
+   if (!result.success) {
+     return {
+       success: false,
+       error: `Invalid request: ${result.error.format()}`,
+     };
+   }
+   // Get the validated data with correct types
+   const validatedData = result.data;
+   // Use validatedData safely with proper TypeScript types
+   ```
+
+2. **Schema Design Pattern:**
+   We've enhanced schemas with useful validation rules:
+   ```typescript
+   export const GetMyAppointmentsSchema = z.object({
+     // Optional filter parameters
+     status: z.nativeEnum(AppointmentStatus).optional(),
+     startDate: isoDateTimeStringSchema.optional(),
+     endDate: isoDateTimeStringSchema.optional(),
+     limit: z.number().int().min(1).max(100).optional(),
+     offset: z.number().int().min(0).optional(),
+   }).strict().partial();
+   ```
+
+3. **Benefits of Schema Validation:**
+   - Type safety throughout the application
+   - Consistent validation rules
+   - Better error messages for users
+   - Self-documenting validation requirements
+   - Reduced code duplication
