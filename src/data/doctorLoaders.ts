@@ -188,11 +188,10 @@ export const useDoctorAvailability = () => {
       if (!user?.uid) throw new AuthError('User not authenticated');
       
       try {
-        return await callApi('getDoctorAvailability', { 
-          uid: user.uid, 
-          role: UserType.DOCTOR,
-          doctorId: user.uid 
-        });
+        return await callApi('getDoctorAvailability', 
+          { uid: user.uid, role: UserType.DOCTOR },
+          { doctorId: user.uid }
+        );
       } catch (error) {
         // Persist errors for analysis
         persistError(normalizeError(error));

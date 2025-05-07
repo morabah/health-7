@@ -310,6 +310,25 @@ export class DataError extends AppError {
     super(message, {
       ...options,
       category: 'data',
+      retryable: options.retryable ?? true,
+    });
+  }
+}
+
+/**
+ * DataFetchError - Thrown when data fetching operations fail
+ */
+export class DataFetchError extends DataError {
+  constructor(
+    message = 'Failed to fetch data',
+    code = 'DATA_FETCH_ERROR',
+    context?: Record<string, unknown>,
+    retryable = true
+  ) {
+    super(message, {
+      code,
+      context,
+      retryable,
     });
   }
 }
@@ -508,7 +527,7 @@ export function enhanceError(
   
   // For non-AppErrors, add context as properties
   Object.entries(context).forEach(([key, value]) => {
-    (error as any)[key] = value;
+    (error as unknown as Record<string, unknown>)[key] = value;
   });
   
   return error;

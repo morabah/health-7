@@ -8,11 +8,12 @@
  */
 
 import { UserType as UserRole } from '@/types/enums';
-import { logInfo, logError, logWarn } from './logger';
+import { logInfo, logError, logWarn } from '@/lib/logger';
 import { cacheKeys, cacheManager } from './queryClient';
-import enhancedCache, { CacheCategory } from './cacheManager';
-import { callApi } from './apiClient';
-import { DataError } from './errors/errorClasses';
+import enhancedCache, { CacheCategory } from '@/lib/cacheManager';
+import { callApi } from '@/lib/apiClient';
+import { DataError } from '@/lib/errors/errorClasses';
+import { getCurrentUserRole } from '@/lib/apiAuthCtx';
 
 // Type for filtered data request options
 export interface FilterOptions {
@@ -769,7 +770,7 @@ export async function getOptimizedNotifications(
     // Call the API
     const response = await callApi('getMyNotifications', {
       uid: userId,
-      role: getUserRole(userId),
+      role: getCurrentUserRole() || 'patient',
     });
 
     // Update backoff parameters based on success/failure
