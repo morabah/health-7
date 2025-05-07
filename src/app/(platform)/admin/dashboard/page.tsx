@@ -170,6 +170,7 @@ interface DoctorsDataResponse {
 interface AppointmentsDataResponse {
   success: boolean;
   appointments: Appointment[];
+  totalCount: number;
   error?: string;
 }
 
@@ -265,7 +266,7 @@ function AdminDashboardContent() {
   const pendingVerifications = dashboardData?.success
     ? dashboardData.adminStats?.pendingVerifications || 0
     : 0;
-  const totalAppointments = appointmentsData?.success ? appointmentsData.appointments.length : 0;
+  const totalAppointments = appointmentsData?.success ? appointmentsData.totalCount || 0 : 0;
 
   // Get derived statistics - memoize to prevent infinite render loops
   const verifiedDoctorsCount = useMemo(

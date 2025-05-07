@@ -22,12 +22,16 @@ const frequentOpLogs: Record<string, OpLogTracking> = {
   getMyDashboardStats: { lastLogTime: 0, logInterval: 60000, messageCount: 0 },
   fetchCollectionData: { lastLogTime: 0, logInterval: 60000, messageCount: 0 },
   'Using memory cached notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
-  'Using React Query cached notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
+  'Using React Query cached notifications data': {
+    lastLogTime: 0,
+    logInterval: 10000,
+    messageCount: 0,
+  },
   'Fetching fresh notifications data': { lastLogTime: 0, logInterval: 10000, messageCount: 0 },
 };
 
 // Track recent log messages to avoid repetition
-const recentLogMessages = new Map<string, { count: number, lastTime: number }>();
+const recentLogMessages = new Map<string, { count: number; lastTime: number }>();
 const RECENT_MESSAGE_TTL = 5000; // 5 seconds retention for duplicate detection
 
 // List of operations to be logged less frequently
@@ -52,22 +56,22 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
   // Check for duplicate recent messages (identical message + level)
   const msgKey = `${level}-${message}`;
   const recentMsg = recentLogMessages.get(msgKey);
-  
+
   if (recentMsg) {
     // We've seen this exact message recently
     recentMsg.count++;
-    
+
     // Only log every 5th occurrence or after 5 seconds
-    if (recentMsg.count < 5 && (now - recentMsg.lastTime) < 5000) {
+    if (recentMsg.count < 5 && now - recentMsg.lastTime < 5000) {
       return; // Skip this log
     }
-    
+
     // Update the timestamp but allow this one through
     recentMsg.lastTime = now;
   } else {
     // New message, add to tracking
     recentLogMessages.set(msgKey, { count: 1, lastTime: now });
-    
+
     // Clean up old entries every 20 logs
     if (recentLogMessages.size > 20) {
       // Use Array.from to convert Map entries to array for iteration compatibility
@@ -97,20 +101,20 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
   // Check for exact message matches in frequent operations
   if (frequentOperations.includes(message)) {
     const tracker = frequentOpLogs[message];
-    
+
     // Skip if we've logged this operation recently
     if (now - tracker.lastLogTime < tracker.logInterval) {
       tracker.messageCount++;
       return;
     }
-    
+
     // Update last log time for this operation
     tracker.lastLogTime = now;
-    
+
     // If we've skipped many messages, add a count
     const skippedCount = tracker.messageCount;
     tracker.messageCount = 0;
-    
+
     if (skippedCount > 0) {
       message = `${message} (${skippedCount} similar messages suppressed)`;
     }
@@ -123,18 +127,18 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
           frequentOpLogs[op].messageCount++;
           return;
         }
-        
+
         // Update last log time for this operation
         frequentOpLogs[op].lastLogTime = now;
-        
+
         // If we've skipped many messages, add a count
         const skippedCount = frequentOpLogs[op].messageCount;
         frequentOpLogs[op].messageCount = 0;
-        
+
         if (skippedCount > 0) {
           message = `${message} (${skippedCount} similar messages suppressed)`;
         }
-        
+
         break;
       }
     }
@@ -252,6 +256,24 @@ setTimeout(() => {
       'Every UI route now powered by local API; full local E2E confirmed'
     );
   } catch (e) {
-    console.error('Could not log final validation for 4.10', e);
+    // eslint-disable-next-line no-console
+    console.error('Error in logger validation log:', e);
   }
-}, 3000); // Delayed to ensure it runs after the app is mounted
+}, 2000);
+
+/**
+ * Resets internal logger state for testing purposes.
+ * This should only be used in test environments.
+ */
+export const resetLoggerStateForTesting = (): void => {
+  recentLogMessages.clear();
+  logCounter = 0;
+  lastLogTime = 0; // Reset last log time as well for throttling
+  // Reset message counts for frequent operations
+  for (const op in frequentOpLogs) {
+    if (Object.prototype.hasOwnProperty.call(frequentOpLogs, op)) {
+      frequentOpLogs[op].lastLogTime = 0;
+      frequentOpLogs[op].messageCount = 0;
+    }
+  }
+};

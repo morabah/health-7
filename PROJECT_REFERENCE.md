@@ -1789,3 +1789,126 @@ User observed that on the `/admin/dashboard`, the sum of "Patients" and "Doctors
 - `src/app/(platform)/admin/dashboard/page.tsx`
 
 ---
+
+### Prompt: Patient Appointment Disappears on Refresh (User Noticed 2024-07-09)
+
+**Issue:**
+After successfully booking an appointment and seeing it on the `/patient/appointments` page (Image 1), refreshing the page caused the newly booked appointment to disappear, showing "No upcoming appointments" (Image 2).
+
+**Analysis:**
+
+- Logs showed that immediately after booking, the UI correctly displayed the appointment, likely due to the manual React Query cache update in the `useBookAppointment` mutation's `onSuccess` handler.
+- However, upon refreshing the page, the logs revealed a strange sequence:
+  1. `[INFO] [callApi] Calling getMyAppointments with args: ...` (Correct call initiated by `usePatientAppointments` hook).
+  2. `[INFO] Fetching fresh appointments data ...` (Log message traced back to `getOptimizedAppointments` in `optimizedDataAccess.ts`).
+  3. `[INFO] [callApi] Calling adminGetAllAppointments with args: ...` (Incorrect admin-level fetch).
+- The root cause was identified in `src/lib/apiClient.ts`. The `OPTIMIZED_METHODS` constant incorrectly mapped the `getMyAppointments` method (intended for fetching the current user's specific appointments) to the `getOptimizedAppointments` function.
+- `getOptimizedAppointments` was designed as a more generic fetcher (likely for admin or broader views) and internally called `adminGetAllAppointments`, which fetched _all_ appointments, not just the specific patient's.
+- This meant the refresh triggered the optimized path, which returned the wrong (all users) data, leading the UI filter to show no _upcoming_ appointments for the current patient if they didn't happen to be among the first few returned by the admin call.
+
+**Fix Implemented:**
+
+- Modified `src/lib/apiClient.ts`.
+- Removed the line `getMyAppointments: getOptimizedAppointments,` from the `OPTIMIZED_METHODS` constant map.
+- This ensures that calls to `callApi('getMyAppointments')` now correctly execute the actual `getMyAppointments` function, respecting the user's context (UID and role) passed in the arguments.
+
+**Lesson Learned:**
+
+- Be extremely cautious when implementing generic optimizations, mappings, or data access layers (`OPTIMIZED_METHODS` in this case).
+- Ensure that context-specific API calls (e.g., fetching data for the _current_ user like `getMyAppointments`) are not inadvertently routed through handlers designed for different, broader contexts (e.g., fetching _all_ data like `adminGetAllAppointments`).
+- Optimization layers must respect the intended specificity and authorization context of the original API method name and its arguments.
+- Verify mappings and abstraction layers thoroughly, especially when dealing with user-specific data versus aggregated/admin data.
+
+**Files Modified:**
+
+- `src/lib/apiClient.ts`
+
+---
+
+### Prompt: Admin Appointments Page Shows Only 10 Appointments (User Noticed 2024-07-10)
+
+**Issue:**
+The Admin Dashboard correctly showed the total number of appointments (e.g., 44), but the dedicated Admin Appointments page (`/admin/appointments`) was only displaying the first 10 appointments, despite more existing in the system.
+
+**Analysis:**
+
+- The `adminGetAllAppointments` API function in `src/lib/api/adminFunctions.ts` defaults to `limit = 10` if no pagination parameters are provided.
+- The `useAllAppointments` hook in `src/data/adminLoaders.ts` (previously called as `useAdminAppointments` on the page) was being called without any payload, thus triggering the backend's default limit of 10.
+- The Admin Dashboard correctly showed the total because it primarily used the `totalCount` from the API response, which is calculated before pagination is applied on the backend.
+- The `/admin/appointments` page was fetching all appointments (or so it thought) and then applying client-side filters. The pagination was missing entirely.
+
+**Fixes Implemented:**
+
+1.  **`src/data/adminLoaders.ts`:**
+
+    - Ensured the `useAllAppointments` hook was correctly modified to accept an `AdminGetAllAppointmentsPayload` (containing `page`, `limit`, `status`, etc.).
+    - This payload is passed to the `callApi('adminGetAllAppointments', ctx, payload)` call.
+    - The React Query `queryKey` for this hook was updated to include the `payload` to ensure proper caching and refetching when pagination/filters change.
+
+2.  **`src/app/(platform)/admin/appointments/page.tsx`:**
+    - **Corrected Hook Usage:** Changed the import and usage from the incorrectly referenced `useAdminAppointments` to the correct, payload-accepting `useAllAppointments`.
+    - **State Management:** Introduced `currentPage` state (defaulting to 1) and a `ITEMS_PER_PAGE` constant (defaulting to 10).
+    - **API Payload:** Constructed an `apiPayload` object using `useMemo`, including `page: currentPage` and `limit: ITEMS_PER_PAGE`. Also included `status` from `statusFilter` if it's not 'all' or 'scheduled' (as 'scheduled' is a client-side group for now).
+    - **Data Fetching:** Passed `apiPayload` to the `useAllAppointments` hook.
+    - **Displaying Totals:** Used `appointmentsResponse.totalCount` to display the total number of appointments and to calculate `totalPages`.
+    - **Pagination Controls:** Added "Previous" and "Next" buttons, with their `disabled` state managed based on `currentPage` and `totalPages`.
+    - **Filter Reset:** Ensured that changing filters (date or status) resets `currentPage` to 1.
+    - **Client-Side Filtering:** Kept existing client-side filtering logic for date ranges and the 'scheduled' status group for now. The appointments displayed (`appointmentsToDisplay`) are those returned from the paginated API call.
+    - **Type Safety:** Added an explicit type assertion for the data returned from `useAllAppointments` to resolve potential TypeScript inference issues.
+
+**Outcome:**
+The `/admin/appointments` page now correctly fetches and displays appointments in a paginated manner, showing the correct total count and allowing navigation through pages. Client-side filters continue to operate on the currently fetched page of data.
+
+---
+
+### Prompt: TypeError: payload is undefined in Admin Appointment Details (User Noticed 2024-07-10)
+
+**Issue:**
+When navigating to an admin appointment detail page (e.g., `/admin/appointments/some-id`), a `TypeError: payload is undefined` occurred. The error originated in the `getAppointmentDetails` API function (`src/lib/api/appointmentFunctions.ts`), which was trying to destructure `appointmentId` from an undefined `payload` argument.
+
+**Analysis:**
+
+- The `getAppointmentDetails` API function expects its second argument to be a `payload` object containing `{ appointmentId: string }`.
+- The call to this API function was made from the `useAppointmentDetails` hook in `src/data/adminLoaders.ts`.
+- Within this hook, `callApi('getAppointmentDetails', context, payload)` was being called. However, the `appointmentId` was incorrectly included in the `context` object (the second argument to `callApi`) instead of being passed as a separate `payload` object (the third argument to `callApi`).
+- This resulted in `getAppointmentDetails` receiving `undefined` for its `payload` parameter.
+
+**Fix Implemented:**
+
+- Modified the `useAppointmentDetails` hook in `src/data/adminLoaders.ts`.
+- The `callApi` invocation was changed to correctly structure its arguments:
+
+  - The `context` object (second argument to `callApi`) now only contains `{ uid: user.uid, role: UserType.ADMIN }`.
+  - The `payload` object (third argument to `callApi`) now correctly contains `{ appointmentId }`.
+
+  ```typescript
+  // Old call in useAppointmentDetails:
+  // return await callApi('getAppointmentDetails', {
+  //   uid: user.uid,
+  //   role: UserType.ADMIN,
+  //   appointmentId, // Incorrectly placed here
+  // });
+
+  // New call in useAppointmentDetails:
+  return await callApi(
+    'getAppointmentDetails',
+    {
+      // Context
+      uid: user.uid,
+      role: UserType.ADMIN,
+    },
+    {
+      // Payload
+      appointmentId,
+    }
+  );
+  ```
+
+**Outcome:**
+The `getAppointmentDetails` API function now receives the `payload` object correctly, and the `TypeError` is resolved. Admin users can successfully view appointment details.
+
+**Files Modified:**
+
+- `src/data/adminLoaders.ts`
+
+---

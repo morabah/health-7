@@ -55,7 +55,6 @@ const OPTIMIZED_METHODS: Record<string, OptimizedMethod<unknown> | null> = {
   getAllDoctors: getOptimizedDoctors,
   getDoctorPublicProfile: null, // Special case handled in code
   getAllUsers: getOptimizedUsers,
-  getMyAppointments: getOptimizedAppointments,
   getPatientAppointments: getOptimizedAppointments,
   getDoctorAppointments: getOptimizedAppointments,
 };

@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useBatchDoctorData } from '@/data/doctorLoaders';
 import { z } from 'zod';
 import { UserProfileSchema, DoctorProfileSchema } from '@/types/schemas';
+import type { Appointment } from '@/types/schemas';
 
 // Define expected API response structure for adminGetAllUsers
 interface AdminGetAllUsersPayload {
@@ -43,6 +44,24 @@ interface AdminGetAllDoctorsResponse {
     lastName: string;
     email: string;
   })[];
+  totalCount: number;
+  error?: string;
+}
+
+// Define payload/response for adminGetAllAppointments
+interface AdminGetAllAppointmentsPayload {
+  page?: number;
+  limit?: number;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  doctorId?: string;
+  patientId?: string;
+}
+
+interface AdminGetAllAppointmentsResponse {
+  success: boolean;
+  appointments: Appointment[];
   totalCount: number;
   error?: string;
 }
@@ -121,20 +140,25 @@ export const useAllDoctors = (payload: AdminGetAllDoctorsPayload = {}) => {
 /**
  * Hook to fetch all appointments
  */
-export const useAllAppointments = () => {
+export const useAllAppointments = (payload: AdminGetAllAppointmentsPayload = {}) => {
   const { user } = useAuth();
+  const queryKey = ['admin', 'appointments', payload];
 
-  return useQuery({
-    queryKey: ['admin', 'appointments'],
+  return useQuery<AdminGetAllAppointmentsResponse, Error>({
+    queryKey,
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
         throw new UnauthorizedError('Only administrators can access all appointments');
       }
 
-      return callApi('adminGetAllAppointments', {
-        uid: user.uid,
-        role: UserType.ADMIN,
-      });
+      return callApi<AdminGetAllAppointmentsResponse>(
+        'adminGetAllAppointments',
+        {
+          uid: user.uid,
+          role: UserType.ADMIN,
+        },
+        payload
+      );
     },
     enabled: !!user && user.role === UserType.ADMIN,
   });
@@ -268,11 +292,16 @@ export function useAppointmentDetails(appointmentId: string) {
         throw new UnauthorizedError('Only administrators can access this appointment');
       }
 
-      return await callApi('getAppointmentDetails', {
-        uid: user.uid,
-        role: UserType.ADMIN,
-        appointmentId,
-      });
+      return await callApi(
+        'getAppointmentDetails',
+        {
+          uid: user.uid,
+          role: UserType.ADMIN,
+        },
+        {
+          appointmentId,
+        }
+      );
     },
     enabled: !!appointmentId && !!user,
   });

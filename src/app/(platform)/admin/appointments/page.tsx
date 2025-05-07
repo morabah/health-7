@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -21,74 +21,112 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Select from '@/components/ui/Select';
 
-import { useAdminAppointments } from '@/data/adminLoaders';
+import { useAllAppointments } from '@/data/adminLoaders';
 import { AppointmentStatus, UserType } from '@/types/enums';
 import { logInfo } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
 
+// Define the expected response type from the hook for clarity
+interface AdminAppointmentsData {
+  success: boolean;
+  appointments: Appointment[];
+  totalCount: number;
+  error?: string;
+}
+
+const ITEMS_PER_PAGE = 10;
+
 export default function AdminAppointmentsPage() {
+  const [currentPage, setCurrentPage] = useState(1);
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [userTypeFilter, setUserTypeFilter] = useState('all');
-  
-  // Get appointments data from API
-  const { data: appointmentsData, isLoading, error } = useAdminAppointments();
 
-  // Filter appointments based on selected filters
-  const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
-  
-  const filteredAppointments = appointments.filter((appointment: Appointment) => {
-    // Date filtering
-    const appointmentDate = new Date(appointment.appointmentDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    
-    const nextMonth = new Date(today);
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    
-    let passesDateFilter = true;
-    
-    if (dateFilter === 'today') {
-      passesDateFilter = appointmentDate.toDateString() === today.toDateString();
-    } else if (dateFilter === 'tomorrow') {
-      passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
-    } else if (dateFilter === 'week') {
-      passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
-    } else if (dateFilter === 'month') {
-      passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
+  const apiPayload = useMemo(() => {
+    const payload: { page: number; limit: number; status?: string } = {
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+    };
+    if (statusFilter !== 'all' && statusFilter !== 'scheduled') {
+      payload.status = statusFilter;
     }
-    
-    // Status filtering
-    let passesStatusFilter = true;
-    
-    if (statusFilter === 'scheduled') {
-      passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
-    } else if (statusFilter === 'completed') {
-      passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
-    } else if (statusFilter === 'cancelled') {
-      passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
-    }
-    
-    return passesDateFilter && passesStatusFilter;
-  });
-  
+    // Date filtering to startDate/endDate is complex; handled client-side for now.
+    // Future: convert dateFilter to startDate/endDate and pass in payload.
+    return payload;
+  }, [currentPage, statusFilter]);
+
+  const {
+    data: appointmentsResponse,
+    isLoading,
+    error,
+  } = useAllAppointments(apiPayload) as {
+    data: AdminAppointmentsData | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+
+  const appointmentsToDisplay = appointmentsResponse?.success
+    ? appointmentsResponse.appointments
+    : [];
+  const totalAppointments = appointmentsResponse?.success ? appointmentsResponse.totalCount : 0;
+  const totalPages = Math.ceil(totalAppointments / ITEMS_PER_PAGE);
+
+  // Client-side filtering for date and complex status cases (like 'scheduled')
+  const filteredAppointments = useMemo(() => {
+    return appointmentsToDisplay.filter((appointment: Appointment) => {
+      let passesDateFilter = true;
+      if (dateFilter !== 'all') {
+        const appointmentDate = new Date(appointment.appointmentDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+        const nextMonth = new Date(today);
+        nextMonth.setMonth(today.getMonth() + 1);
+        if (dateFilter === 'today')
+          passesDateFilter = appointmentDate.toDateString() === today.toDateString();
+        else if (dateFilter === 'tomorrow')
+          passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
+        else if (dateFilter === 'week')
+          passesDateFilter = appointmentDate >= today && appointmentDate < nextWeek;
+        else if (dateFilter === 'month')
+          passesDateFilter = appointmentDate >= today && appointmentDate < nextMonth;
+      }
+
+      let passesStatusFilter = true;
+      if (statusFilter === 'scheduled') {
+        passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(
+          appointment.status
+        );
+      } else if (statusFilter !== 'all' && apiPayload.status !== statusFilter) {
+        passesStatusFilter = appointment.status === statusFilter;
+      }
+
+      return passesDateFilter && passesStatusFilter;
+    });
+  }, [appointmentsToDisplay, dateFilter, statusFilter, apiPayload.status]);
+
   useEffect(() => {
-    logInfo('Admin appointments page loaded');
-  }, []);
+    logInfo('Admin appointments page loaded', {
+      currentPage,
+      statusFilter,
+      dateFilter,
+      totalFetched: appointmentsToDisplay.length,
+      totalAvailable: totalAppointments,
+    });
+  }, [currentPage, statusFilter, dateFilter, appointmentsToDisplay.length, totalAppointments]);
+
+  const handlePreviousPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  const handleNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages || 1));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">All Appointments</h1>
+        <h1 className="text-2xl font-bold">All Appointments ({totalAppointments})</h1>
       </div>
 
-      {/* Filters */}
+      {/* Filters Card */}
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <div className="w-full sm:w-auto">
@@ -96,7 +134,10 @@ export default function AdminAppointmentsPage() {
               id="date-filter"
               label="Date"
               value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
+              onChange={e => {
+                setCurrentPage(1);
+                setDateFilter(e.target.value);
+              }}
               className="w-full sm:w-40"
             >
               <option value="all">All Dates</option>
@@ -111,41 +152,50 @@ export default function AdminAppointmentsPage() {
               id="status-filter"
               label="Status"
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={e => {
+                setCurrentPage(1);
+                setStatusFilter(e.target.value);
+              }}
               className="w-full sm:w-40"
             >
               <option value="all">All Statuses</option>
               <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value={AppointmentStatus.COMPLETED}>Completed</option>
+              <option value={AppointmentStatus.CANCELED}>Cancelled</option>
+              <option value={AppointmentStatus.PENDING}>Pending</option>
+              <option value={AppointmentStatus.CONFIRMED}>Confirmed</option>
             </Select>
           </div>
           <div className="flex-grow" />
         </div>
       </Card>
 
-      {/* Loading, Error and Empty States */}
       {isLoading && (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
       )}
-      
+
       {error && (
         <Alert variant="error" className="my-4">
           Error loading appointments: {error instanceof Error ? error.message : String(error)}
         </Alert>
       )}
-      
+
       {!isLoading && !error && filteredAppointments.length === 0 && (
         <Card className="p-8 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-          <p className="text-slate-500 dark:text-slate-400">No appointments found matching your filters.</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <p className="text-slate-500 dark:text-slate-400">
+            {totalAppointments > 0
+              ? 'No appointments match your current filters.'
+              : 'No appointments found.'}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
             className="mt-4"
             onClick={() => {
+              setCurrentPage(1);
               setDateFilter('all');
               setStatusFilter('all');
             }}
@@ -155,39 +205,45 @@ export default function AdminAppointmentsPage() {
         </Card>
       )}
 
-      {/* List View */}
       {!isLoading && !error && filteredAppointments.length > 0 && (
         <div className="space-y-4">
           {filteredAppointments.map((appointment: Appointment) => (
-            <AppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-            />
+            <AppointmentCard key={appointment.id} appointment={appointment} />
           ))}
+        </div>
+      )}
+
+      {!isLoading && !error && totalAppointments > 0 && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <Button onClick={handlePreviousPage} disabled={currentPage === 1} variant="outline">
+            Previous
+          </Button>
+          <span className="text-sm text-slate-600 dark:text-slate-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button onClick={handleNextPage} disabled={currentPage === totalPages} variant="outline">
+            Next
+          </Button>
         </div>
       )}
     </div>
   );
 }
 
-// Appointment Card Component
-function AppointmentCard({
-  appointment,
-}: {
-  appointment: Appointment;
-}) {
-  // Format date nicely
+// AppointmentCard component remains the same
+function AppointmentCard({ appointment }: { appointment: Appointment }) {
   const formattedDate = format(new Date(appointment.appointmentDate), 'PPPP');
-
   const statusMap: Record<string, string> = {
     [AppointmentStatus.PENDING]: 'Pending',
     [AppointmentStatus.CONFIRMED]: 'Confirmed',
     [AppointmentStatus.COMPLETED]: 'Completed',
     [AppointmentStatus.CANCELED]: 'Cancelled',
-    [AppointmentStatus.RESCHEDULED]: 'Rescheduled'
+    [AppointmentStatus.RESCHEDULED]: 'Rescheduled',
   };
-
-  const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
+  const statusColor: Record<
+    string,
+    'success' | 'default' | 'warning' | 'info' | 'danger' | 'pending'
+  > = {
     [AppointmentStatus.PENDING]: 'pending',
     [AppointmentStatus.CONFIRMED]: 'info',
     [AppointmentStatus.COMPLETED]: 'success',
@@ -198,7 +254,6 @@ function AppointmentCard({
   return (
     <Card className="p-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Patient Info & Time */}
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex items-center">
             <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 mr-3">
@@ -206,12 +261,9 @@ function AppointmentCard({
             </div>
             <div>
               <h3 className="font-medium">{appointment.patientName}</h3>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Patient
-              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Patient</div>
             </div>
           </div>
-
           <div className="flex items-center mt-2 md:mt-0 md:ml-6">
             <div className="flex flex-col">
               <div className="font-medium">Dr. {appointment.doctorName}</div>
@@ -221,8 +273,6 @@ function AppointmentCard({
             </div>
           </div>
         </div>
-
-        {/* Date, Time and Status */}
         <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
           <div>
             <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
@@ -234,25 +284,22 @@ function AppointmentCard({
               {appointment.startTime} - {appointment.endTime}
             </div>
           </div>
-
           <div className="flex flex-col items-end gap-2">
             <Badge variant={statusColor[appointment.status] || 'default'}>
               {statusMap[appointment.status] || 'Unknown'}
             </Badge>
-
-            <Button size="sm" variant="outline" as={Link} href={`/admin/appointments/${appointment.id}`}>
+            <Button
+              size="sm"
+              variant="outline"
+              as={Link}
+              href={`/admin/appointments/${appointment.id}`}
+            >
               <ChevronRight className="h-4 w-4 mr-1" />
               Details
             </Button>
           </div>
         </div>
       </div>
-      
-      {appointment.reason && (
-        <p className="text-sm mt-2 text-slate-600 dark:text-slate-400">
-          <strong>Reason:</strong> {appointment.reason}
-        </p>
-      )}
     </Card>
   );
-} 
+}

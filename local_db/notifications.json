@@ -1765,5 +1765,65 @@
     "isRead": false,
     "createdAt": "2025-05-07T19:54:16.776Z",
     "relatedId": "pphkiwd2wg28f23ymg8shj"
+  },
+  {
+    "id": "notif-d597ii8qhijr7d3c3pm2kd",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-09T13:00:00.000Z at 16:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:04:13.060Z",
+    "relatedId": "xbaylijdhy93o9z1v2buar"
+  },
+  {
+    "id": "notif-ln6sbpuknzozb61yg3thg",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-09T13:00:00.000Z at 16:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:04:13.060Z",
+    "relatedId": "xbaylijdhy93o9z1v2buar"
+  },
+  {
+    "id": "notif-kskmkvneuchhgwb42vxi8f",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-09T13:00:00.000Z at 16:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:05:05.511Z",
+    "relatedId": "3wxj326zcb912jiiun1mno"
+  },
+  {
+    "id": "notif-0o0qsd2bkp6o7vcjefty19x",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-09T13:00:00.000Z at 16:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:05:05.511Z",
+    "relatedId": "3wxj326zcb912jiiun1mno"
+  },
+  {
+    "id": "notif-cc423knzov88wasjqsfg6e",
+    "userId": "u-001",
+    "title": "New Appointment",
+    "message": "Anita D'AmoreeAsdv3f has booked an appointment on 2025-05-09T13:00:00.000Z at 16:00",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:11:14.615Z",
+    "relatedId": "xuv5ym25y1gse5imt851u"
+  },
+  {
+    "id": "notif-rkhgn8gdofd6zqwpkh002",
+    "userId": "u-007",
+    "title": "Appointment Confirmed",
+    "message": "Your appointment with Dr. Chris Streich on 2025-05-09T13:00:00.000Z at 16:00 has been booked.",
+    "type": "appointment_booked",
+    "isRead": false,
+    "createdAt": "2025-05-07T21:11:14.615Z",
+    "relatedId": "xuv5ym25y1gse5imt851u"
   }
 ]

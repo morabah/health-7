@@ -632,7 +632,13 @@ export async function adminGetAllAppointments(
     doctorId?: string;
     patientId?: string;
   } = {}
-): Promise<ResultOk<{ appointments: Appointment[] }> | ResultErr> {
+): Promise<
+  | ResultOk<{
+      appointments: Appointment[];
+      totalCount: number;
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('adminGetAllAppointments');
 
   try {
@@ -697,11 +703,15 @@ export async function adminGetAllAppointments(
       filteredAppointments = filteredAppointments.filter(a => a.patientId === patientId);
     }
 
+    // Get the total count *after* filtering, *before* pagination
+    const totalCount = filteredAppointments.length;
+
     // Apply pagination
     const start = (page - 1) * limit;
     const paginatedAppointments = filteredAppointments.slice(start, start + limit);
 
-    return { success: true, appointments: paginatedAppointments };
+    // Return both paginated list and total count
+    return { success: true, appointments: paginatedAppointments, totalCount };
   } catch (e) {
     logError('adminGetAllAppointments failed', e);
     return { success: false, error: 'Error fetching all appointments' };
