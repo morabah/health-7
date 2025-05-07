@@ -15,21 +15,27 @@ export interface PerformanceTracker {
 
   /** Returns the current elapsed time without stopping the timer */
   current: () => number;
+  
+  /** Marks a point in time during execution with a label */
+  mark: (markerName: string) => void;
 }
 
 /**
  * Creates a performance tracker that measures elapsed time.
  *
  * @param label Name to identify this tracking session in logs
- * @returns PerformanceTracker object with stop() and current() methods
+ * @returns PerformanceTracker object with stop(), current(), and mark() methods
  *
  * @example
  * const perf = trackPerformance('fetchUsers');
  * // ... do something ...
+ * perf.mark('data-loaded');
+ * // ... do more things ...
  * const elapsedMs = perf.stop(); // logs and returns time
  */
 export function trackPerformance(label: string): PerformanceTracker {
   const startTime = performance.now();
+  const markers: Record<string, number> = {};
   let isStopped = false;
 
   return {
@@ -40,7 +46,16 @@ export function trackPerformance(label: string): PerformanceTracker {
       const elapsed = endTime - startTime;
       const roundedMs = Math.round(elapsed);
 
-      logInfo(`Performance [${label}]: ${roundedMs}ms`);
+      // Log any markers collected during execution
+      const markerInfo = Object.entries(markers)
+        .map(([name, time]) => `${name}: ${Math.round(time - startTime)}ms`)
+        .join(', ');
+        
+      const logMessage = markerInfo 
+        ? `Performance [${label}]: ${roundedMs}ms (${markerInfo})`
+        : `Performance [${label}]: ${roundedMs}ms`;
+        
+      logInfo(logMessage);
       isStopped = true;
 
       return roundedMs;
@@ -50,6 +65,14 @@ export function trackPerformance(label: string): PerformanceTracker {
       if (isStopped) return 0;
       return Math.round(performance.now() - startTime);
     },
+    
+    mark: (markerName: string) => {
+      if (isStopped) return;
+      markers[markerName] = performance.now();
+      
+      // Optionally log each marker as it happens (useful for long-running operations)
+      // logInfo(`Performance [${label}] Mark: ${markerName} at ${Math.round(markers[markerName] - startTime)}ms`);
+    }
   };
 }
 

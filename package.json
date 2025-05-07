@@ -46,8 +46,10 @@
     "mitt": "^3.0.1",
     "next": "~14.2.0",
     "react": "^18.2.0",
+    "react-confetti": "^6.4.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.56.1",
+    "react-tooltip": "^5.28.1",
     "tailwind-merge": "^3.2.0",
     "zod": "^3.24.3"
   },
@@ -58,6 +60,7 @@
     "@babel/preset-typescript": "^7.27.0",
     "@faker-js/faker": "^9.7.0",
     "@playwright/test": "^1.52.0",
+    "@tailwindcss/forms": "^0.5.10",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@types/jest": "^29.5.14",

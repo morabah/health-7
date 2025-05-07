@@ -282,7 +282,7 @@ export const doctorGetAppointmentById = async (context: { uid: string; role: Use
     persistError(normalizedError);
     throw normalizedError;
   }
-};
+}; 
 
 /**
  * Hook to batch fetch multiple doctors data at once

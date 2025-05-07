@@ -7,8 +7,9 @@
  * Particularly useful for high-frequency calls like getMyNotifications.
  */
 
+import { CacheCategory } from './browserCacheManager';
+import { enhancedCache } from './cacheManager';
 import { logInfo, logError } from './logger';
-import { enhancedCache, CacheCategory } from './cacheManager';
 
 // Types
 type RequestKey = string;

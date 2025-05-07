@@ -231,6 +231,7 @@ export default localApi;
 /**
  * Batch get doctor data to reduce multiple API calls
  * This combines doctor profile, availability and appointments into a single call
+ * Enhanced with multi-day availability and improved caching
  */
 export async function batchGetDoctorData(
   ctx: { uid: string; role: UserType } | undefined,
@@ -240,20 +241,21 @@ export async function batchGetDoctorData(
     includeAvailability: boolean;
     includeAppointments: boolean;
     currentDate: string;
+    numDays?: number; // Number of days of slots to include (default 1)
   }
 ): Promise<ResultOk<{
   success: true;
   doctor?: DoctorProfile;
   availability?: unknown;
-  slots?: unknown;
+  slots?: Record<string, unknown>;
   appointments?: Appointment[];
 }> | ResultErr> {
   const perf = trackPerformance('batchGetDoctorData');
 
   try {
-    const { doctorId, includeProfile, includeAvailability, includeAppointments, currentDate } = payload;
+    const { doctorId, includeProfile, includeAvailability, includeAppointments, currentDate, numDays = 1 } = payload;
     
-    logInfo('batchGetDoctorData called', { doctorId, uid: ctx?.uid, role: ctx?.role });
+    logInfo('batchGetDoctorData called', { doctorId, uid: ctx?.uid, role: ctx?.role, numDays });
     
     // Get all doctors from database
     const doctors = await getDoctors();
@@ -268,13 +270,18 @@ export async function batchGetDoctorData(
       success: true;
       doctor?: DoctorProfile;
       availability?: unknown;
-      slots?: unknown;
+      slots?: Record<string, unknown>;
       appointments?: Appointment[];
     } = { success: true };
     
     // Include doctor profile if requested
     if (includeProfile) {
-      response.doctor = doctor;
+      // Just return the doctor data without trying to merge with user data
+      // This avoids type issues while maintaining the essential information
+      response.doctor = {
+        ...doctor,
+        id: doctor.id || doctor.userId
+      };
     }
     
     // Include availability if requested
@@ -286,26 +293,37 @@ export async function batchGetDoctorData(
       response.availability = availability;
     }
     
-    // Include available slots for current date if requested
+    // Get all appointments once for efficiency
+    const appointments = includeAvailability || includeAppointments ? await getAppointments() : [];
+    
+    // Include available slots for multiple days if requested
     if (includeAvailability && currentDate) {
-      // Get all appointments to check conflicts
-      const appointments = await getAppointments();
+      // Process slots for multiple days
+      const slots: Record<string, unknown> = {};
+      const currentDateObj = new Date(currentDate);
+      
+      // Generate slots for requested number of days
+      for (let i = 0; i < numDays; i++) {
+        const dateToProcess = new Date(currentDateObj);
+        dateToProcess.setDate(currentDateObj.getDate() + i);
 
-      // Get available slots
-      const slots = getAvailableSlotsForDate(
+        // Format date as YYYY-MM-DD
+        const dateStr = dateToProcess.toISOString().split('T')[0];
+        
+        // Get slots for this date 
+        slots[dateStr] = getAvailableSlotsForDate(
         doctor,
-        currentDate,
+          dateStr,
         appointments,
         30 // 30-minute slots
       );
+      }
       
       response.slots = slots;
     }
     
     // Include appointments if requested and user is authenticated
     if (includeAppointments && ctx?.uid) {
-      const appointments = await getAppointments();
-      
       // Filter appointments relevant to this user and doctor
       const filteredAppointments = appointments.filter(appt => {
         if (ctx.role === UserType.PATIENT) {
@@ -323,12 +341,12 @@ export async function batchGetDoctorData(
       response.appointments = filteredAppointments;
     }
     
+    perf.stop();
     return response;
   } catch (error) {
     logError('batchGetDoctorData failed', error);
-    return { success: false, error: 'Failed to batch load doctor data' };
-  } finally {
     perf.stop();
+    return { success: false, error: 'Failed to batch load doctor data' };
   }
 }
 
