@@ -28,7 +28,14 @@ import { getAvailableSlotsForDate } from '@/utils/availabilityUtils';
 
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Appointment, Notification, DoctorProfile, TimeSlot } from '@/types/schemas';
-import { BookAppointmentSchema, CancelAppointmentSchema } from '@/types/schemas';
+import { 
+  BookAppointmentSchema, 
+  CancelAppointmentSchema,
+  CompleteAppointmentSchema,
+  GetAvailableSlotsSchema,
+  GetAppointmentDetailsSchema,
+  GetMyAppointmentsSchema
+} from '@/types/schemas';
 
 /**
  * Book an appointment with a doctor
@@ -341,17 +348,12 @@ export async function completeAppointment(
     const { uid, role } = ctx;
     const { appointmentId, notes } = payload;
 
-    // Validate with Zod schema
-    const validationSchema = z.object({
-      appointmentId: z.string().min(1, 'Appointment ID is required'),
-      notes: z.string().optional(),
-    });
-
-    const result = validationSchema.safeParse(payload);
+    // Validate with Zod schema from central schema definitions
+    const result = CompleteAppointmentSchema.safeParse(payload);
     if (!result.success) {
       return {
         success: false,
-        error: `Invalid completion data: ${result.error.message}`,
+        error: `Invalid completion data: ${result.error.format()}`,
       };
     }
 
@@ -431,6 +433,15 @@ export async function getMyAppointments(ctx: {
   try {
     const { uid, role } = ctx;
 
+    // Validate with GetMyAppointmentsSchema from central schema repository
+    const validationResult = GetMyAppointmentsSchema.safeParse({});
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`,
+      };
+    }
+
     logInfo('getMyAppointments called', { uid, role });
 
     const appointments = await getAppointments();
@@ -480,11 +491,12 @@ export async function getAppointmentDetails(
     const { uid, role } = ctx;
     const { appointmentId } = payload;
 
-    // Simple validation instead of using zod
-    if (!appointmentId) {
+    // Validate with Zod schema from central schema definitions
+    const result = GetAppointmentDetailsSchema.safeParse(payload);
+    if (!result.success) {
       return {
         success: false,
-        error: 'Appointment ID is required',
+        error: `Invalid appointment details request: ${result.error.format()}`,
       };
     }
 
@@ -750,18 +762,16 @@ export async function getAvailableSlots(
       doctorId: payload?.doctorId,
     });
 
-    // Step 2: Validate payload
-    const payloadValidation = validateGetAvailableSlotsPayload(payload, uid, role);
-    if (!payloadValidation.isValid) {
-      return { success: false, error: payloadValidation.error || 'Invalid payload' };
+    // Step 2: Validate payload with Zod schema from central schema definitions
+    const result = GetAvailableSlotsSchema.safeParse(payload);
+    if (!result.success) {
+      return {
+        success: false,
+        error: `Invalid slot availability request: ${result.error.format()}`,
+      };
     }
 
-    const { doctorId, date } = payloadValidation;
-
-    // Ensure doctorId and date are defined
-    if (!doctorId || !date) {
-      return { success: false, error: 'Missing required parameters' };
-    }
+    const { doctorId, date } = result.data;
 
     // Step 3: Retrieve and validate doctor profile
     const doctorResult = await retrieveDoctorProfile(doctorId, uid, role);

@@ -904,6 +904,24 @@ export const CompleteAppointmentSchema = z.object({
 });
 
 /**
+ * Zod schema for getting appointment details
+ */
+export const GetAppointmentDetailsSchema = z.object({
+  appointmentId: z.string().min(1, 'Appointment ID is required'),
+});
+
+/**
+ * Zod schema for getting user's appointments
+ * 
+ * This schema validates the authentication context for user accessing their appointments.
+ * No parameters are required since we filter by the authenticated user's ID.
+ */
+export const GetMyAppointmentsSchema = z.object({
+  // Optional filter parameters could be added here in the future
+  // Example: status, dateRange, etc.
+}).strict();
+
+/**
  * Zod schema for admin user updates
  */
 export const AdminUpdateUserSchema = z.object({
