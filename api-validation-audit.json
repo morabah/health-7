@@ -1,11 +1,11 @@
 {
   "summary": {
     "totalEndpoints": 28,
-    "perfectEndpoints": 10,
+    "perfectEndpoints": 17,
     "goodEndpoints": 1,
     "mediumEndpoints": 0,
-    "poorEndpoints": 17,
-    "averageScore": 42.142857142857146
+    "poorEndpoints": 10,
+    "averageScore": 67.85714285714286
   },
   "results": [
     {
@@ -27,134 +27,6 @@
     {
       "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/dashboardFunctions.ts",
       "endpoint": "adminGetDashboardData",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
-      "endpoint": "findDoctors",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
-      "endpoint": "getDoctorPublicProfile",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
-      "endpoint": "setDoctorAvailability",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
-      "endpoint": "getDoctorAvailability",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
-      "endpoint": "getMockDoctorProfile",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
-      "endpoint": "getMyNotifications",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
-      "endpoint": "markNotificationRead",
-      "score": 0,
-      "issues": [
-        "Add Zod schema validation to validate input data"
-      ],
-      "details": {
-        "usesSchemaValidation": false,
-        "importsFromCentralSchema": false,
-        "usesZodSafeParse": false,
-        "validatesBeforeProcessing": false,
-        "returnsValidationErrors": false,
-        "inlineSchemaDefinitions": false
-      }
-    },
-    {
-      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
-      "endpoint": "sendDirectMessage",
       "score": 0,
       "issues": [
         "Add Zod schema validation to validate input data"
@@ -267,6 +139,22 @@
     {
       "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/adminFunctions.ts",
       "endpoint": "adminGetDoctorById",
+      "score": 20,
+      "issues": [
+        "Add Zod schema validation to validate input data"
+      ],
+      "details": {
+        "usesSchemaValidation": false,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": false,
+        "validatesBeforeProcessing": false,
+        "returnsValidationErrors": false,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
+      "endpoint": "getMockDoctorProfile",
       "score": 20,
       "issues": [
         "Add Zod schema validation to validate input data"
@@ -425,6 +313,104 @@
     {
       "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/appointmentFunctions.ts",
       "endpoint": "getAvailableSlots",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
+      "endpoint": "findDoctors",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
+      "endpoint": "getDoctorPublicProfile",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
+      "endpoint": "setDoctorAvailability",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/doctorFunctions.ts",
+      "endpoint": "getDoctorAvailability",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
+      "endpoint": "getMyNotifications",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
+      "endpoint": "markNotificationRead",
+      "score": 100,
+      "issues": [],
+      "details": {
+        "usesSchemaValidation": true,
+        "importsFromCentralSchema": true,
+        "usesZodSafeParse": true,
+        "validatesBeforeProcessing": true,
+        "returnsValidationErrors": true,
+        "inlineSchemaDefinitions": false
+      }
+    },
+    {
+      "file": "/Volumes/Rabah_SSD/enrpreneurship/health 7 /src/lib/api/notificationFunctions.ts",
+      "endpoint": "sendDirectMessage",
       "score": 100,
       "issues": [],
       "details": {

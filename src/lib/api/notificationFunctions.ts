@@ -16,6 +16,11 @@ import {
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Notification } from '@/types/schemas';
+import { 
+  GetMyNotificationsSchema, 
+  MarkNotificationReadSchema, 
+  SendDirectMessageSchema 
+} from '@/types/schemas';
 
 // Simple in-memory cache for notifications
 const notificationsCache: {
@@ -31,15 +36,24 @@ const notificationsCache: {
 /**
  * Get notifications for the current user
  */
-export async function getMyNotifications(ctx: {
-  uid: string;
-  role: UserType;
-}): Promise<ResultOk<{ notifications: Notification[] }> | ResultErr> {
+export async function getMyNotifications(
+  ctx: { uid: string; role: UserType },
+  payload: {} = {}
+): Promise<ResultOk<{ notifications: Notification[] }> | ResultErr> {
   const perf = trackPerformance('getMyNotifications');
 
   try {
     const { uid, role } = ctx;
     logInfo('getMyNotifications called', { uid, role });
+    
+    // Validate with schema
+    const validationResult = GetMyNotificationsSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
     
     // Check cache first
     const now = Date.now();
@@ -92,9 +106,19 @@ export async function markNotificationRead(
 
   try {
     const { uid, role } = ctx;
-    const { notificationId, isRead = true } = payload;
 
-    logInfo('markNotificationRead called', { uid, role, notificationId, isRead });
+    logInfo('markNotificationRead called', { uid, role, ...payload });
+
+    // Validate with schema
+    const validationResult = MarkNotificationReadSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { notificationId, isRead = true } = validationResult.data;
 
     const notifications = await getNotifications();
     const notificationIndex = notifications.findIndex(n => n.id === notificationId);
@@ -145,9 +169,19 @@ export async function sendDirectMessage(
 
   try {
     const { uid, role } = ctx;
-    const { recipientId, message, subject = 'New Message' } = payload;
 
-    logInfo('sendDirectMessage called', { uid, role, recipientId });
+    logInfo('sendDirectMessage called', { uid, role, recipientId: payload.recipientId });
+
+    // Validate with schema
+    const validationResult = SendDirectMessageSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { recipientId, message, subject = 'New Message' } = validationResult.data;
 
     // Validate sender exists
     const users = await getUsers();

@@ -1098,3 +1098,43 @@ export type DoctorRegistrationPayload = z.infer<typeof DoctorRegistrationSchema>
 export const AdminGetUserDetailSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
 });
+
+/**
+ * Zod schema for getting user's notifications
+ */
+export const GetMyNotificationsSchema = z.object({
+  // Optional filtering parameters could be added here in the future
+  // limit: z.number().int().min(1).max(100).optional(),
+  // onlyUnread: z.boolean().optional(),
+}).strict();
+
+/**
+ * Zod schema for marking a notification as read
+ */
+export const MarkNotificationReadSchema = z.object({
+  notificationId: z.string().min(1, 'Notification ID is required'),
+  isRead: z.boolean().optional().default(true),
+});
+
+/**
+ * Zod schema for sending a direct message
+ */
+export const SendDirectMessageSchema = z.object({
+  recipientId: z.string().min(1, 'Recipient ID is required'),
+  message: z.string().min(1, 'Message is required').max(1000, 'Message is too long (max 1000 characters)'),
+  subject: z.string().max(100, 'Subject is too long (max 100 characters)').optional(),
+});
+
+/**
+ * Zod schema for getting a doctor's public profile
+ */
+export const GetDoctorPublicProfileSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+});
+
+/**
+ * Zod schema for getting doctor's availability
+ */
+export const GetDoctorAvailabilitySchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+});

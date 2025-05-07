@@ -16,6 +16,12 @@ import {
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { DoctorProfileSchema } from '@/types/schemas';
+import { 
+  FindDoctorsSchema, 
+  SetDoctorAvailabilitySchema,
+  GetDoctorPublicProfileSchema,
+  GetDoctorAvailabilitySchema
+} from '@/types/schemas';
 
 /**
  * Search for doctors based on criteria
@@ -40,9 +46,26 @@ export async function findDoctors(
 
   try {
     const { uid, role } = ctx;
-    const { specialty, location, name, page = 1, limit = 10 } = payload;
 
-    logInfo('findDoctors called', { uid, role, specialty, location, name, page, limit });
+    logInfo('findDoctors called', { uid, role, ...payload });
+
+    // Validate with schema
+    const validationResult = FindDoctorsSchema.safeParse({
+      ...payload,
+      pageNumber: payload.page,
+      pageSize: payload.limit
+    });
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    // Extract the validated data and map schema fields to expected function parameters
+    const { specialty, location, searchTerm: name, pageNumber = 1, pageSize = 10 } = validationResult.data;
+    const page = pageNumber;
+    const limit = pageSize;
 
     // Get all doctors
     const doctors = await getDoctors();
@@ -109,7 +132,7 @@ export async function findDoctors(
  */
 export async function getDoctorPublicProfile(
   ctx: { uid: string; role: UserType },
-  payload?: { doctorId: string }
+  payload: { doctorId: string }
 ): Promise<
   | ResultOk<{
       doctor: z.infer<typeof DoctorProfileSchema> & { id: string; firstName: string; lastName: string };
@@ -121,21 +144,18 @@ export async function getDoctorPublicProfile(
   try {
     const { uid, role } = ctx;
     
-    // Check if payload exists, if not return error
-    if (!payload) {
-      logError('getDoctorPublicProfile failed: payload is undefined');
-      return { success: false, error: 'Missing required doctor ID' };
-    }
-    
-    const { doctorId } = payload;
+    logInfo('getDoctorPublicProfile called', { uid, role, doctorId: payload.doctorId });
 
-    // Additional validation
-    if (!doctorId) {
-      logError('getDoctorPublicProfile failed: doctorId is undefined or empty');
-      return { success: false, error: 'Doctor ID is required' };
+    // Validate with schema
+    const validationResult = GetDoctorPublicProfileSchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
     }
 
-    logInfo('getDoctorPublicProfile called', { uid, role, doctorId });
+    const { doctorId } = validationResult.data;
 
     // Get doctor profile
     const doctors = await getDoctors();
@@ -196,13 +216,13 @@ export async function setDoctorAvailability(
       sunday: Array<{ startTime: string; endTime: string; isAvailable: boolean }>;
     };
     blockedDates?: string[];
+    timezone?: string;
   }
 ): Promise<ResultOk<{ success: true }> | ResultErr> {
   const perf = trackPerformance('setDoctorAvailability');
 
   try {
     const { uid, role } = ctx;
-    const { weeklySchedule, blockedDates } = payload;
 
     logInfo('setDoctorAvailability called', { uid, role });
 
@@ -210,6 +230,17 @@ export async function setDoctorAvailability(
     if (role !== UserType.DOCTOR) {
       return { success: false, error: 'Only doctors can set availability' };
     }
+
+    // Validate with schema
+    const validationResult = SetDoctorAvailabilitySchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
+    }
+
+    const { weeklySchedule, blockedDates, timezone } = validationResult.data;
 
     // Get doctor profile
     const doctors = await getDoctors();
@@ -221,10 +252,17 @@ export async function setDoctorAvailability(
 
     // Update availability
     const doctor = { ...doctors[doctorIndex] };
-    doctor.weeklySchedule = weeklySchedule;
+    
+    if (weeklySchedule) {
+      doctor.weeklySchedule = weeklySchedule;
+    }
 
     if (blockedDates) {
       doctor.blockedDates = blockedDates;
+    }
+
+    if (timezone) {
+      doctor.timezone = timezone;
     }
 
     doctor.updatedAt = nowIso();
@@ -247,7 +285,7 @@ export async function setDoctorAvailability(
  */
 export async function getDoctorAvailability(
   ctx: { uid: string; role: UserType },
-  payload?: { doctorId: string }
+  payload: { doctorId: string }
 ): Promise<
   | ResultOk<{
       availability: {
@@ -261,6 +299,7 @@ export async function getDoctorAvailability(
           sunday: Array<{ startTime: string; endTime: string; isAvailable: boolean }>;
         };
         blockedDates: string[];
+        timezone: string;
       }
     }>
   | ResultErr
@@ -270,30 +309,18 @@ export async function getDoctorAvailability(
   try {
     const { uid, role } = ctx;
     
-    // Allow doctors to view their own availability without passing doctorId
-    let doctorId: string;
-    
-    if (!payload) {
-      // If there's no payload but the user is a doctor, use their own ID
-      if (role === UserType.DOCTOR) {
-        doctorId = uid;
-        logInfo('getDoctorAvailability: doctor viewing own availability', { uid, role });
-      } else {
-        logError('getDoctorAvailability failed: payload is undefined');
-        return { success: false, error: 'Missing required doctor ID' };
-      }
-    } else {
-      // Use the provided doctorId from payload
-      doctorId = payload.doctorId;
-      
-      // Additional validation for payload-provided doctorId
-      if (!doctorId) {
-        logError('getDoctorAvailability failed: doctorId is undefined or empty');
-        return { success: false, error: 'Doctor ID is required' };
-      }
+    logInfo('getDoctorAvailability called', { uid, role, doctorId: payload.doctorId });
+
+    // Validate with schema
+    const validationResult = GetDoctorAvailabilitySchema.safeParse(payload);
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: `Invalid request: ${validationResult.error.format()}`
+      };
     }
 
-    logInfo('getDoctorAvailability called', { uid, role, doctorId });
+    const { doctorId } = validationResult.data;
 
     // Get doctor profile
     const doctors = await getDoctors();
@@ -303,24 +330,27 @@ export async function getDoctorAvailability(
       return { success: false, error: 'Doctor not found' };
     }
 
-    // Create default schedule with isAvailable property
-    const defaultSchedule = {
-      monday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      tuesday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      wednesday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      thursday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      friday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      saturday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
-      sunday: [] as Array<{ startTime: string; endTime: string; isAvailable: boolean }>,
+    // Initialize availability if not present
+    const weeklySchedule = doctor.weeklySchedule || {
+      monday: [],
+      tuesday: [],
+      wednesday: [],
+      thursday: [],
+      friday: [],
+      saturday: [],
+      sunday: [],
     };
 
-    // Return availability with proper types and wrapped in an 'availability' object
+    const blockedDates = doctor.blockedDates || [];
+    const timezone = doctor.timezone || 'UTC';
+
     return {
       success: true,
       availability: {
-        weeklySchedule: doctor.weeklySchedule || defaultSchedule,
-        blockedDates: doctor.blockedDates || [],
-      }
+        weeklySchedule,
+        blockedDates,
+        timezone,
+      },
     };
   } catch (e) {
     logError('getDoctorAvailability failed', e);
