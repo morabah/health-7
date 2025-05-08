@@ -3,7 +3,7 @@ declare module 'node-fetch' {
   export class Response {
     status: number;
     ok: boolean;
-    json(): Promise<any>;
+    json<T = unknown>(): Promise<T>;
     text(): Promise<string>;
     headers: Headers;
   }
@@ -18,7 +18,7 @@ declare module 'node-fetch' {
     url: string;
     method: string;
     headers: Headers;
-    body: any;
+    body: BodyInit | null;
   }
   export interface RequestInit {
     method?: string;
@@ -32,7 +32,12 @@ declare module 'node-fetch' {
     referrerPolicy?: ReferrerPolicy;
   }
   export type HeadersInit = Headers | Record<string, string> | [string, string][];
-  export type BodyInit = ArrayBuffer | ArrayBufferView | NodeJS.ReadableStream | string | URLSearchParams;
+  export type BodyInit =
+    | ArrayBuffer
+    | ArrayBufferView
+    | NodeJS.ReadableStream
+    | string
+    | URLSearchParams;
   export type RequestRedirect = 'follow' | 'error' | 'manual';
   export type RequestCredentials = 'omit' | 'same-origin' | 'include';
   export type RequestMode = 'cors' | 'no-cors' | 'same-origin' | 'navigate';
@@ -46,4 +51,4 @@ declare module 'node-fetch' {
     | 'origin-when-cross-origin'
     | 'strict-origin-when-cross-origin'
     | 'unsafe-url';
-} 
+}

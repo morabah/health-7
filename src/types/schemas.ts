@@ -121,7 +121,8 @@ export type UserProfile = z.infer<typeof UserProfileSchema> & { id: string };
  */
 export const PatientProfileSchema = z.object({
   /** Links to the UserProfile document/Auth UID. Required. */
-  userId: z.string().min(1, 'User ID linkage is required.'), // Should match UserProfile['id'] type conceptually
+  userId: z.string().min(1, 'User ID linkage is required').describe('Auth UID / FK'),
+  id: z.string().optional().describe('Document ID, if available'),
 
   /** @PHI Patient's date of birth. Stored as ISO string locally. */
   dateOfBirth: isoDateTimeStringSchema
@@ -1128,11 +1129,8 @@ export const MarkNotificationReadSchema = z.object({
  */
 export const SendDirectMessageSchema = z.object({
   recipientId: z.string().min(1, 'Recipient ID is required'),
-  message: z
-    .string()
-    .min(1, 'Message is required')
-    .max(1000, 'Message is too long (max 1000 characters)'),
-  subject: z.string().max(100, 'Subject is too long (max 100 characters)').optional(),
+  subject: z.string().max(200, 'Subject is too long').optional(),
+  message: z.string().min(1, 'Message body is required').max(5000, 'Message is too long'),
 });
 
 /**
@@ -1186,6 +1184,14 @@ export const BatchGetDoctorsDataSchema = z
   .array(z.string().min(1, 'Doctor ID is required'))
   .min(1, 'At least one doctor ID is required')
   .max(20, 'Maximum 20 doctor IDs allowed');
+
+/**
+ * Zod schema for batch getting multiple patients data
+ */
+export const BatchGetPatientDataSchema = z
+  .array(z.string().min(1, 'Patient ID is required'))
+  .min(1, 'At least one patient ID is required')
+  .max(20, 'Maximum 20 patient IDs allowed');
 
 /**
  * Zod schema for admin getting all users
@@ -1262,4 +1268,12 @@ export const MockGetDoctorScheduleSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format')
     .optional(),
+});
+
+/**
+ * Zod schema for user sign-in
+ */
+export const SignInSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
 });

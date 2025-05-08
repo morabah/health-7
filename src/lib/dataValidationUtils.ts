@@ -2,6 +2,7 @@
 
 import type { z } from 'zod';
 import { logInfo, logWarn, logError } from '@/lib/logger';
+// Import schemas both as types and values
 import {
   UserProfileSchema,
   PatientProfileSchema,

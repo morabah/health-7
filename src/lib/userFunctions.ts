@@ -8,28 +8,27 @@ import type { z } from 'zod';
 import { UserType, Gender, BloodType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from './performance';
 import { logInfo, logWarn, logError } from './logger';
-import { 
-  getUsers, 
-  saveUsers,
-  getPatients,
-  savePatients,
-  getDoctors,
-  saveDoctors
-} from './localDb';
+import { getUsers, saveUsers, getPatients, savePatients, getDoctors, saveDoctors } from './localDb';
 import { generateId, nowIso, sleep, userPasswords, RegisterSchema } from './localApiCore';
 import type { ResultOk, ResultErr } from './localApiCore';
-import type { 
-  UserProfileSchema, 
-  PatientProfileSchema, 
-  DoctorProfileSchema
-} from '@/types/schemas';
-import type { 
-  UserProfile, 
-  PatientProfile
+import { SignInSchema } from '@/types/schemas';
+import type {
+  UserProfile,
+  PatientProfile,
+  UserProfileSchema,
+  PatientProfileSchema,
+  DoctorProfileSchema,
 } from '@/types/schemas';
 
-// Import getMockDoctorProfile directly to avoid circular dependency
-let getMockDoctorProfileFn: ((userId: string) => Promise<z.infer<typeof DoctorProfileSchema> & { id: string }>) | null = null;
+// Import getMockDoctorProfileFn type to match its actual signature if needed
+// Or adjust its usage. For now, assume getMockDoctorProfile expects (ctx, payload)
+
+let getMockDoctorProfileFn:
+  | ((
+      ctx: { uid: string; role: UserType } | undefined,
+      payload: { userId: string }
+    ) => Promise<ResultOk<z.infer<typeof DoctorProfileSchema> & { id: string }> | ResultErr>)
+  | null = null;
 
 /**
  * Register a new user (patient or doctor)
@@ -42,7 +41,8 @@ export async function registerUser(
     /* 1  validate payload */
     const parsed = RegisterSchema.safeParse(raw);
     if (!parsed.success) {
-      return { success: false, error: 'Invalid registration data' };
+      // Return detailed validation error
+      return { success: false, error: 'Invalid registration data', details: parsed.error.format() };
     }
     // Strictly type input for patient/doctor profile creation
     type RegisterInput = z.infer<typeof RegisterSchema> & {
@@ -96,11 +96,8 @@ export async function registerUser(
         id: `patient-${uid}`, // Add id field
         address: null,
       };
-      
-      await savePatients([
-        ...(await getPatients()),
-        patientProfile,
-      ]);
+
+      await savePatients([...(await getPatients()), patientProfile]);
     } else {
       await saveDoctors([
         ...(await getDoctors()),
@@ -201,12 +198,102 @@ export async function getMockUserProfile(
 }
 
 /**
+ * Handle special development-time admin login
+ */
+async function handleDevAdminLogin(
+  email: string,
+  password: string
+): Promise<ResultOk<{
+  user: { id: string; email: string | null };
+  userProfile: z.infer<typeof UserProfileSchema> & { id: string };
+  roleProfile: null;
+}> | null> {
+  const normalizedEmail = email.toLowerCase();
+  const trimmedPassword = password.trim();
+
+  if (
+    normalizedEmail === 'admin@example.com' &&
+    (trimmedPassword === 'Targo2000!' || trimmedPassword === 'password123')
+  ) {
+    logInfo('Admin auto-login detected, creating/logging in admin user if needed');
+    const users = await getUsers();
+    let adminUser = users.find(
+      u => u.email === 'admin@example.com' && u.userType === UserType.ADMIN
+    );
+
+    if (!adminUser) {
+      const adminUserId = 'admin-' + generateId();
+      adminUser = {
+        id: adminUserId,
+        email: 'admin@example.com',
+        firstName: 'System',
+        lastName: 'Admin',
+        userType: UserType.ADMIN,
+        isActive: true,
+        emailVerified: true,
+        phoneVerified: true,
+        phone: null,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        profilePictureUrl: null,
+      };
+      await saveUsers([...users, adminUser]);
+      logInfo('Admin user auto-created.', { userId: adminUser.id });
+    }
+
+    return {
+      success: true,
+      user: { id: adminUser.id, email: adminUser.email },
+      userProfile: adminUser,
+      roleProfile: null, // Admin has no specific patient/doctor role profile
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Load or create a mock doctor profile for development
+ */
+async function loadOrCreateMockDoctorProfile(
+  userId: string,
+  doctors: Array<z.infer<typeof DoctorProfileSchema> & { id: string }>
+): Promise<(z.infer<typeof DoctorProfileSchema> & { id: string }) | null> {
+  logInfo('Auto-creating missing doctor profile for dev/test user', { userId });
+
+  if (!getMockDoctorProfileFn) {
+    try {
+      const doctorModule = await import('./api/doctorFunctions');
+      getMockDoctorProfileFn = doctorModule.getMockDoctorProfile;
+    } catch (e) {
+      logError('Failed to lazy-load getMockDoctorProfile function', e);
+      return null;
+    }
+  }
+
+  if (typeof getMockDoctorProfileFn === 'function') {
+    try {
+      const mockProfileResult = await getMockDoctorProfileFn(undefined, { userId });
+      if (mockProfileResult.success) {
+        const { ...profileData } = mockProfileResult;
+        const doctorProfile = profileData as z.infer<typeof DoctorProfileSchema> & { id: string };
+        await saveDoctors([...doctors, doctorProfile]);
+        return doctorProfile;
+      } else {
+        logError('Failed to get mock doctor profile data', mockProfileResult.error);
+      }
+    } catch (e) {
+      logError('Error calling getMockDoctorProfileFn', e);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Sign in a user with email and password
  */
-export async function signIn(
-  email: string | { email: string; password?: string } | Record<string, any>,
-  password?: string | { password: string } | Record<string, any>
-): Promise<
+export async function signIn(rawPayload: unknown): Promise<
   | ResultOk<{
       user: { id: string; email: string | null };
       userProfile: z.infer<typeof UserProfileSchema> & { id: string };
@@ -220,164 +307,198 @@ export async function signIn(
   const perf = trackPerformance('signIn');
 
   try {
-    /* 1  log and validate */
-    // Handle case where email might be an object
-    let emailStr: string;
-    let passwordStr: string;
-    
-    // Handle the case where a single object containing both email and password is passed
-    if (typeof email === 'object' && email !== null && 'email' in email && 'password' in email && password === undefined) {
-      // Extract both email and password from the first parameter
-      emailStr = email.email as string;
-      passwordStr = email.password as string;
-    } else {
-      // Handle normal case where email and password are separate parameters
-      if (typeof email === 'object' && email !== null && 'email' in email) {
-        emailStr = email.email as string;
-      } else if (typeof email === 'string') {
-        emailStr = email;
-      } else {
-        return { success: false, error: 'Invalid email format' };
-      }
-      
-      if (typeof password === 'object' && password !== null && 'password' in password) {
-        passwordStr = password.password as string;
-      } else if (typeof password === 'string') {
-        passwordStr = password;
-      } else {
-        return { success: false, error: 'Invalid password format' };
-      }
-    }
-    
-    if (!emailStr || !passwordStr) {
-      return { success: false, error: 'Email and password are required' };
-    }
-    
-    logInfo('signIn attempt', { email: emailStr });
+    // Parse input for standard login or dev login paths
+    let rawEmail: string | null = null;
+    let rawPassword: string | null = null;
 
-    /* 2  find user in users.json */
+    if (typeof rawPayload === 'object' && rawPayload !== null) {
+      // Using type guard to safely access properties
+      const payload = rawPayload as Record<string, unknown>;
+      if ('email' in payload && typeof payload.email === 'string') {
+        rawEmail = payload.email;
+      }
+      if ('password' in payload && typeof payload.password === 'string') {
+        rawPassword = payload.password;
+      }
+    }
+
+    // Handle special development-time admin login
+    if (rawEmail && rawPassword) {
+      const adminResult = await handleDevAdminLogin(rawEmail, rawPassword);
+      if (adminResult) {
+        return adminResult;
+      }
+    }
+
+    // Validate payload for standard login
+    const parsedPayload = SignInSchema.safeParse(rawPayload);
+    if (!parsedPayload.success) {
+      return {
+        success: false,
+        error: 'Invalid sign-in data',
+        details: parsedPayload.error.format(),
+      };
+    }
+
+    // Use validated email and password from here onwards for standard flow
+    const validatedEmail = parsedPayload.data.email;
+    const validatedPassword = parsedPayload.data.password;
+
+    logInfo('signIn attempt', { email: validatedEmail });
+
+    // Find user
     const users = await getUsers();
-    const userMatch = users.find(u => u.email?.toLowerCase() === emailStr.toLowerCase());
+    const user = users.find(u => u.email?.toLowerCase() === validatedEmail.toLowerCase());
 
-    // Special case for admin@example.com auto-creation
-    if (
-      emailStr === 'admin@example.com' &&
-      (passwordStr === 'Targo2000!' || passwordStr === 'password123')
-    ) {
-      logInfo('Admin auto-login detected, creating admin user if needed');
+    if (!user) {
+      logWarn('Login attempt: email not found', { email: validatedEmail });
+      return { success: false, error: 'Invalid email or password' }; // Generic error
+    }
 
-      // If admin user doesn't exist yet, create one
-      if (!userMatch) {
-        const adminUserId = 'admin-' + generateId();
-        const adminUser = {
-          id: adminUserId,
-          userId: adminUserId,
-          email: 'admin@example.com',
-          firstName: 'System',
-          lastName: 'Admin',
-          userType: UserType.ADMIN,
-          isActive: true,
-          emailVerified: true,
-          phoneVerified: true,
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-          phone: null,
-          profilePictureUrl: null
-        };
+    // Validate password
+    const storedPassword = userPasswords[validatedEmail.toLowerCase()];
+    const defaultDevPasswords = ['password123', 'password', 'Targo2000!']; // Common dev passwords
 
-        // Save the admin user to the database
-        await saveUsers([...users, adminUser]);
+    if (storedPassword !== validatedPassword && !defaultDevPasswords.includes(validatedPassword)) {
+      logWarn('Login attempt: incorrect password', { email: validatedEmail });
+      return { success: false, error: 'Invalid email or password' }; // Generic error
+    }
 
-        // Return success with the admin user
-        return {
-          success: true,
-          user: { id: adminUserId, email: adminUser.email },
-          userProfile: adminUser,
-          roleProfile: null,
-        };
+    if (!user.isActive) {
+      return { success: false, error: 'Account is inactive' };
+    }
+
+    // Get role profile
+    const roleProfile = await getRoleProfileForUser(user);
+
+    logInfo('signIn: successful', { uid: user.id, role: user.userType });
+    return {
+      success: true,
+      user: { id: user.id, email: user.email },
+      userProfile: user,
+      roleProfile,
+    };
+  } catch (e) {
+    logError('signIn failed', e);
+    return { success: false, error: 'Internal error during sign-in' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Get the role-specific profile for a user
+ */
+async function getRoleProfileForUser(
+  user: z.infer<typeof UserProfileSchema> & { id: string }
+): Promise<
+  | (z.infer<typeof PatientProfileSchema> & { id: string })
+  | (z.infer<typeof DoctorProfileSchema> & { id: string })
+  | null
+> {
+  const isTestUser = user.email?.endsWith('@example.com') || user.email?.includes('test');
+
+  if (user.userType === UserType.PATIENT) {
+    const patients = await getPatients();
+    let patientData = patients.find(p => p.userId === user.id);
+
+    if (!patientData && isTestUser) {
+      // Auto-create mock patient profile for test users
+      const mockPatient = await getMockPatientProfile(user.id);
+      await savePatients([...patients, mockPatient]);
+      patientData = mockPatient;
+    }
+
+    if (patientData) {
+      return {
+        ...patientData,
+        id: patientData.id || `patient-${user.id}`,
+      };
+    }
+
+    logWarn('getRoleProfileForUser: Patient profile not found', { userId: user.id });
+    return null;
+  } else if (user.userType === UserType.DOCTOR) {
+    const doctors = await getDoctors();
+    let doctorData = doctors.find(d => d.userId === user.id);
+
+    if (!doctorData && isTestUser) {
+      // Auto-create mock doctor profile for test users
+      const mockDoctorProfile = await loadOrCreateMockDoctorProfile(user.id, doctors);
+
+      if (mockDoctorProfile) {
+        doctorData = mockDoctorProfile;
       }
-
-      // If admin user already exists, continue with normal flow
     }
 
-    if (!userMatch) {
-      logWarn('Login attempt: email not found', { email: emailStr });
-      return { success: false, error: 'Invalid email or password' };
+    if (doctorData) {
+      return {
+        ...doctorData,
+        id: doctorData.id || `doctor-${user.id}`,
+      };
     }
 
-    /* 3  validate password */
-    const storedPassword = userPasswords[emailStr.toLowerCase()];
-    const defaultPasswords = ['password123', 'password', 'Targo2000!', 'Password123'];
+    logWarn('getRoleProfileForUser: Doctor profile not found', { userId: user.id });
+    return null;
+  }
 
-    // Check if the password matches either the stored password or any of the default passwords
-    if (storedPassword !== passwordStr && !defaultPasswords.includes(passwordStr)) {
-      logWarn('Login attempt: incorrect password', { email: emailStr });
-      return { success: false, error: 'Invalid email or password' };
-    }
+  // Admin users have no role profile
+  return null;
+}
 
-    // Support automatic mock user generation in dev
-    if (userMatch.userType === UserType.ADMIN && emailStr === 'admin@example.com') {
-      logInfo('Admin auto-login detected');
-    }
+/**
+ * Get a user profile by UID - directly exported for AuthContext
+ * Returns the user profile along with role-specific profile data
+ */
+export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Promise<
+  | ResultOk<{
+      userProfile: z.infer<typeof UserProfileSchema> & { id: string };
+      roleProfile:
+        | (z.infer<typeof PatientProfileSchema> & { id: string })
+        | (z.infer<typeof DoctorProfileSchema> & { id: string })
+        | null;
+    }>
+  | ResultErr
+> {
+  const perf = trackPerformance('getMyUserProfile');
+  try {
+    await sleep(200); // simulate network request
 
-    const uid = userMatch.id;
+    logInfo('getMyUserProfile', { uid: ctx.uid, role: ctx.role });
 
-    /* 4  get role profile */
-    let roleProfile:
-      | (z.infer<typeof PatientProfileSchema> & { id: string })
-      | (z.infer<typeof DoctorProfileSchema> & { id: string })
-      | null = null;
+    // Handle test user auto-generation
+    if (ctx.uid.startsWith('test-')) {
+      const mockUser = await getMockUserProfile(ctx.uid, ctx.role);
+      let roleProfile:
+        | (z.infer<typeof PatientProfileSchema> & { id: string })
+        | (z.infer<typeof DoctorProfileSchema> & { id: string })
+        | null = null;
 
-    // Get profile details by role
-    if (userMatch.userType === UserType.PATIENT) {
-      const patients = await getPatients();
-      const patientData = patients.find(p => p.userId === uid);
-      
-      // Ensure patient profile has an id
-      if (patientData) {
-        roleProfile = {
-          ...patientData,
-          id: `patient-${uid}`
-        };
-      }
-
-      // Auto-create mock profile if missing
-      if (!roleProfile) {
-        logInfo('Auto-creating missing patient profile');
-        roleProfile = await getMockPatientProfile(uid);
-        await savePatients([...patients, roleProfile]);
-      }
-    } else if (userMatch.userType === UserType.DOCTOR) {
-      const doctors = await getDoctors();
-      let doctorProfile = doctors.find(d => d.userId === uid);
-
-      // Auto-create mock profile if missing
-      if (!doctorProfile) {
-        logInfo('Auto-creating missing doctor profile');
-        // Avoid circular dependencies by lazy-loading mock function
-        if (!getMockDoctorProfileFn) {
-          const doctorModule = await import('./api/doctorFunctions');
-          getMockDoctorProfileFn = doctorModule.getMockDoctorProfile;
-        }
-        
-        // Call the function once we have it
-        if (typeof getMockDoctorProfileFn === 'function') {
-          try {
-            const mockProfile = await getMockDoctorProfileFn(uid);
-            if (mockProfile) {
-              doctorProfile = mockProfile;
-              await saveDoctors([...doctors, doctorProfile]);
-            }
-          } catch (e) {
-            logError('Failed to load mock doctor profile from function', e);
+      if (ctx.role === UserType.PATIENT) {
+        roleProfile = await getMockPatientProfile(ctx.uid);
+      } else if (ctx.role === UserType.DOCTOR) {
+        // Try to get mock doctor profile
+        try {
+          if (!getMockDoctorProfileFn) {
+            const doctorModule = await import('./api/doctorFunctions');
+            getMockDoctorProfileFn = doctorModule.getMockDoctorProfile;
           }
-        }
-        
-        // If we still don't have a profile, create a fallback
-        if (!doctorProfile) {
-          // Fallback if import fails
-          doctorProfile = {
-            userId: uid,
+
+          if (getMockDoctorProfileFn) {
+            const mockProfileResult = await getMockDoctorProfileFn(undefined, { userId: ctx.uid });
+            if (mockProfileResult.success) {
+              const { ...profileData } = mockProfileResult;
+              roleProfile = profileData as z.infer<typeof DoctorProfileSchema> & { id: string };
+              if (!roleProfile.id) {
+                roleProfile.id = `doctor-${ctx.uid}`;
+              }
+            }
+          }
+        } catch (e) {
+          logError('Failed to load doctor mock profile, using fallback', e);
+          // Create fallback doctor profile if loading fails
+          roleProfile = {
+            userId: ctx.uid,
             specialty: 'General Medicine',
             licenseNumber: 'TEMP12345',
             yearsOfExperience: 1,
@@ -413,127 +534,8 @@ export async function signIn(
             timezone: 'UTC',
             createdAt: nowIso(),
             updatedAt: nowIso(),
-            id: `doctor-${uid}`,
+            id: `doctor-${ctx.uid}`,
           };
-          await saveDoctors([...doctors, doctorProfile]);
-        }
-      } else if (!doctorProfile.id) {
-        // Ensure existing doctor profile has an id
-        doctorProfile = {
-          ...doctorProfile,
-          id: `doctor-${uid}`
-        };
-      }
-      
-      if (doctorProfile) {
-        roleProfile = doctorProfile;
-      }
-    }
-
-    return {
-      success: true,
-      user: { id: uid, email: userMatch.email },
-      userProfile: userMatch,
-      roleProfile,
-    };
-  } catch (e) {
-    logError('signIn failed', e);
-    return { success: false, error: 'Internal error during login' };
-  } finally {
-    perf.stop();
-  }
-}
-
-/**
- * Get a user profile by UID - directly exported for AuthContext
- * Returns the user profile along with role-specific profile data
- */
-export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Promise<
-  | ResultOk<{
-      userProfile: z.infer<typeof UserProfileSchema> & { id: string };
-      roleProfile:
-        | (z.infer<typeof PatientProfileSchema> & { id: string })
-        | (z.infer<typeof DoctorProfileSchema> & { id: string })
-        | null;
-    }>
-  | ResultErr
-> {
-  const perf = trackPerformance('getMyUserProfile');
-  try {
-    await sleep(200); // simulate network request
-
-    logInfo('getMyUserProfile', { uid: ctx.uid, role: ctx.role });
-
-    // Handle test user auto-generation
-    if (ctx.uid.startsWith('test-')) {
-      const mockUser = await getMockUserProfile(ctx.uid, ctx.role);
-      let roleProfile = null;
-
-      if (ctx.role === UserType.PATIENT) {
-        roleProfile = await getMockPatientProfile(ctx.uid);
-      } else if (ctx.role === UserType.DOCTOR) {
-        // Avoid circular dependencies by lazy-loading mock function
-        if (!getMockDoctorProfileFn) {
-          try {
-            const doctorModule = await import('./api/doctorFunctions');
-            getMockDoctorProfileFn = doctorModule.getMockDoctorProfile;
-            const mockProfile = await getMockDoctorProfileFn(ctx.uid);
-            if (mockProfile) {
-              roleProfile = {
-                ...mockProfile,
-                id: `doctor-${ctx.uid}`
-              };
-            }
-          } catch (e) {
-            logError('Failed to load doctor mock profile, using fallback', e);
-            roleProfile = {
-              userId: ctx.uid,
-              specialty: 'General Medicine',
-              licenseNumber: 'TEMP12345',
-              yearsOfExperience: 1,
-              verificationStatus: VerificationStatus.PENDING,
-              blockedDates: [],
-              weeklySchedule: {
-                monday: [],
-                tuesday: [],
-                wednesday: [],
-                thursday: [],
-                friday: [],
-                saturday: [],
-                sunday: [],
-              },
-              rating: 0,
-              reviewCount: 0,
-              bio: null,
-              verificationNotes: null,
-              adminNotes: '',
-              languages: ['English'],
-              location: null,
-              education: null,
-              servicesOffered: null,
-              consultationFee: 100,
-              profilePictureUrl: null,
-              profilePicturePath: null,
-              licenseDocumentUrl: null,
-              licenseDocumentPath: null,
-              certificateUrl: null,
-              certificatePath: null,
-              educationHistory: [],
-              experience: [],
-              timezone: 'UTC',
-              createdAt: nowIso(),
-              updatedAt: nowIso(),
-              id: `doctor-${ctx.uid}`
-            };
-          }
-        } else {
-          const mockProfile = await getMockDoctorProfileFn(ctx.uid);
-          if (mockProfile) {
-            roleProfile = {
-              ...mockProfile,
-              id: `doctor-${ctx.uid}`
-            };
-          }
         }
       }
 
@@ -544,7 +546,7 @@ export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Pr
       };
     }
 
-    // Get actual user from DB
+    // Rest of function remains unchanged
     const users = await getUsers();
     const userProfile = users.find(u => u.id === ctx.uid);
 
@@ -558,12 +560,12 @@ export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Pr
     if (ctx.role === UserType.PATIENT) {
       const patients = await getPatients();
       const patientData = patients.find(p => p.userId === ctx.uid);
-      
+
       // If profile found, ensure it has an id
       if (patientData) {
         roleProfile = {
           ...patientData,
-          id: `patient-${ctx.uid}`
+          id: `patient-${ctx.uid}`,
         };
       } else {
         // If no profile found, generate a patient profile with an ID
@@ -574,18 +576,18 @@ export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Pr
           dateOfBirth: null,
           medicalHistory: null,
           address: null,
-          id: `patient-${ctx.uid}`
+          id: `patient-${ctx.uid}`,
         };
       }
     } else if (ctx.role === UserType.DOCTOR) {
       const doctors = await getDoctors();
       const doctorData = doctors.find(d => d.userId === ctx.uid);
-      
+
       // If profile found, ensure it has an id
       if (doctorData) {
         roleProfile = {
           ...doctorData,
-          id: `doctor-${ctx.uid}`
+          id: `doctor-${ctx.uid}`,
         };
       } else {
         // If no profile found, generate a doctor profile with an ID
@@ -626,7 +628,7 @@ export async function getMyUserProfile(ctx: { uid: string; role: UserType }): Pr
           timezone: 'UTC',
           createdAt: nowIso(),
           updatedAt: nowIso(),
-          id: `doctor-${ctx.uid}`
+          id: `doctor-${ctx.uid}`,
         };
       }
     }
@@ -795,10 +797,13 @@ export async function updateMyUserProfile(
 export async function getPatientProfile(
   ctx: { uid: string; role: UserType },
   payload: { patientId: string }
-): Promise<ResultOk<{
-  userProfile: UserProfile;
-  roleProfile: PatientProfile & { id: string };
-}> | ResultErr> {
+): Promise<
+  | ResultOk<{
+      userProfile: UserProfile;
+      roleProfile: PatientProfile & { id: string };
+    }>
+  | ResultErr
+> {
   const perf = trackPerformance('getPatientProfile');
   try {
     const { uid, role } = ctx;
@@ -818,7 +823,7 @@ export async function getPatientProfile(
     // Get patient user data
     const users = await getUsers();
     const user = users.find(u => u.id === patientId);
-    
+
     if (!user) {
       return { success: false, error: 'Patient not found' };
     }
@@ -839,21 +844,21 @@ export async function getPatientProfile(
     // Add id property as required by return type
     const patientWithId = {
       ...patientProfile,
-      id: `patient-${patientId}`
+      id: `patient-${patientId}`,
     };
 
     return {
       success: true,
       userProfile: user as UserProfile,
-      roleProfile: patientWithId
+      roleProfile: patientWithId,
     };
   } catch (error) {
     logError('getPatientProfile failed', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get patient profile'
+      error: error instanceof Error ? error.message : 'Failed to get patient profile',
     };
   } finally {
     perf.stop();
   }
-} 
+}

@@ -232,9 +232,7 @@ export async function callApiWithOptions<T = unknown>(
       if (method === 'login' && args.length === 1 && args[0] && typeof args[0] === 'object') {
         const loginParams = args[0] as Record<string, unknown>;
         if ('email' in loginParams && 'password' in loginParams) {
-          const email = loginParams.email;
-          const password = loginParams.password;
-          return (await (api as ApiMethods)[mappedMethod](email, password)) as T;
+          return (await (api as ApiMethods)[mappedMethod](loginParams)) as T;
         }
       }
 

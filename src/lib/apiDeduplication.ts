@@ -57,20 +57,32 @@ const pendingRequests = new Map<RequestKey, PendingRequest<unknown>>();
 
 // Configure which methods to deduplicate and their TTLs
 const DEDUPLICATION_CONFIG: Record<string, MethodConfig> = {
-  // High-frequency methods with deduplication enabled
-  getMyNotifications: { enabled: true, ttlMs: 1500 }, // reduced from 3000ms
-  getMyDashboardStats: { enabled: true, ttlMs: 1500 }, // reduced from 3000ms
-  getAvailableSlots: { enabled: true, ttlMs: 1000 }, // reduced from 2000ms
-  findDoctors: { enabled: true, ttlMs: 1000 }, // reduced from 2000ms
-  getAllDoctors: { enabled: true, ttlMs: 1500 }, // new method
-  getDoctorPublicProfile: { enabled: true, ttlMs: 2000 }, // new method
+  // High-volatility data (refresh frequently)
+  getMyNotifications: { enabled: true, ttlMs: 1000 }, // Very volatile data - 1 sec TTL
 
-  // Methods that should rarely be deduplicated but could be in some scenarios
-  getMyUserProfile: { enabled: true, ttlMs: 500 }, // unchanged
-  getMyAppointments: { enabled: true, ttlMs: 1000 }, // unchanged
-  getAllUsers: { enabled: true, ttlMs: 1500 }, // new method
-  getAllPatients: { enabled: true, ttlMs: 1500 }, // new method
-  getPatientDetails: { enabled: true, ttlMs: 1000 }, // new method
+  // Medium-volatility data (regular refresh)
+  getMyDashboardStats: { enabled: true, ttlMs: 3000 }, // Medium volatility - 3 sec TTL
+  getAvailableSlots: { enabled: true, ttlMs: 3000 }, // Medium volatility - 3 sec TTL
+  getMyAppointments: { enabled: true, ttlMs: 3000 }, // Medium volatility - 3 sec TTL
+  getDoctorAvailability: { enabled: true, ttlMs: 3000 }, // Medium volatility - 3 sec TTL
+
+  // Low-volatility data (less frequent refresh)
+  findDoctors: { enabled: true, ttlMs: 5000 }, // Low volatility - 5 sec TTL
+  getAllDoctors: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+  getDoctorPublicProfile: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+  getAllUsers: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+  getAllPatients: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+  getPatientDetails: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+
+  // User profile data (infrequent changes)
+  getMyUserProfile: { enabled: true, ttlMs: 2000 }, // Context-dependent - 2 sec TTL
+
+  // Batch data operations
+  batchGetDoctorsData: { enabled: true, ttlMs: 10000 }, // Low volatility - 10 sec TTL
+  batchGetDoctorData: { enabled: true, ttlMs: 5000 }, // Medium-low volatility - 5 sec TTL
+
+  // Other appointment data
+  getAppointmentDetails: { enabled: true, ttlMs: 5000 }, // Medium-low volatility - 5 sec TTL
 
   // Default configuration for any method not explicitly listed
   default: { enabled: false, ttlMs: 0 },

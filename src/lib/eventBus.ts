@@ -17,7 +17,7 @@ export enum LogLevel {
 export interface LogEventPayload {
   level: LogLevel;
   message: string;
-  data?: unknown;
+  data?: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -44,4 +44,4 @@ export type AppEvents = {
  * Application-wide event bus instance
  * Used for communication between components/services
  */
-export const appEventBus: Emitter<AppEvents> = mitt<AppEvents>(); 
+export const appEventBus: Emitter<AppEvents> = mitt<AppEvents>();

@@ -56,22 +56,22 @@ export async function bookAppointment(
   try {
     const { uid, role } = context;
 
-    // Validate with Zod schema from central schema definitions
-    const result = BookAppointmentSchema.safeParse(payload);
-    if (!result.success) {
-      return {
-        success: false,
-        error: `Invalid booking data: ${result.error.format()}`,
-      };
-    }
-
-    // Validate user is authenticated and has correct role
+    // Validate user is authenticated and has correct role FIRST
     if (!uid) {
       return { success: false, error: 'User not authenticated' };
     }
 
     if (role !== UserType.PATIENT) {
       return { success: false, error: 'Only patients can book appointments' };
+    }
+
+    // THEN Validate with Zod schema from central schema definitions
+    const result = BookAppointmentSchema.safeParse(payload);
+    if (!result.success) {
+      return {
+        success: false,
+        error: `Invalid booking data: ${result.error.format()}`,
+      };
     }
 
     // Get validated payload data
@@ -346,7 +346,19 @@ export async function completeAppointment(
 
   try {
     const { uid, role } = ctx;
-    const { appointmentId, notes } = payload;
+    // const { appointmentId, notes } = payload; // Delay destructuring
+
+    logInfo('completeAppointment called', {
+      uid,
+      role,
+      payload_appointmentId: payload.appointmentId,
+      payload_notes: payload.notes,
+    });
+
+    // Only doctors can complete appointments (Initial Auth Check)
+    if (role !== UserType.DOCTOR) {
+      return { success: false, error: 'Only doctors can mark appointments as completed' };
+    }
 
     // Validate with Zod schema from central schema definitions
     const result = CompleteAppointmentSchema.safeParse(payload);
@@ -356,13 +368,7 @@ export async function completeAppointment(
         error: `Invalid completion data: ${result.error.format()}`,
       };
     }
-
-    logInfo('completeAppointment called', { uid, role, appointmentId, notes });
-
-    // Only doctors can complete appointments
-    if (role !== UserType.DOCTOR) {
-      return { success: false, error: 'Only doctors can mark appointments as completed' };
-    }
+    const { appointmentId, notes } = result.data; // Destructure after validation
 
     // Get all appointments
     const appointments = await getAppointments();
@@ -518,9 +524,20 @@ export async function getAppointmentDetails(
 
   try {
     const { uid, role } = ctx;
-    const { appointmentId } = payload;
+    // const { appointmentId } = payload; // Delay destructuring payload until after validation
 
-    // Validate with Zod schema from central schema definitions
+    logInfo('getAppointmentDetails called', {
+      uid,
+      role,
+      payload_appointmentId: payload.appointmentId,
+    });
+
+    // Validate auth context first
+    if (!uid || !role) {
+      return { success: false, error: 'User authentication failed' };
+    }
+
+    // Then validate payload with Zod schema
     const result = GetAppointmentDetailsSchema.safeParse(payload);
     if (!result.success) {
       return {
@@ -528,8 +545,7 @@ export async function getAppointmentDetails(
         error: `Invalid appointment details request: ${result.error.format()}`,
       };
     }
-
-    logInfo('getAppointmentDetails called', { uid, role, appointmentId });
+    const { appointmentId } = result.data; // Destructure after successful validation
 
     // Get all appointments
     const appointments = await getAppointments();

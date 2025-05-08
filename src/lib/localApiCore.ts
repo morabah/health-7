@@ -35,7 +35,10 @@ export interface ExtendedDoctorProfile {
   educationHistory?: { institution: string; degree: string; year: string }[];
   experience?: { position: string; hospital: string; duration: string }[];
   timezone?: string;
-  weeklySchedule?: Record<string, Array<{ startTime: string; endTime: string; isAvailable: boolean }>>;
+  weeklySchedule?: Record<
+    string,
+    Array<{ startTime: string; endTime: string; isAvailable: boolean }>
+  >;
 }
 
 // Define the RegisterSchema
@@ -56,17 +59,20 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 export function sleep(ms: number = 200): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export class LocalApiError extends Error {
-  constructor(public code: string, message: string) {
+  constructor(
+    public code: string,
+    message: string
+  ) {
     super(message);
     this.name = 'LocalApiError';
   }
 }
 export type ResultOk<T> = { success: true } & T;
-export type ResultErr = { success: false; error: string };
+export type ResultErr = { success: false; error: string; details?: unknown };
 export function notImpl(fn: string): never {
   throw new LocalApiError('not-implemented', `${fn} is not implemented in localApiCore.`);
 }
