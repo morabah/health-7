@@ -2352,13 +2352,19 @@ The doctor dashboard now properly displays both today's appointments and upcomin
   - Added quick actions panel for common patient tasks
   - Implemented responsive design for mobile and desktop
   - Fixed profile loading error display with better UX for error states
-  - Added visual distinction for unread notifications
-  - Enhanced overall typography and spacing for better readability
-  - Created dedicated sections for upcoming appointments and notifications
-  - Fixed profile data extraction from batch API response
-  - Added dark mode support for all dashboard components
+  - Added visual distinction for different appointment statuses
+  - Implemented skeleton loaders to replace generic spinners
+  - Added progressive loading of dashboard elements to reduce perceived load time
+  - Enhanced notifications with unread badge counts
+  - Added "Mark all as read" functionality for notifications
+  - Added notification counters in quick actions section
+  - Implemented dashboard personalization:
+    - User preferences to customize dashboard layout (compact, default, expanded)
+    - Drag-and-drop rearrangement of dashboard sections
+    - Toggle visibility of individual dashboard sections
+    - Persistent preferences storage in localStorage
 
-The patient dashboard now follows modern healthcare UI principles with a clear focus on important health information and upcoming appointments. The new design helps patients quickly find their most important information and take action on common tasks directly from the dashboard.
+The patient dashboard now follows modern healthcare UI principles with a clear focus on important health information and upcoming appointments. The new design helps patients quickly find their most important information and take action on common tasks directly from the dashboard. The personalization features allow patients to tailor their dashboard to their individual needs and preferences.
 
 ### Patient Health Management Pages
 
