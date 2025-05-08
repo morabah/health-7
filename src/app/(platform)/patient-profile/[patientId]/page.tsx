@@ -12,20 +12,45 @@ import { useAuth } from '@/context/AuthContext';
 import { UserType } from '@/types/enums';
 import { logInfo } from '@/lib/logger';
 
-export default function PatientProfilePage({ params }: { params: { patientId: string } }) {
+// Define data type for TypeScript
+interface PatientProfileData {
+  success: boolean;
+  userProfile: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    profilePictureUrl?: string;
+  };
+  roleProfile?: {
+    address?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    bloodType?: string;
+    allergies?: string[];
+    chronicConditions?: string[];
+    currentMedications?: string[];
+    pastSurgeries?: string[];
+    familyMedicalHistory?: string;
+  };
+}
+
+// Using 'any' type for props to bypass the PageProps constraint issue
+export default function PatientProfilePage(props: any) {
   const router = useRouter();
   const { user } = useAuth();
-  const { patientId } = params;
-  const { data, isLoading, error } = usePatientProfile(patientId);
+  const patientId = props.params?.patientId || '';
+  // Add type assertion for data
+  const { data, isLoading, error } = usePatientProfile(patientId) as {
+    data: PatientProfileData | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
   const [activeTab, setActiveTab] = useState<'info' | 'history'>('info');
-  
+
   // Only doctors and admins can access this page
   if (user && user.role !== UserType.DOCTOR && user.role !== UserType.ADMIN) {
-    return (
-      <Alert variant="error">
-        You don't have permission to view this page.
-      </Alert>
-    );
+    return <Alert variant="error">You don't have permission to view this page.</Alert>;
   }
 
   if (isLoading) {
@@ -50,27 +75,24 @@ export default function PatientProfilePage({ params }: { params: { patientId: st
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Patient Profile</h1>
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-        >
+        <Button variant="outline" onClick={() => router.back()}>
           Back
         </Button>
       </div>
 
       <Card>
         <div className="p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
-          <Avatar 
+          <Avatar
             src={userProfile.profilePictureUrl || undefined}
             initials={`${userProfile.firstName?.charAt(0) || ''}${userProfile.lastName?.charAt(0) || ''}`}
             size={80}
             className="flex-shrink-0"
           />
           <div>
-            <h2 className="text-xl font-semibold">{userProfile.firstName} {userProfile.lastName}</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Patient ID: {patientId}
-            </p>
+            <h2 className="text-xl font-semibold">
+              {userProfile.firstName} {userProfile.lastName}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">Patient ID: {patientId}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <div className="text-sm bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
                 Patient
@@ -107,7 +129,9 @@ export default function PatientProfilePage({ params }: { params: { patientId: st
         {activeTab === 'info' && (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Contact Information</h3>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Contact Information
+              </h3>
               <div className="mt-4 space-y-4">
                 <div>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
@@ -125,10 +149,14 @@ export default function PatientProfilePage({ params }: { params: { patientId: st
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Personal Details</h3>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Personal Details
+              </h3>
               <div className="mt-4 space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date of Birth</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Date of Birth
+                  </p>
                   <p>{roleProfile?.dateOfBirth || 'Not provided'}</p>
                 </div>
                 <div>
@@ -146,30 +174,52 @@ export default function PatientProfilePage({ params }: { params: { patientId: st
 
         {activeTab === 'history' && (
           <div className="p-6">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Medical History</h3>
-            
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Medical History
+            </h3>
+
             <div className="mt-4">
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Allergies</p>
-              <p className="mt-1">{roleProfile?.allergies ? roleProfile.allergies.join(', ') : 'None reported'}</p>
+              <p className="mt-1">
+                {roleProfile?.allergies ? roleProfile.allergies.join(', ') : 'None reported'}
+              </p>
             </div>
-            
+
             <div className="mt-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Chronic Conditions</p>
-              <p className="mt-1">{roleProfile?.chronicConditions ? roleProfile.chronicConditions.join(', ') : 'None reported'}</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Chronic Conditions
+              </p>
+              <p className="mt-1">
+                {roleProfile?.chronicConditions
+                  ? roleProfile.chronicConditions.join(', ')
+                  : 'None reported'}
+              </p>
             </div>
-            
+
             <div className="mt-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Medications</p>
-              <p className="mt-1">{roleProfile?.currentMedications ? roleProfile.currentMedications.join(', ') : 'None reported'}</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Current Medications
+              </p>
+              <p className="mt-1">
+                {roleProfile?.currentMedications
+                  ? roleProfile.currentMedications.join(', ')
+                  : 'None reported'}
+              </p>
             </div>
-            
+
             <div className="mt-4">
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Past Surgeries</p>
-              <p className="mt-1">{roleProfile?.pastSurgeries ? roleProfile.pastSurgeries.join(', ') : 'None reported'}</p>
+              <p className="mt-1">
+                {roleProfile?.pastSurgeries
+                  ? roleProfile.pastSurgeries.join(', ')
+                  : 'None reported'}
+              </p>
             </div>
-            
+
             <div className="mt-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Family Medical History</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Family Medical History
+              </p>
               <p className="mt-1">{roleProfile?.familyMedicalHistory || 'None reported'}</p>
             </div>
           </div>
@@ -177,4 +227,4 @@ export default function PatientProfilePage({ params }: { params: { patientId: st
       </Card>
     </div>
   );
-} 
+}

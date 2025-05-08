@@ -12,7 +12,8 @@ import { LazyDoctorSearchResults } from '@/components/LazyComponents';
 import { prefetchLazyComponents } from '@/components/LazyComponents';
 import { startMeasurement, endMeasurement } from '@/lib/performanceMetrics';
 
-interface SearchParams {
+// Modified SearchParams to be compatible with DoctorSearchParams
+interface SearchParams extends Record<string, string> {
   specialty: string;
   location: string;
   name: string;
@@ -25,23 +26,23 @@ export default function FindDoctorsPage() {
     name: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Debounced search params to prevent excessive re-renders
   const debouncedSearchParams = useDebounce(searchParams, 300);
-  
+
   // Prefetch doctor-related components on mount
   useEffect(() => {
     // Measure page load performance
     const perfId = startMeasurement('find-doctors-page-load');
-    
+
     // Prefetch related components
     prefetchLazyComponents('doctors');
-    
+
     // End measurement after components have loaded
     const timeoutId = setTimeout(() => {
       endMeasurement(perfId);
     }, 500);
-    
+
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -138,9 +139,7 @@ export default function FindDoctorsPage() {
 
         {/* Main Content - Using the optimized lazy-loaded component */}
         <div className="lg:col-span-3">
-          <LazyDoctorSearchResults 
-            searchParams={debouncedSearchParams} 
-          />
+          <LazyDoctorSearchResults searchParams={debouncedSearchParams} />
         </div>
       </div>
     </div>

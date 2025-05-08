@@ -9,23 +9,42 @@ import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import {
-  ArrowLeft,
-  Save,
-  UserCog,
-  RotateCcw,
-  Check,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Save, UserCog, RotateCcw, Check, X } from 'lucide-react';
 import { UserType, AccountStatus } from '@/types/enums';
-import { useUserDetail, useAdminActivateUser, useAdminUpdateUserProfile } from '@/data/adminLoaders';
+import {
+  useUserDetail,
+  useAdminActivateUser,
+  useAdminUpdateUserProfile,
+} from '@/data/adminLoaders';
 import { logInfo, logError } from '@/lib/logger';
+
+// Define response type to fix TypeScript errors
+interface UserDetailResponse {
+  success: boolean;
+  user?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    isActive?: boolean;
+    userType?: UserType;
+  };
+  error?: string;
+}
+
+// Define response type for update profile mutation
+interface UpdateProfileResponse {
+  success: boolean;
+  error?: string;
+}
 
 export default function UserEditPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params?.userId as string;
-  
+
   // Form state
   const [formData, setFormData] = useState({
     firstName: '',
@@ -35,18 +54,23 @@ export default function UserEditPage() {
     address: '',
     accountStatus: AccountStatus.ACTIVE,
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Fetch user details
-  const { 
-    data, 
-    isLoading, 
-    error: fetchError, 
-    refetch 
-  } = useUserDetail(userId);
+  // Fetch user details with proper type annotation
+  const {
+    data,
+    isLoading,
+    error: fetchError,
+    refetch,
+  } = useUserDetail(userId) as {
+    data: UserDetailResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<any>;
+  };
 
   // Update profile mutation
   const updateProfile = useAdminUpdateUserProfile();
@@ -71,7 +95,7 @@ export default function UserEditPage() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -85,25 +109,28 @@ export default function UserEditPage() {
     try {
       // Update user profile information with all fields
       logInfo('Updating user data', { userId, ...formData });
-      
-      const result = await updateProfile.mutateAsync({
+
+      // Format the request properly according to the expected API structure
+      const result = (await updateProfile.mutateAsync({
         userId,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        address: formData.address,
-        accountStatus: formData.accountStatus
-      });
-      
+        profileData: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          address: formData.address,
+          accountStatus: formData.accountStatus,
+        },
+      })) as UpdateProfileResponse;
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to update user profile');
       }
 
       // Force a refetch of the user details to ensure we have the latest data
       await refetch();
-      
+
       setSuccess(true);
-      
+
       // Add a longer delay before redirecting to ensure data is properly updated
       setTimeout(() => {
         router.push(`/admin/users/${userId}`);
@@ -133,11 +160,7 @@ export default function UserEditPage() {
           {fetchError ? String(fetchError) : data?.error || 'Failed to load user details'}
         </Alert>
         <div className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => router.back()}
-            className="flex items-center"
-          >
+          <Button variant="outline" onClick={() => router.back()} className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -155,11 +178,7 @@ export default function UserEditPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">User not found</Alert>
-        <Button 
-          variant="outline" 
-          onClick={() => router.back()}
-          className="flex items-center"
-        >
+        <Button variant="outline" onClick={() => router.back()} className="flex items-center">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Users
         </Button>
@@ -172,20 +191,12 @@ export default function UserEditPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center mb-4 sm:mb-0">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.back()}
-            className="mr-4 p-2"
-          >
+          <Button variant="ghost" onClick={() => router.back()} className="mr-4 p-2">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold dark:text-white">
-              Edit User
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400">
-              Update user information
-            </p>
+            <h1 className="text-2xl font-semibold dark:text-white">Edit User</h1>
+            <p className="text-slate-500 dark:text-slate-400">Update user information</p>
           </div>
         </div>
       </div>
@@ -196,7 +207,7 @@ export default function UserEditPage() {
           {error}
         </Alert>
       )}
-      
+
       {success && (
         <Alert variant="success" className="mb-4">
           User information updated successfully. Redirecting...
@@ -269,12 +280,7 @@ export default function UserEditPage() {
               <label htmlFor="phone" className="block text-sm font-medium mb-1">
                 Phone Number
               </label>
-              <Input
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-              />
+              <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} />
             </div>
 
             {/* Address */}
@@ -282,12 +288,7 @@ export default function UserEditPage() {
               <label htmlFor="address" className="block text-sm font-medium mb-1">
                 Address
               </label>
-              <Input
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-              />
+              <Input id="address" name="address" value={formData.address} onChange={handleChange} />
             </div>
 
             {/* Account Status */}
@@ -311,8 +312,8 @@ export default function UserEditPage() {
 
           {/* Form actions */}
           <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               type="button"
               onClick={() => router.push(`/admin/users/${userId}`)}
               disabled={isSubmitting}
@@ -320,11 +321,7 @@ export default function UserEditPage() {
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button 
-              variant="primary" 
-              type="submit"
-              disabled={isSubmitting}
-            >
+            <Button variant="primary" type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Spinner className="h-4 w-4 mr-2" />
@@ -342,4 +339,4 @@ export default function UserEditPage() {
       </Card>
     </div>
   );
-} 
+}

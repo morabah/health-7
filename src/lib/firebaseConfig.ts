@@ -1,6 +1,6 @@
 /**
  * Firebase Configuration
- * 
+ *
  * This file contains Firebase configuration and initialization.
  * It handles both local development with emulators and production environment.
  */
@@ -28,13 +28,14 @@ export interface FirebaseDocument {
  * Firebase configuration object
  */
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "FIREBASE_API_KEY",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "your-app.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "your-project-id",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "your-app.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "your-messaging-sender-id",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "your-app-id",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "your-measurement-id"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'FIREBASE_API_KEY',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'your-app.firebaseapp.com',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'your-project-id',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'your-app.appspot.com',
+  messagingSenderId:
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || 'your-messaging-sender-id',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || 'your-app-id',
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || 'your-measurement-id',
 };
 
 /**
@@ -42,11 +43,11 @@ export const firebaseConfig = {
  */
 export const emulatorConfig = {
   // Use 127.0.0.1 instead of localhost to avoid IPv6/IPv4 mismatches
-  authHost: process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099",
-  firestoreHost: process.env.NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080",
-  functionsHost: process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_HOST || "127.0.0.1:5001",
-  storageHost: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_EMULATOR_HOST || "127.0.0.1:9199",
-  useEmulator: process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATOR === "true" || false
+  authHost: process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099',
+  firestoreHost: process.env.NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080',
+  functionsHost: process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_HOST || '127.0.0.1:5001',
+  storageHost: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_EMULATOR_HOST || '127.0.0.1:9199',
+  useEmulator: process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATOR === 'true' || false,
 };
 
 /**
@@ -54,65 +55,71 @@ export const emulatorConfig = {
  */
 export interface AuthService {
   currentUser: FirebaseUser | null;
-  onAuthStateChanged: (callback: (user: FirebaseUser | null) => void) => () => void;
-  signInWithEmailAndPassword: (email: string, password: string) => Promise<{ user: FirebaseUser }>;
-  createUserWithEmailAndPassword: (email: string, password: string) => Promise<{ user: FirebaseUser }>;
+  onAuthStateChanged: (_callback: (user: FirebaseUser | null) => void) => () => void;
+  signInWithEmailAndPassword: (
+    _email: string,
+    _password: string
+  ) => Promise<{ user: FirebaseUser }>;
+  createUserWithEmailAndPassword: (
+    _email: string,
+    _password: string
+  ) => Promise<{ user: FirebaseUser }>;
   signOut: () => Promise<void>;
-  sendPasswordResetEmail: (email: string) => Promise<void>;
-  sendEmailVerification: (user: FirebaseUser) => Promise<void>;
+  sendPasswordResetEmail: (_email: string) => Promise<void>;
+  sendEmailVerification: (_user: FirebaseUser) => Promise<void>;
 }
 
 export const auth: AuthService = {
   currentUser: null,
-  onAuthStateChanged: (callback: (user: FirebaseUser | null) => void) => {
+  onAuthStateChanged: (_callback: (user: FirebaseUser | null) => void) => {
     return () => {}; // Returns unsubscribe function
   },
   signInWithEmailAndPassword: async (_email: string, _password: string) => {
     // This is just a mock - will be replaced with actual Firebase Auth
-    throw new AuthError("Firebase Auth not initialized", {code: 'FIREBASE_AUTH_NOT_INITIALIZED'});
+    throw new AuthError('Firebase Auth not initialized', { code: 'FIREBASE_AUTH_NOT_INITIALIZED' });
   },
   createUserWithEmailAndPassword: async (_email: string, _password: string) => {
-    throw new AuthError("Firebase Auth not initialized", {code: 'FIREBASE_AUTH_NOT_INITIALIZED'});
+    throw new AuthError('Firebase Auth not initialized', { code: 'FIREBASE_AUTH_NOT_INITIALIZED' });
   },
   signOut: async () => {
-    throw new AuthError("Firebase Auth not initialized", {code: 'FIREBASE_AUTH_NOT_INITIALIZED'});
+    throw new AuthError('Firebase Auth not initialized', { code: 'FIREBASE_AUTH_NOT_INITIALIZED' });
   },
   sendPasswordResetEmail: async (_email: string) => {
-    throw new AuthError("Firebase Auth not initialized", {code: 'FIREBASE_AUTH_NOT_INITIALIZED'});
+    throw new AuthError('Firebase Auth not initialized', { code: 'FIREBASE_AUTH_NOT_INITIALIZED' });
   },
   sendEmailVerification: async (_user: FirebaseUser) => {
-    throw new AuthError("Firebase Auth not initialized", {code: 'FIREBASE_AUTH_NOT_INITIALIZED'});
-  }
+    throw new AuthError('Firebase Auth not initialized', { code: 'FIREBASE_AUTH_NOT_INITIALIZED' });
+  },
 };
 
 /**
  * Firestore database mock service
  */
 export interface FirestoreService {
-  collection: (path: string) => FirestoreCollection;
+  collection: (_path: string) => FirestoreCollection;
 }
 
 interface FirestoreCollection {
-  doc: (id: string) => FirestoreDocument;
-  add: (data: Record<string, unknown>) => Promise<{ id: string }>;
-  where: (field: string, operator: string, value: unknown) => FirestoreQuery;
-  orderBy: (field: string, direction?: 'asc' | 'desc') => FirestoreOrderBy;
+  doc: (_id: string) => FirestoreDocument;
+  add: (_data: Record<string, unknown>) => Promise<{ id: string }>;
+  where: (_field: string, _operator: string, _value: unknown) => FirestoreQuery;
+  orderBy: (_field: string, _direction?: 'asc' | 'desc') => FirestoreOrderBy;
 }
 
 interface FirestoreDocument {
   get: () => Promise<FirebaseDocument>;
-  set: (data: Record<string, unknown>) => Promise<void>;
-  update: (data: Record<string, unknown>) => Promise<void>;
+  set: (_data: Record<string, unknown>) => Promise<void>;
+  update: (_data: Record<string, unknown>) => Promise<void>;
   delete: () => Promise<void>;
 }
 
 interface FirestoreQuery {
   get: () => Promise<{ docs: FirebaseDocument[] }>;
-  orderBy: (field: string, direction?: 'asc' | 'desc') => FirestoreOrderBy;
+  orderBy: (_field: string, _direction?: 'asc' | 'desc') => FirestoreOrderBy;
 }
 
 interface FirestoreOrderBy {
-  limit: (limit: number) => {
+  limit: (_limit: number) => {
     get: () => Promise<{ docs: FirebaseDocument[] }>;
   };
 }
@@ -123,54 +130,59 @@ export const firestore: FirestoreService = {
       get: async (): Promise<FirebaseDocument> => ({ exists: false, data: () => null }),
       set: async (_data: Record<string, unknown>) => {},
       update: async (_data: Record<string, unknown>) => {},
-      delete: async () => {}
+      delete: async () => {},
     }),
     add: async (_data: Record<string, unknown>) => ({ id: 'mock-id' }),
-    where: (_field: string, _operator: string, _value: unknown) => ({ 
+    where: (_field: string, _operator: string, _value: unknown) => ({
       get: async () => ({ docs: [] }),
-      orderBy: (_field: string, _direction?: 'asc' | 'desc') => ({
+      orderBy: (_field2: string, _direction?: 'asc' | 'desc') => ({
         limit: (_limit: number) => ({
-          get: async () => ({ docs: [] })
-        })
-      })
+          get: async () => ({ docs: [] }),
+        }),
+      }),
     }),
     orderBy: (_field: string, _direction?: 'asc' | 'desc') => ({
       limit: (_limit: number) => ({
-        get: async () => ({ docs: [] })
-      })
-    })
-  })
+        get: async () => ({ docs: [] }),
+      }),
+    }),
+  }),
 };
 
 /**
  * Functions mock service
  */
 export interface FunctionsService {
-  httpsCallable: <T = Record<string, unknown>, R = unknown>(name: string) => (data: T) => Promise<{ data: R }>;
+  httpsCallable: <T = Record<string, unknown>, R = unknown>(
+    name: string
+  ) => (data: T) => Promise<{ data: R }>;
   createTypedCallable: <T, R>(name: string) => (data: T) => Promise<{ data: R }>;
 }
 
 export const functions: FunctionsService = {
-  httpsCallable: (name: string) => async (data) => {
-    console.log(`Mock Firebase Function called: ${name}`, data);
-    return { data: null as unknown as any };
-  },
-  createTypedCallable: <T, R>(name: string) => 
+  httpsCallable:
+    <T = Record<string, unknown>, R = unknown>(name: string) =>
+    async (data: T): Promise<{ data: R }> => {
+      console.log(`Mock Firebase Function called: ${name}`, data);
+      return { data: null as unknown as R };
+    },
+  createTypedCallable:
+    <T, R>(name: string) =>
     async (data: T): Promise<{ data: R }> => {
       console.log(`Mock Typed Firebase Function called: ${name}`, data);
       return { data: null as unknown as R };
-    }
+    },
 };
 
 /**
  * Storage mock service
  */
 export interface StorageService {
-  ref: (path: string) => StorageReference;
+  ref: (_path: string) => StorageReference;
 }
 
 interface StorageReference {
-  put: (file: File) => Promise<{ ref: { getDownloadURL: () => Promise<string> } }>;
+  put: (_file: File) => Promise<{ ref: { getDownloadURL: () => Promise<string> } }>;
   delete: () => Promise<void>;
   getDownloadURL: () => Promise<string>;
 }
@@ -179,22 +191,22 @@ export const storage: StorageService = {
   ref: (_path: string) => ({
     put: async (_file: File) => ({
       ref: {
-        getDownloadURL: async () => "https://mock-download-url.com/file.jpg"
-      }
+        getDownloadURL: async () => 'https://mock-download-url.com/file.jpg',
+      },
     }),
     delete: async () => {},
-    getDownloadURL: async () => "https://mock-download-url.com/file.jpg"
-  })
+    getDownloadURL: async () => 'https://mock-download-url.com/file.jpg',
+  }),
 };
 
 /**
  * Firebase configuration flags
  */
 // Migration helper - set to true when migrating to Firebase
-export const isFirebaseEnabled = process.env.NEXT_PUBLIC_FIREBASE_ENABLED === "true" || false;
+export const isFirebaseEnabled = process.env.NEXT_PUBLIC_FIREBASE_ENABLED === 'true' || false;
 
 // Toggle to prefer emulator even in production build (for testing)
-export const forceEmulator = process.env.NEXT_PUBLIC_FORCE_EMULATOR === "true" || false;
+export const forceEmulator = process.env.NEXT_PUBLIC_FORCE_EMULATOR === 'true' || false;
 
 // Flag for Firebase connection status
 export const isFirebaseInitialized = false;
@@ -214,5 +226,5 @@ export const getFirebaseStatus = (): FirebaseStatus => ({
   isEnabled: isFirebaseEnabled,
   isInitialized: isFirebaseInitialized,
   useEmulator: emulatorConfig.useEmulator || forceEmulator,
-  projectId: firebaseConfig.projectId
+  projectId: firebaseConfig.projectId,
 });

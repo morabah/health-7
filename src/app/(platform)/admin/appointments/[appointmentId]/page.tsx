@@ -3,13 +3,13 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  FileText, 
-  MessageCircle, 
-  ChevronLeft, 
+import {
+  Calendar,
+  Clock,
+  User,
+  FileText,
+  MessageCircle,
+  ChevronLeft,
   FileCheck,
   Building,
   MapPin,
@@ -27,24 +27,31 @@ import { useAppointmentDetails } from '@/data/adminLoaders';
 import { AppointmentStatus, AppointmentType } from '@/types/enums';
 import type { Appointment } from '@/types/schemas';
 
+// Define type for API response
+interface AppointmentResponse {
+  success: boolean;
+  appointment: Appointment;
+  error?: string;
+}
+
 export default function AdminAppointmentDetailsPage() {
   const params = useParams();
   const appointmentId = params?.appointmentId as string;
-  
+
   if (!appointmentId) {
-    return (
-      <Alert variant="error">
-        Missing appointment ID
-      </Alert>
-    );
+    return <Alert variant="error">Missing appointment ID</Alert>;
   }
-  
-  // Fetch appointment details
-  const { 
-    data: appointmentData, 
-    isLoading, 
-    error 
-  } = useAppointmentDetails(appointmentId);
+
+  // Fetch appointment details with type annotation
+  const {
+    data: appointmentData,
+    isLoading,
+    error,
+  } = useAppointmentDetails(appointmentId) as {
+    data: AppointmentResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
 
   if (isLoading) {
     return (
@@ -63,21 +70,24 @@ export default function AdminAppointmentDetailsPage() {
   }
 
   const appointment = appointmentData.appointment as Appointment;
-  
+
   // Format date for display
   const formattedDate = format(new Date(appointment.appointmentDate), 'PPPP');
-  
+
   // Map for status display
   const statusMap: Record<string, string> = {
     [AppointmentStatus.PENDING]: 'Pending',
     [AppointmentStatus.CONFIRMED]: 'Confirmed',
     [AppointmentStatus.COMPLETED]: 'Completed',
     [AppointmentStatus.CANCELED]: 'Cancelled',
-    [AppointmentStatus.RESCHEDULED]: 'Rescheduled'
+    [AppointmentStatus.RESCHEDULED]: 'Rescheduled',
   };
 
   // Map for status badge colors
-  const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
+  const statusColor: Record<
+    string,
+    'success' | 'default' | 'warning' | 'info' | 'danger' | 'pending'
+  > = {
     [AppointmentStatus.PENDING]: 'pending',
     [AppointmentStatus.CONFIRMED]: 'info',
     [AppointmentStatus.COMPLETED]: 'success',
@@ -88,7 +98,7 @@ export default function AdminAppointmentDetailsPage() {
   // Map for appointment type display
   const appointmentTypeMap: Record<string, string> = {
     [AppointmentType.IN_PERSON]: 'In-Person Visit',
-    [AppointmentType.VIDEO]: 'Video Consultation'
+    [AppointmentType.VIDEO]: 'Video Consultation',
   };
 
   return (
@@ -162,7 +172,7 @@ export default function AdminAppointmentDetailsPage() {
       {/* Appointment Details */}
       <Card className="p-6">
         <h2 className="text-lg font-bold mb-4">Appointment Details</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
@@ -172,15 +182,17 @@ export default function AdminAppointmentDetailsPage() {
               </div>
               <p className="ml-7">{formattedDate}</p>
             </div>
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 <Clock className="h-5 w-5 mr-2" />
                 <span className="font-medium">Time</span>
               </div>
-              <p className="ml-7">{appointment.startTime} - {appointment.endTime}</p>
+              <p className="ml-7">
+                {appointment.startTime} - {appointment.endTime}
+              </p>
             </div>
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 {appointment.appointmentType === AppointmentType.IN_PERSON ? (
@@ -190,21 +202,24 @@ export default function AdminAppointmentDetailsPage() {
                 )}
                 <span className="font-medium">Type</span>
               </div>
-              <p className="ml-7">{appointmentTypeMap[appointment.appointmentType] || 'In-Person Visit'}</p>
-              {appointment.appointmentType === AppointmentType.VIDEO && appointment.videoCallUrl && (
-                <a 
-                  href={appointment.videoCallUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="ml-7 mt-2 inline-flex items-center text-primary-600 hover:underline"
-                >
-                  <Video className="h-4 w-4 mr-1" />
-                  View Video Call Link
-                </a>
-              )}
+              <p className="ml-7">
+                {appointmentTypeMap[appointment.appointmentType] || 'In-Person Visit'}
+              </p>
+              {appointment.appointmentType === AppointmentType.VIDEO &&
+                appointment.videoCallUrl && (
+                  <a
+                    href={appointment.videoCallUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-7 mt-2 inline-flex items-center text-primary-600 hover:underline"
+                  >
+                    <Video className="h-4 w-4 mr-1" />
+                    View Video Call Link
+                  </a>
+                )}
             </div>
           </div>
-          
+
           <div className="space-y-4">
             {appointment.reason && (
               <div>
@@ -215,7 +230,7 @@ export default function AdminAppointmentDetailsPage() {
                 <p className="ml-7">{appointment.reason}</p>
               </div>
             )}
-            
+
             {appointment.notes && (
               <div>
                 <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
@@ -225,7 +240,7 @@ export default function AdminAppointmentDetailsPage() {
                 <p className="ml-7">{appointment.notes}</p>
               </div>
             )}
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 <FileCheck className="h-5 w-5 mr-2" />
@@ -243,4 +258,4 @@ export default function AdminAppointmentDetailsPage() {
       </Card>
     </div>
   );
-} 
+}

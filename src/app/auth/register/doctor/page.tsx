@@ -110,7 +110,7 @@ export default function DoctorRegisterPage() {
       logInfo('doctor_registration', { email, specialty });
 
       // Register doctor via auth context
-      const result = await registerDoctor({
+      const success = await registerDoctor({
         email,
         password,
         userType: UserType.DOCTOR,
@@ -123,18 +123,14 @@ export default function DoctorRegisterPage() {
         // will be updated later through the doctor profile
       });
 
-      if (result && typeof result === 'object' && 'success' in result && result.success) {
+      if (success) {
         // Registration successful, redirect to success page
         router.push(
           `/auth/registration-success?type=${UserType.DOCTOR}&email=${encodeURIComponent(email)}`
         );
       } else {
         // Handle unsuccessful registration
-        const errorMessage =
-          result && typeof result === 'object' && 'error' in result
-            ? result.error
-            : 'Registration failed';
-        setError(errorMessage as string);
+        setError('Registration failed. Please check your information and try again.');
       }
     } catch (err) {
       logError('Error during doctor registration', err);

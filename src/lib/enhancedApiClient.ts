@@ -5,7 +5,7 @@ import { cacheKeys, cacheManager } from './queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import type { UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useEffect, useCallback } from 'react';
-import { logInfo, logError } from './logger';
+import { logError } from './logger';
 
 /**
  * Enhanced API client that uses React Query for data fetching and caching
@@ -45,18 +45,18 @@ const BATCH_DELAYS: Record<string, number> = {
 
 // Map API methods to batch queues
 const METHOD_TO_BATCH: Record<string, string> = {
-  'getMyNotifications': 'notifications',
-  'getAllNotifications': 'notifications',
-  'findDoctors': 'doctors',
-  'getAllDoctors': 'doctors',
-  'getDoctorPublicProfile': 'doctors',
-  'getMyAppointments': 'appointments',
-  'getPatientAppointments': 'appointments',
-  'getDoctorAppointments': 'appointments',
-  'getAvailableSlots': 'appointments',
-  'getAllUsers': 'users',
-  'getMyUserProfile': 'users',
-  'getUserProfile': 'users',
+  getMyNotifications: 'notifications',
+  getAllNotifications: 'notifications',
+  findDoctors: 'doctors',
+  getAllDoctors: 'doctors',
+  getDoctorPublicProfile: 'doctors',
+  getMyAppointments: 'appointments',
+  getPatientAppointments: 'appointments',
+  getDoctorAppointments: 'appointments',
+  getAvailableSlots: 'appointments',
+  getAllUsers: 'users',
+  getMyUserProfile: 'users',
+  getUserProfile: 'users',
 };
 
 /**
@@ -65,20 +65,20 @@ const METHOD_TO_BATCH: Record<string, string> = {
 function processBatch(batchType: string) {
   const queue = batchQueues[batchType];
   if (!queue || queue.length === 0) return;
-  
+
   // Clear the timer
   if (batchTimers[batchType]) {
     clearTimeout(batchTimers[batchType]!);
     batchTimers[batchType] = null;
   }
-  
+
   // Create a copy of the queue and clear the original
   const batchToProcess = [...queue];
   batchQueues[batchType] = [];
-  
+
   // Group by method name to process each method separately
   const batchesByMethod: Record<string, BatchQueueItem<unknown>[]> = {};
-  
+
   for (const item of batchToProcess) {
     const methodName = item.params[0] as string;
     if (!batchesByMethod[methodName]) {
@@ -86,7 +86,7 @@ function processBatch(batchType: string) {
     }
     batchesByMethod[methodName].push(item);
   }
-  
+
   // Process each method batch
   for (const [method, items] of Object.entries(batchesByMethod)) {
     processBatchForMethod(method, items);
@@ -98,7 +98,7 @@ function processBatch(batchType: string) {
  */
 async function processBatchForMethod(method: string, batch: BatchQueueItem<unknown>[]) {
   if (batch.length === 0) return;
-  
+
   try {
     // For single item batches, just process normally
     if (batch.length === 1) {
@@ -107,14 +107,14 @@ async function processBatchForMethod(method: string, batch: BatchQueueItem<unkno
       item.resolve(result);
       return;
     }
-    
+
     // For multiple items, process according to method
     if (method === 'getMyNotifications' || method === 'getAllNotifications') {
       // Special case for notifications - we can make a single call
       // and distribute results to all requesters
       const firstItem = batch[0];
       const result = await callApi(method, ...firstItem.params.slice(1));
-      
+
       // Resolve all promises with the same result
       for (const item of batch) {
         item.resolve(result);
@@ -130,7 +130,7 @@ async function processBatchForMethod(method: string, batch: BatchQueueItem<unkno
         } catch (error) {
           item.reject(error);
         }
-        
+
         // Add a small delay between calls except for the last one
         if (i < batch.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 50));
@@ -151,21 +151,21 @@ async function processBatchForMethod(method: string, batch: BatchQueueItem<unkno
  */
 function queueBatchedCall<T>(method: string, params: unknown[]): Promise<T> {
   const batchType = METHOD_TO_BATCH[method];
-  
+
   // If method isn't configured for batching, execute directly
   if (!batchType || !batchQueues[batchType]) {
     return callApi<T>(method, ...params);
   }
-  
+
   return new Promise<T>((resolve, reject) => {
     // Add to queue
     batchQueues[batchType].push({
       params: [method, ...params],
       resolve: resolve as (value: unknown) => void,
       reject,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    
+
     // Set a timer to process the batch if not already set
     if (!batchTimers[batchType]) {
       batchTimers[batchType] = setTimeout(() => {
@@ -188,13 +188,13 @@ export function useEnhancedApi() {
     if (METHOD_TO_BATCH[method]) {
       return queueBatchedCall<T>(method, params);
     }
-    
+
     // Default to regular API call
     return callApi<T>(method, ...params);
   }, []);
-  
+
   return {
-    callApi: callEnhancedApi
+    callApi: callEnhancedApi,
   };
 }
 
@@ -204,7 +204,7 @@ export const enhancedApiCall = <T>(method: string, ...params: unknown[]): Promis
   if (METHOD_TO_BATCH[method]) {
     return queueBatchedCall<T>(method, params);
   }
-  
+
   // Default to regular API call
   return callApi<T>(method, ...params);
 };
@@ -230,10 +230,10 @@ export function useApiQuery<TData, TError = Error>(
     retry: 1,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   };
-  
+
   // Merge with user-provided options, but allow overrides
   const mergedOptions = { ...defaultOptions, ...options };
-  
+
   return useQuery<TData, TError>({
     queryKey,
     queryFn: async () => {
@@ -246,15 +246,15 @@ export function useApiQuery<TData, TError = Error>(
             return cachedData;
           }
         }
-        
+
         // Get the data from the API
         // Use batching if appropriate for this method
         const canBatch = ['getUsers', 'getDoctors', 'getNotifications'].includes(method);
-        
+
         const result = canBatch
           ? await queueBatchedCall<TData>(method, args)
           : await callApi<TData>(method, ...args);
-          
+
         return result;
       } catch (error) {
         logError(`API query error in ${method}:`, error);
@@ -273,11 +273,13 @@ export function useApiQuery<TData, TError = Error>(
  */
 export function useApiMutation<TData, TVariables, TError = Error>(
   method: string,
-  invalidateQueries: Array<Array<string | unknown>> | ((data: TData) => Array<Array<string | unknown>>) = [],
+  invalidateQueries:
+    | Array<Array<string | unknown>>
+    | ((data: TData) => Array<Array<string | unknown>>) = [],
   options: Omit<UseMutationOptions<TData, TError, TVariables>, 'mutationFn'> = {}
 ) {
   return useMutation<TData, TError, TVariables>({
-    mutationFn: async (variables) => {
+    mutationFn: async variables => {
       // We assume variables is the args array for the API call
       return callApi<TData>(method, ...(Array.isArray(variables) ? variables : [variables]));
     },
@@ -286,12 +288,11 @@ export function useApiMutation<TData, TVariables, TError = Error>(
       if (options.onSuccess) {
         await options.onSuccess(data, variables, context);
       }
-      
+
       // Invalidate queries
-      const queriesToInvalidate = typeof invalidateQueries === 'function'
-        ? invalidateQueries(data)
-        : invalidateQueries;
-      
+      const queriesToInvalidate =
+        typeof invalidateQueries === 'function' ? invalidateQueries(data) : invalidateQueries;
+
       // Invalidate each query
       for (const queryKey of queriesToInvalidate) {
         await cacheManager.invalidateQueries(queryKey as Array<string>);
@@ -321,17 +322,20 @@ export async function prefetchApiQuery<TData>(
  * Cache and preload hook - use on key pages to preload related data
  * @param preloads Array of preload configurations
  */
-export function usePreloadData(preloads: {
-  method: string;
-  queryKey: unknown[];
-  args: unknown[];
-  enabled?: boolean;
-}[]) {
+export function usePreloadData(
+  preloads: {
+    method: string;
+    queryKey: unknown[];
+    args: unknown[];
+    enabled?: boolean;
+  }[]
+) {
   useEffect(() => {
     preloads.forEach(({ method, queryKey, args, enabled = true }) => {
       if (enabled) {
-        prefetchApiQuery(method, queryKey, args)
-          .catch(err => logError(`Error preloading ${method}:`, err));
+        prefetchApiQuery(method, queryKey, args).catch(err =>
+          logError(`Error preloading ${method}:`, err)
+        );
       }
     });
   }, [preloads]);
@@ -343,32 +347,17 @@ export function usePreloadData(preloads: {
 
 // Get current user profile
 export function useMyUserProfile(options = {}) {
-  return useApiQuery(
-    'getMyUserProfile',
-    cacheKeys.myUserProfile(),
-    [],
-    options
-  );
+  return useApiQuery('getMyUserProfile', cacheKeys.myUserProfile(), [], options);
 }
 
 // Get user by ID
 export function useUserProfile(userId: string, options = {}) {
-  return useApiQuery(
-    'getUserProfile',
-    cacheKeys.userProfile(userId),
-    [{ userId }],
-    options
-  );
+  return useApiQuery('getUserProfile', cacheKeys.userProfile(userId), [{ userId }], options);
 }
 
 // Get doctor profile
 export function useDoctorProfile(doctorId: string, options = {}) {
-  return useApiQuery(
-    'getDoctorPublicProfile',
-    cacheKeys.doctor(doctorId),
-    [{ doctorId }],
-    options
-  );
+  return useApiQuery('getDoctorPublicProfile', cacheKeys.doctor(doctorId), [{ doctorId }], options);
 }
 
 // Get available slots
@@ -377,45 +366,31 @@ export function useAvailableSlots(doctorId: string, date: string, options = {}) 
     'getAvailableSlots',
     cacheKeys.availableSlots(doctorId, date),
     [{ doctorId, date }],
-    { 
+    {
       staleTime: 2 * 60 * 1000, // 2 minutes
-      ...options 
+      ...options,
     }
   );
 }
 
 // Get my appointments
 export function useMyAppointments(options = {}) {
-  return useApiQuery(
-    'getMyAppointments',
-    cacheKeys.appointments(),
-    [],
-    options
-  );
+  return useApiQuery('getMyAppointments', cacheKeys.appointments(), [], options);
 }
 
 // Get my notifications
 export function useMyNotifications(options = {}) {
-  return useApiQuery(
-    'getMyNotifications',
-    cacheKeys.notifications(),
-    [],
-    { 
-      refetchInterval: 30000, // 30 seconds
-      ...options 
-    }
-  );
+  return useApiQuery('getMyNotifications', cacheKeys.notifications(), [], {
+    refetchInterval: 30000, // 30 seconds
+    ...options,
+  });
 }
 
 // Book appointment mutation
 export function useBookAppointment(options = {}) {
   return useApiMutation(
     'bookAppointment',
-    [
-      cacheKeys.appointments(),
-      cacheKeys.doctors(),
-      cacheKeys.notifications()
-    ],
+    [cacheKeys.appointments(), cacheKeys.doctors(), cacheKeys.notifications()],
     options
   );
 }
@@ -424,21 +399,12 @@ export function useBookAppointment(options = {}) {
 export function useCancelAppointment(options = {}) {
   return useApiMutation(
     'cancelAppointment',
-    [
-      cacheKeys.appointments(),
-      cacheKeys.notifications()
-    ],
+    [cacheKeys.appointments(), cacheKeys.notifications()],
     options
   );
 }
 
 // Update user profile mutation
 export function useUpdateProfile(options = {}) {
-  return useApiMutation(
-    'updateMyUserProfile',
-    [
-      cacheKeys.myUserProfile()
-    ],
-    options
-  );
-} 
+  return useApiMutation('updateMyUserProfile', [cacheKeys.myUserProfile()], options);
+}

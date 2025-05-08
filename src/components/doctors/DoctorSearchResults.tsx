@@ -1,5 +1,4 @@
-import React, { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Card from '@/components/ui/Card';
@@ -7,15 +6,7 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import {
-  MapPin,
-  Globe,
-  DollarSign,
-  Stethoscope,
-  Calendar,
-  Star,
-} from 'lucide-react';
-import { logInfo } from '@/lib/logger';
+import { MapPin, Globe, DollarSign, Stethoscope, Calendar, Star } from 'lucide-react';
 import { useApiQuery, prefetchApiQuery } from '@/lib/enhancedApiClient';
 import { cacheKeys } from '@/lib/queryClient';
 import { useBatchDoctorData } from '@/data/doctorLoaders';
@@ -93,11 +84,11 @@ const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
   // Prefetch doctor profile data on hover to improve perceived speed
   const handleMouseEnter = () => {
     prefetchApiQuery<ApiResponse<DoctorProfile>>(
-      'getDoctorPublicProfile', 
-      cacheKeys.doctor(doctor.id), 
+      'getDoctorPublicProfile',
+      cacheKeys.doctor(doctor.id),
       [{ doctorId: doctor.id }]
     );
-    
+
     // Also prefetch first page of available slots for current date
     const currentDate = new Date().toISOString().split('T')[0];
     prefetchApiQuery<ApiResponse<AvailableSlot[]>>(
@@ -106,7 +97,7 @@ const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
       [{ doctorId: doctor.id, date: currentDate }]
     );
   };
-  
+
   if (!doctor) {
     return <Card className="p-6 text-center">Doctor data not found</Card>;
   }
@@ -125,11 +116,7 @@ const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
   } = doctor;
 
   return (
-    <Card 
-      className="overflow-hidden" 
-      hoverable
-      onMouseEnter={handleMouseEnter}
-    >
+    <Card className="overflow-hidden" hoverable onMouseEnter={handleMouseEnter}>
       <div className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Doctor Image */}
@@ -212,17 +199,18 @@ const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
 
 DoctorCard.displayName = 'DoctorCard';
 
-const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({ 
+const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   searchParams,
   className = '',
 }) => {
-  const perfTracker = trackPerformance('DoctorSearchResults');
-  
+  const perfTracker = useMemo(() => trackPerformance('DoctorSearchResults'), []);
+  const hasLoggedPerformance = useRef(false);
+
   // Use enhanced API client with React Query integration
-  const { 
-    data: searchData, 
-    isLoading: isSearchLoading, 
-    error: searchError 
+  const {
+    data: searchData,
+    isLoading: isSearchLoading,
+    error: searchError,
   } = useApiQuery<FindDoctorsResponse, Error>(
     'findDoctors',
     cacheKeys.doctors(searchParams),
@@ -233,56 +221,44 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
       retryDelay: 1000, // 1 second between retries
     }
   );
-  
+
   // Extract doctor IDs for batch loading
   const doctorIds = useMemo(() => {
     if (!searchData?.success || !searchData.doctors) return [];
     return searchData.doctors.map(doctor => doctor.id);
   }, [searchData]);
-  
+
   // Batch load additional doctor details
-  const { 
-    data: batchData,
-    isLoading: isBatchLoading
-  } = useBatchDoctorData(doctorIds, { 
-    enabled: doctorIds.length > 0 
+  const { data: batchData, isLoading: isBatchLoading } = useBatchDoctorData(doctorIds, {
+    enabled: doctorIds.length > 0,
   });
-  
+
   // Create enhanced doctor data by merging search results with batch data
   const doctors = useMemo(() => {
     if (!searchData?.success || !searchData.doctors) return [];
-    
+
     return searchData.doctors.map(doctor => {
       // Find additional data from batch results if available
       const batchDoctor = batchData?.success && batchData.doctors[doctor.id];
-      
+
       // Merge the data, preferring search result data when there's a conflict
       return {
         ...(batchDoctor || {}),
-        ...doctor // Ensure original doctor data takes precedence
+        ...doctor, // Ensure original doctor data takes precedence
       };
     });
   }, [searchData, batchData]);
-  
+
   // Determine overall loading state
   const isLoading = isSearchLoading || (doctorIds.length > 0 && isBatchLoading && !batchData);
   const error = searchError;
-  
-  // Log search performance
+
   React.useEffect(() => {
-    if (doctors.length > 0) {
-      logInfo('Doctor search completed', { 
-        resultCount: doctors.length,
-        params: searchParams,
-        batchLoaded: !!batchData
-      });
-    }
-    
-    // Stop performance tracking when component unmounts
-    return () => {
+    if (doctors.length > 0 && !hasLoggedPerformance.current) {
       perfTracker.stop();
-    };
-  }, [doctors.length, searchParams, batchData]);
+      hasLoggedPerformance.current = true;
+    }
+  }, [doctors.length, perfTracker, searchParams, batchData]);
 
   return (
     <div className={className}>
@@ -314,7 +290,7 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
       {/* Doctor Cards */}
       {!isLoading && !error && doctors && doctors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {doctors.map((doctor) => (
+          {doctors.map(doctor => (
             <DoctorCard key={doctor.id} doctor={doctor} />
           ))}
         </div>
@@ -327,9 +303,7 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
             <p className="text-slate-500 mb-4">
               Try adjusting your search filters to find more results.
             </p>
-            <Button variant="outline">
-              Clear Filters
-            </Button>
+            <Button variant="outline">Clear Filters</Button>
           </div>
         )
       )}
@@ -337,4 +311,4 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   );
 };
 
-export default DoctorSearchResults; 
+export default DoctorSearchResults;

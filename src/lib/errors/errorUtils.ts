@@ -1,6 +1,6 @@
 /**
  * Error Utilities
- * 
+ *
  * This file contains utility functions for handling errors consistently
  * throughout the application. These utilities make it easier to safely
  * execute functions with standardized error handling.
@@ -12,16 +12,16 @@ import { reportError } from './errorMonitoring';
 export interface ErrorHandlingConfig {
   /** Whether to log the error */
   logError?: boolean;
-  
+
   /** Whether to report the error to monitoring service */
   reportError?: boolean;
-  
+
   /** Custom error transformation function */
   transformError?: (error: unknown) => Error;
-  
+
   /** Default error message if none provided */
   defaultMessage?: string;
-  
+
   /** Additional context to add to the error */
   context?: Record<string, unknown>;
 }
@@ -40,17 +40,17 @@ export async function withErrorHandling<T>(
       defaultMessage: config.defaultMessage,
       context: config.context,
     });
-    
+
     // Optionally report the error to monitoring
     if (config.reportError !== false) {
       reportError(normalizedError);
     }
-    
+
     // Apply custom error transformation if provided
     if (config.transformError) {
       throw config.transformError(normalizedError);
     }
-    
+
     throw normalizedError;
   }
 }
@@ -58,10 +58,7 @@ export async function withErrorHandling<T>(
 /**
  * Wraps a synchronous function with standardized error handling
  */
-export function withErrorHandlingSync<T>(
-  fn: () => T,
-  config: ErrorHandlingConfig = {}
-): T {
+export function withErrorHandlingSync<T>(fn: () => T, config: ErrorHandlingConfig = {}): T {
   try {
     return fn();
   } catch (error) {
@@ -69,17 +66,17 @@ export function withErrorHandlingSync<T>(
       defaultMessage: config.defaultMessage,
       context: config.context,
     });
-    
+
     // Optionally report the error to monitoring
     if (config.reportError !== false) {
       reportError(normalizedError);
     }
-    
+
     // Apply custom error transformation if provided
     if (config.transformError) {
       throw config.transformError(normalizedError);
     }
-    
+
     throw normalizedError;
   }
 }
@@ -87,7 +84,7 @@ export function withErrorHandlingSync<T>(
 export interface NormalizeErrorOptions {
   /** Default error message if none provided */
   defaultMessage?: string;
-  
+
   /** Additional context to add to the error */
   context?: Record<string, unknown>;
 }
@@ -95,10 +92,7 @@ export interface NormalizeErrorOptions {
 /**
  * Converts any error to a standardized AppError
  */
-export function normalizeError(
-  error: unknown, 
-  options: NormalizeErrorOptions = {}
-): Error {
+export function normalizeError(error: unknown, options: NormalizeErrorOptions = {}): Error {
   // If it's already an AppError, just add any additional context
   if (error instanceof AppError) {
     if (options.context) {
@@ -108,36 +102,38 @@ export function normalizeError(
     }
     return error;
   }
-  
+
   // If it's a standard Error, convert to AppError and preserve the stack
   if (error instanceof Error) {
     const appError = new AppError(
       error.message || options.defaultMessage || 'An unexpected error occurred',
-      { 
+      {
         cause: error,
-        context: options.context
+        context: options.context,
       }
     );
-    
+
     // Try to preserve the original stack trace
     if (error.stack) {
       appError.stack = error.stack;
     }
-    
+
     return appError;
   }
-  
+
   // For non-Error objects or primitives
-  const errorMessage = 
-    typeof error === 'string' ? error :
-    error && typeof error === 'object' && 'message' in error ? String(error.message) :
-    options.defaultMessage || 'An unexpected error occurred';
-  
-  return new AppError(errorMessage, { 
+  const errorMessage =
+    typeof error === 'string'
+      ? error
+      : error && typeof error === 'object' && 'message' in error
+        ? String(error.message)
+        : options.defaultMessage || 'An unexpected error occurred';
+
+  return new AppError(errorMessage, {
     context: {
       ...(options.context || {}),
-      originalError: error
-    }
+      originalError: error,
+    },
   });
 }
 
@@ -150,23 +146,23 @@ export function getUserFriendlyMessage(error: unknown): string {
     const fieldErrors = Object.entries(error.validationErrors)
       .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
       .join('; ');
-    
+
     return fieldErrors || error.message;
   }
-  
+
   if (error instanceof AppError) {
     // For app errors, use the message directly
     return error.message;
   }
-  
+
   if (error instanceof Error) {
     // For standard errors, use the message
     return error.message;
   }
-  
+
   // For non-Error objects or primitives
-  return typeof error === 'string' 
-    ? error 
+  return typeof error === 'string'
+    ? error
     : 'An unexpected error occurred. Please try again later.';
 }
 
@@ -177,15 +173,15 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   if (typeof error === 'string') {
     return error;
   }
-  
+
   if (error && typeof error === 'object' && 'message' in error) {
     return String(error.message);
   }
-  
+
   return 'Unknown error';
 }
 
@@ -196,13 +192,15 @@ export function getErrorStatusCode(error: unknown): number | undefined {
   if (error instanceof ApiError && error.statusCode) {
     return error.statusCode;
   }
-  
+
+  // Check if it's an object with a statusCode property
   if (error && typeof error === 'object' && 'statusCode' in error) {
-    const statusCode = (error as any).statusCode;
-    if (typeof statusCode === 'number') {
-      return statusCode;
+    // Cast to a type that acknowledges the property might exist, avoid using 'any'
+    const potentialStatusCode = (error as { statusCode?: unknown }).statusCode;
+    if (typeof potentialStatusCode === 'number') {
+      return potentialStatusCode;
     }
   }
-  
+
   return undefined;
-} 
+}

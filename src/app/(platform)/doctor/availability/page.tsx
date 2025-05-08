@@ -51,11 +51,22 @@ const timeSlots = [
   '19:00',
 ];
 
+// Define days of the week type for better type safety
 type Weekday = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 type WeeklySchedule = Record<
   Weekday,
   Array<{ startTime: string; endTime: string; isAvailable: boolean }>
 >;
+
+// Define type for API response
+interface AvailabilityResponse {
+  success: boolean;
+  availability: {
+    weeklySchedule: Partial<WeeklySchedule>;
+    blockedDates: string[];
+  };
+  error?: string;
+}
 
 const getNextTimeSlot = (time: string): string => {
   const [hours] = time.split(':');
@@ -94,9 +105,20 @@ export default function DoctorAvailabilityPage() {
     type: 'success' | 'error';
   } | null>(null);
 
-  // Load doctor availability
-  const { data, isLoading, error, refetch } = useDoctorAvailability();
+  // Load doctor availability with type assertion
+  const { data, isLoading, error, refetch } = useDoctorAvailability() as {
+    data: AvailabilityResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<unknown>;
+  };
   const setAvailabilityMutation = useSetAvailability();
+
+  // Define interface for mutation result
+  interface MutationResult {
+    success: boolean;
+    error?: string;
+  }
 
   // Prevent re-initializing on every data update
   const initialized = useRef(false);
@@ -211,10 +233,10 @@ export default function DoctorAvailabilityPage() {
         return acc;
       }, {} as WeeklySchedule);
 
-      const result = await setAvailabilityMutation.mutateAsync({
+      const result = (await setAvailabilityMutation.mutateAsync({
         weeklySchedule: cleanWeeklySchedule,
         blockedDates: blockedDates || [],
-      });
+      })) as MutationResult;
 
       if (result.success) {
         logInfo('Doctor availability saved successfully');

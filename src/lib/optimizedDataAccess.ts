@@ -337,13 +337,11 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
       return cachedData;
     }
 
-    // Fall back to API call
-    const response = await callApi(
+    // Fetch fresh data from API
+    logInfo('Fetching fresh users data');
+    const response = await callApi<{ success: boolean; users: User[] }>(
       'getAllUsers',
-      {
-        uid: 'admin', // Admin-level operation
-        role: 'admin',
-      },
+      {},
       {
         filters: options.filters,
         limit: options.limit,
@@ -388,7 +386,7 @@ export async function getOptimizedUsers(options: FilterOptions = {}): Promise<Us
     }
 
     // Handle errors or invalid responses
-    const fallbackData = fallbackToLocalDb() as User[];
+    const fallbackData = (fallbackToLocalDb() || []) as User[];
 
     // Cache the fallback data
     setMemoryCacheData(memoryCacheKey, fallbackData, { ttl: 10000 });
@@ -768,7 +766,12 @@ export async function getOptimizedNotifications(
     notificationRequestTracker.lastRequestTime = now;
 
     // Call the API
-    const response = await callApi('getMyNotifications', {
+    interface NotificationResponse {
+      success: boolean;
+      notifications: Notification[];
+    }
+
+    const response = await callApi<NotificationResponse>('getMyNotifications', {
       uid: userId,
       role: getCurrentUserRole() || 'patient',
     });
@@ -943,7 +946,8 @@ export class OptimizedDataError extends Error {
   }
 }
 
-function fallbackToLocalDb() {
+function fallbackToLocalDb(): User[] {
   logWarn('Falling back to local database for data access');
-  // Implementation...
+  // Return an empty array as fallback
+  return [];
 }

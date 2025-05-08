@@ -64,6 +64,29 @@ import { AppointmentSchema } from '@/types/schemas';
 
 type Appointment = z.infer<typeof AppointmentSchema> & { id: string };
 
+// Define types for API responses
+interface AppointmentsResponse {
+  success: boolean;
+  appointments: Appointment[];
+  error?: string;
+}
+
+interface NotificationsResponse {
+  success: boolean;
+  notifications: Notification[];
+  error?: string;
+}
+
+interface ProfileResponse {
+  success: boolean;
+  firstName?: string;
+  lastName?: string;
+  specialty?: string;
+  verificationStatus?: VerificationStatus;
+  profileCompleted?: boolean;
+  error?: string;
+}
+
 // Helper function to safely create dates
 const safeDate = (dateStr: string | undefined): Date | null => {
   if (!dateStr) return null;
@@ -122,19 +145,39 @@ const getStatusVariant = (status: string) => {
 };
 
 export default function DoctorDashboardPage() {
-  const { data: profileData, isLoading: profileLoading, error: profileError } = useDoctorProfile();
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useDoctorProfile() as {
+    data: ProfileResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+
   const {
     data: appointmentsData,
     isLoading: appointmentsLoading,
     error: appointmentsError,
     refetch: refetchAppointments,
-  } = useDoctorAppointments();
+  } = useDoctorAppointments() as {
+    data: AppointmentsResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<unknown>;
+  };
+
   const {
     data: notificationsData,
     isLoading: notificationsLoading,
     error: notificationsError,
     refetch: refetchNotifications,
-  } = useNotifications();
+  } = useNotifications() as {
+    data: NotificationsResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<unknown>;
+  };
   const completeAppointmentMutation = useCompleteAppointment();
   const cancelAppointmentMutation = useDoctorCancelAppointment();
 
@@ -218,7 +261,7 @@ export default function DoctorDashboardPage() {
   }
 
   // After fetching profileData
-  const userProfile = profileData?.success ? profileData : {};
+  const userProfile = profileData?.success ? profileData : ({} as ProfileResponse);
   const displayName =
     userProfile.firstName && userProfile.lastName
       ? `Dr. ${userProfile.firstName} ${userProfile.lastName}`

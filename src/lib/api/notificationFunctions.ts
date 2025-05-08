@@ -4,23 +4,20 @@
  * Functions for managing user notifications
  */
 
-import type { UserType} from '@/types/enums';
+import type { UserType } from '@/types/enums';
 import { NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { 
-  getNotifications, 
-  saveNotifications,
-  getUsers
-} from '@/lib/localDb';
+import { getNotifications, saveNotifications, getUsers } from '@/lib/localDb';
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { Notification } from '@/types/schemas';
-import { 
-  GetMyNotificationsSchema, 
-  MarkNotificationReadSchema, 
-  SendDirectMessageSchema 
+import {
+  GetMyNotificationsSchema,
+  MarkNotificationReadSchema,
+  SendDirectMessageSchema,
 } from '@/types/schemas';
+import type { z } from 'zod';
 
 // Simple in-memory cache for notifications
 const notificationsCache: {
@@ -38,30 +35,30 @@ const notificationsCache: {
  */
 export async function getMyNotifications(
   ctx: { uid: string; role: UserType },
-  payload: {} = {}
+  payload: z.input<typeof GetMyNotificationsSchema> = {}
 ): Promise<ResultOk<{ notifications: Notification[] }> | ResultErr> {
   const perf = trackPerformance('getMyNotifications');
 
   try {
     const { uid, role } = ctx;
     logInfo('getMyNotifications called', { uid, role });
-    
+
     // Validate with schema
     const validationResult = GetMyNotificationsSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
-    
+
     // Check cache first
     const now = Date.now();
     const cachedData = notificationsCache.data[uid];
     const cachedTimestamp = notificationsCache.timestamp[uid] || 0;
-    
+
     // If we have cached data that's still valid, use it
-    if (cachedData && (now - cachedTimestamp < notificationsCache.ttl)) {
+    if (cachedData && now - cachedTimestamp < notificationsCache.ttl) {
       logInfo('getMyNotifications: Using cached data', { uid, cacheAge: now - cachedTimestamp });
       return { success: true, notifications: cachedData };
     }
@@ -78,7 +75,7 @@ export async function getMyNotifications(
       const dateB = new Date(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
-    
+
     // Update cache
     notificationsCache.data[uid] = userNotifications;
     notificationsCache.timestamp[uid] = now;
@@ -114,7 +111,7 @@ export async function markNotificationRead(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -140,7 +137,7 @@ export async function markNotificationRead(
     }
 
     await saveNotifications(notifications);
-    
+
     // Invalidate cache for this user to ensure fresh data next time
     delete notificationsCache.data[uid];
     delete notificationsCache.timestamp[uid];
@@ -177,7 +174,7 @@ export async function sendDirectMessage(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -210,7 +207,7 @@ export async function sendDirectMessage(
     };
     notifications.push(notification);
     await saveNotifications(notifications);
-    
+
     // Invalidate cache for recipient
     delete notificationsCache.data[recipientId];
     delete notificationsCache.timestamp[recipientId];
@@ -222,4 +219,4 @@ export async function sendDirectMessage(
   } finally {
     perf.stop();
   }
-} 
+}

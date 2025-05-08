@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
+  trailingSlash: true,
   experimental: {
-    // serverActions option removed as it's now available by default
+    // No experimental options needed
   },
   images: {
     remotePatterns: [
@@ -15,7 +17,7 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'cdn-icons-png.flaticon.com',
         pathname: '/**',
-      }
+      },
     ],
   },
   async redirects() {
@@ -31,4 +33,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;

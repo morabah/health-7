@@ -7,7 +7,6 @@ import { logInfo, logError } from './logger';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useCallback } from 'react';
 import { startMeasurement, endMeasurement } from './performanceMetrics';
-import type { UseQueryOptions } from '@tanstack/react-query';
 
 // Type definitions
 interface TimeSlot {
@@ -53,21 +52,16 @@ const dashboardCacheKey = () => ['dashboard'];
 export function useAvailableSlots(doctorId: string, date: string) {
   const { user } = useAuth();
   const [retryCount, setRetryCount] = useState(0);
-  
+
   // Create a cache key for this specific doctor/date combination
   const cacheKey = `available-slots-${doctorId}-${date}`;
-  
+
   // Check for cached data first, with a short TTL (15 seconds)
   const loadCachedData = useCallback(() => {
     return getMemoryCacheData<AvailableSlotsResponse>(cacheKey);
   }, [cacheKey]);
-  
-  const {
-    data,
-    isLoading,
-    error,
-    refetch
-  } = useApiQuery<AvailableSlotsResponse, Error>(
+
+  const { data, isLoading, error, refetch } = useApiQuery<AvailableSlotsResponse, Error>(
     'getAvailableSlots',
     cacheKeys.availableSlots(doctorId, date),
     [{ doctorId, date }],
@@ -75,39 +69,42 @@ export function useAvailableSlots(doctorId: string, date: string) {
       enabled: !!user?.uid && !!doctorId && !!date,
       staleTime: 60 * 1000, // 1 minute
       retry: 2,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000)
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
     }
   );
-  
+
   // Handle successful responses separately
   useEffect(() => {
     if (data?.success && data.slots) {
       // Cache successful responses in memory for faster access
-      setMemoryCacheData(cacheKey, data, { 
+      setMemoryCacheData(cacheKey, data, {
         ttl: 15000, // 15 seconds TTL
-        priority: 'high' 
+        priority: 'high',
       });
-      
+
       // Prefetch adjacent dates to improve UX when user navigates
       prefetchAdjacentDates(doctorId, date);
     }
   }, [data, cacheKey, doctorId, date]);
-  
+
   // Handle errors separately
   useEffect(() => {
     if (error) {
       logError('Error fetching available slots', { doctorId, date, error });
-      
+
       // Handle specific error types with custom retry logic
       if (retryCount < 3 && isNetworkError(error)) {
         setRetryCount(prev => prev + 1);
-        setTimeout(() => {
-          refetch();
-        }, 1000 * (2 ** retryCount));
+        setTimeout(
+          () => {
+            refetch();
+          },
+          1000 * 2 ** retryCount
+        );
       }
     }
   }, [error, retryCount, doctorId, date, refetch]);
-  
+
   // Try to use cached data first for faster rendering
   useEffect(() => {
     const cachedData = loadCachedData();
@@ -115,12 +112,12 @@ export function useAvailableSlots(doctorId: string, date: string) {
       logInfo('Using cached slots data', { doctorId, date });
     }
   }, [loadCachedData, doctorId, date, data]);
-  
+
   return {
     data: data || loadCachedData(),
     isLoading,
     error,
-    refetch
+    refetch,
   };
 }
 
@@ -142,17 +139,17 @@ function isNetworkError(error: Error): boolean {
 function prefetchAdjacentDates(doctorId: string, currentDate: string) {
   try {
     const currentDateObj = new Date(currentDate);
-    
+
     // Prefetch next day
     const nextDay = new Date(currentDateObj);
     nextDay.setDate(nextDay.getDate() + 1);
     const nextDayStr = nextDay.toISOString().split('T')[0];
-    
+
     // Prefetch previous day
     const prevDay = new Date(currentDateObj);
     prevDay.setDate(prevDay.getDate() - 1);
     const prevDayStr = prevDay.toISOString().split('T')[0];
-    
+
     // Prefetch in the background with a delay to not interfere with current request
     setTimeout(() => {
       prefetchApiQuery<AvailableSlotsResponse>(
@@ -161,7 +158,7 @@ function prefetchAdjacentDates(doctorId: string, currentDate: string) {
         [{ doctorId, date: nextDayStr }]
       );
     }, 500);
-    
+
     setTimeout(() => {
       prefetchApiQuery<AvailableSlotsResponse>(
         'getAvailableSlots',
@@ -181,20 +178,20 @@ function prefetchAdjacentDates(doctorId: string, currentDate: string) {
 export function useBookAppointment() {
   const { user } = useAuth();
   const [perfId, setPerfId] = useState<string | null>(null);
-  
-  const mutation = useApiMutation<BookAppointmentResponse, Error>(
-    'bookAppointment',
-    (response) => {
-      // Invalidate affected cache entries on success
-      return [
-        cacheKeys.appointments(user?.uid),
-        cacheKeys.availableSlots(response?.appointment?.doctorId, response?.appointment?.appointmentDate),
-        dashboardCacheKey(),
-        cacheKeys.notifications()
-      ];
-    }
-  );
-  
+
+  const mutation = useApiMutation<BookAppointmentResponse, Error>('bookAppointment', response => {
+    // Invalidate affected cache entries on success
+    return [
+      cacheKeys.appointments(user?.uid),
+      cacheKeys.availableSlots(
+        response?.appointment?.doctorId,
+        response?.appointment?.appointmentDate
+      ),
+      dashboardCacheKey(),
+      cacheKeys.notifications(),
+    ];
+  });
+
   // Handle performance tracking with useEffect
   useEffect(() => {
     if (mutation.isPending && !perfId) {
@@ -207,18 +204,19 @@ export function useBookAppointment() {
         endMeasurement(perfId, { success: true });
         logInfo('Appointment booked successfully');
       } else if (mutation.isError) {
-        endMeasurement(perfId, { 
+        endMeasurement(perfId, {
           success: false,
-          errorMessage: mutation.error instanceof Error ? mutation.error.message : String(mutation.error)
+          errorMessage:
+            mutation.error instanceof Error ? mutation.error.message : String(mutation.error),
         });
         logError('Error booking appointment', mutation.error);
       }
-      
+
       // Reset perfId
       setPerfId(null);
     }
   }, [mutation.isPending, mutation.isSuccess, mutation.isError, mutation.error, perfId]);
-  
+
   return mutation;
 }
 
@@ -228,38 +226,34 @@ export function useBookAppointment() {
 export function useDoctorDetails(doctorId: string) {
   const { user } = useAuth();
   const cacheKey = `doctor-details-${doctorId}`;
-  
-  const { 
-    data, 
-    isLoading, 
-    error 
-  } = useApiQuery<{ success: boolean; doctor: Doctor }, Error>(
+
+  const { data, isLoading, error } = useApiQuery<{ success: boolean; doctor: Doctor }, Error>(
     'getDoctorPublicProfile',
     cacheKeys.doctor(doctorId),
     [{ doctorId }],
     {
       enabled: !!user?.uid && !!doctorId,
-      staleTime: 5 * 60 * 1000 // 5 minutes
+      staleTime: 5 * 60 * 1000, // 5 minutes
     }
   );
-  
+
   // Implement the caching logic in a useEffect hook instead
   useEffect(() => {
     if (data?.success && data.doctor) {
       // Store in memory cache for even faster access
       setMemoryCacheData(cacheKey, data.doctor, {
         ttl: 5 * 60 * 1000, // 5 minutes
-        priority: 'normal'
+        priority: 'normal',
       });
     }
   }, [data, cacheKey]);
-  
+
   // Try to use cached data first for faster initial render
   const cachedDoctor = getMemoryCacheData<Doctor>(cacheKey);
-  
+
   return {
     doctor: data?.doctor || cachedDoctor,
     isLoading,
-    error
+    error,
   };
-} 
+}

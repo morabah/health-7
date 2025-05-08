@@ -15,6 +15,19 @@ import { NotificationType } from '@/types/enums';
 import { formatDistanceToNow } from 'date-fns';
 import type { Notification } from '@/types/schemas';
 
+// Define notification response type
+interface NotificationsResponse {
+  success: boolean;
+  notifications: Notification[];
+  error?: string;
+}
+
+// Define direct message response type
+interface DirectMessageResponse {
+  success: boolean;
+  error?: string;
+}
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const [recipientId, setRecipientId] = useState('');
@@ -22,41 +35,46 @@ export default function MessagesPage() {
   const [message, setMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Get notifications with message type
-  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications();
-  
+
+  // Get notifications with message type, add type assertion
+  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications() as {
+    data: NotificationsResponse | undefined;
+    isLoading: boolean;
+  };
+
   // Direct message mutation
   const directMessageMutation = useDirectMessage();
-  
+
   // Filter for message-type notifications
-  const messageNotifications = notificationsData?.success 
-    ? notificationsData.notifications.filter((n: Notification) => n.type === NotificationType.NEW_MESSAGE)
+  const messageNotifications = notificationsData?.success
+    ? notificationsData.notifications.filter(
+        (n: Notification) => n.type === NotificationType.NEW_MESSAGE
+      )
     : [];
-  
+
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
-    
+
     if (!recipientId) {
       setError('Please enter a recipient ID');
       return;
     }
-    
+
     if (!message) {
       setError('Please enter a message');
       return;
     }
-    
+
     try {
-      const result = await directMessageMutation.mutateAsync({
+      const result = (await directMessageMutation.mutateAsync({
         recipientId,
         subject: subject || 'New Message',
-        message
-      });
-      
+        message,
+      })) as DirectMessageResponse;
+
       if (result.success) {
         logInfo('messages', { action: 'send-message', recipientId, userId: user?.uid });
         setSuccessMessage('Message sent successfully');
@@ -70,17 +88,17 @@ export default function MessagesPage() {
       console.error(err);
     }
   };
-  
+
   return (
     <div className="max-w-4xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
         <MessageSquare /> Messages
       </h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card className="p-4">
           <h2 className="text-xl font-semibold mb-4">Send a Message</h2>
-          
+
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="recipientId" className="block text-sm font-medium mb-1">
@@ -90,7 +108,7 @@ export default function MessagesPage() {
                 id="recipientId"
                 type="text"
                 value={recipientId}
-                onChange={(e) => setRecipientId(e.target.value)}
+                onChange={e => setRecipientId(e.target.value)}
                 placeholder="Enter user ID of recipient"
                 required
               />
@@ -98,7 +116,7 @@ export default function MessagesPage() {
                 Enter the user ID of the person you want to message
               </p>
             </div>
-            
+
             <div className="mb-4">
               <label htmlFor="subject" className="block text-sm font-medium mb-1">
                 Subject
@@ -107,11 +125,11 @@ export default function MessagesPage() {
                 id="subject"
                 type="text"
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+                onChange={e => setSubject(e.target.value)}
                 placeholder="Enter message subject"
               />
             </div>
-            
+
             <div className="mb-4">
               <label htmlFor="message" className="block text-sm font-medium mb-1">
                 Message
@@ -119,30 +137,26 @@ export default function MessagesPage() {
               <Textarea
                 id="message"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={e => setMessage(e.target.value)}
                 placeholder="Type your message here..."
                 rows={4}
                 required
               />
             </div>
-            
+
             {error && (
               <Alert variant="error" className="mb-4">
                 {error}
               </Alert>
             )}
-            
+
             {successMessage && (
               <Alert variant="success" className="mb-4">
                 {successMessage}
               </Alert>
             )}
-            
-            <Button 
-              type="submit" 
-              disabled={directMessageMutation.isPending}
-              className="w-full"
-            >
+
+            <Button type="submit" disabled={directMessageMutation.isPending} className="w-full">
               {directMessageMutation.isPending ? (
                 <>
                   <Spinner className="mr-2 h-4 w-4" /> Sending...
@@ -155,22 +169,22 @@ export default function MessagesPage() {
             </Button>
           </form>
         </Card>
-        
+
         <div>
           <h2 className="text-xl font-semibold mb-4">Received Messages</h2>
-          
+
           {notificationsLoading && (
             <div className="flex justify-center py-8">
               <Spinner />
             </div>
           )}
-          
+
           {!notificationsLoading && messageNotifications.length === 0 && (
             <Card className="p-6 text-center">
               <p className="text-gray-500">You have no messages</p>
             </Card>
           )}
-          
+
           {messageNotifications.length > 0 && (
             <div className="space-y-4">
               {messageNotifications.map((notification: Notification) => (
@@ -183,10 +197,15 @@ export default function MessagesPage() {
                       <div className="flex justify-between items-start">
                         <h3 className="font-semibold">{notification.title}</h3>
                         <div className="text-sm text-gray-500">
-                          {notification.createdAt && formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                          {notification.createdAt &&
+                            formatDistanceToNow(new Date(notification.createdAt), {
+                              addSuffix: true,
+                            })}
                         </div>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 my-1">{notification.message}</p>
+                      <p className="text-gray-700 dark:text-gray-300 my-1">
+                        {notification.message}
+                      </p>
                     </div>
                   </div>
                 </Card>
@@ -197,4 +216,4 @@ export default function MessagesPage() {
       </div>
     </div>
   );
-} 
+}

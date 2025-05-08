@@ -28,16 +28,16 @@ const DoctorListLoading = () => (
 );
 
 // Lazy loaded DoctorItem component
-const DoctorItem = lazyLoad(
-  () => import('./DoctorItem'),
-  { loadingComponent: <div className="border rounded-lg p-4 animate-pulse h-32"></div> }
-);
+const DoctorItem = lazyLoad(() => import('./DoctorItem'), {
+  loadingComponent: <div className="border rounded-lg p-4 animate-pulse h-32"></div>,
+});
 
-// Lazy loaded filter component 
-const DoctorFilters = lazyLoad(
-  () => import('./DoctorFilters'),
-  { loadingComponent: <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse mb-4"></div> }
-);
+// Lazy loaded filter component
+const DoctorFilters = lazyLoad(() => import('./DoctorFilters'), {
+  loadingComponent: (
+    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse mb-4"></div>
+  ),
+});
 
 // Define response type for findDoctors API
 interface FindDoctorsResponse {
@@ -58,18 +58,19 @@ interface FindDoctorsResponse {
  * Lazy loaded doctor list component that optimizes data loading using batch fetch
  */
 export default function LazyDoctorList() {
-  const perfTracker = trackPerformance('LazyDoctorList');
+  // Stabilize perfTracker with useMemo
+  const perfTracker = useMemo(() => trackPerformance('LazyDoctorList'), []);
   const [filters, setFilters] = useState({
     specialty: '',
     name: '',
-    status: ''
+    status: '',
   });
-  
+
   // Use traditional API for filtered results
-  const { 
-    data: filteredData, 
-    isLoading: isFilteredLoading, 
-    error: filteredError 
+  const {
+    data: filteredData,
+    isLoading: isFilteredLoading,
+    error: filteredError,
   } = useApiQuery<FindDoctorsResponse, Error>(
     'findDoctors',
     cacheKeys.doctors(filters),
@@ -77,101 +78,92 @@ export default function LazyDoctorList() {
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       placeholderData: prevData => prevData, // Use previous data while loading
-      enabled: Object.values(filters).some(value => !!value) // Only run query if filters are applied
+      enabled: Object.values(filters).some(value => !!value), // Only run query if filters are applied
     }
   );
-  
+
   // Get all doctors if no filters are applied
-  const { 
-    data: allDoctorsData, 
+  const {
+    data: allDoctorsData,
     isLoading: isAllDoctorsLoading,
-    error: allDoctorsError
-  } = useApiQuery<FindDoctorsResponse, Error>(
-    'findDoctors',
-    cacheKeys.doctors({}),
-    [{}],
-    {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      enabled: !Object.values(filters).some(value => !!value) // Only run if no filters are applied
-    }
-  );
-  
+    error: allDoctorsError,
+  } = useApiQuery<FindDoctorsResponse, Error>('findDoctors', cacheKeys.doctors({}), [{}], {
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !Object.values(filters).some(value => !!value), // Only run if no filters are applied
+  });
+
   // Determine which data source to use based on filters
   const data = Object.values(filters).some(value => !!value) ? filteredData : allDoctorsData;
-  const isLoading = Object.values(filters).some(value => !!value) ? isFilteredLoading : isAllDoctorsLoading;
+  const isLoading = Object.values(filters).some(value => !!value)
+    ? isFilteredLoading
+    : isAllDoctorsLoading;
   const error = Object.values(filters).some(value => !!value) ? filteredError : allDoctorsError;
-  
+
   // Extract doctor IDs for batch loading
   const doctorIds = useMemo(() => {
     if (!data?.success || !data.doctors) return [];
     return data.doctors.map(doctor => doctor.userId);
   }, [data]);
-  
+
   // Use batch doctor data loading for additional details
-  const { 
-    data: batchData,
-    isLoading: isBatchLoading
-  } = useBatchDoctorData(doctorIds, { 
-    enabled: doctorIds.length > 0 
+  const { data: batchData, isLoading: isBatchLoading } = useBatchDoctorData(doctorIds, {
+    enabled: doctorIds.length > 0,
   });
-  
+
   // Prepare enhanced doctor data with batch details
   const enhancedDoctors = useMemo(() => {
     if (!data?.success || !data.doctors) return [];
-    
+
     return data.doctors.map(doctor => {
       // Lookup additional data from batch results if available
       const batchDoctor = batchData?.success && batchData.doctors[doctor.userId];
-      
+
       // Merge the data, preferring batch data when available
       return {
         ...doctor,
-        ...(batchDoctor || {})
+        ...(batchDoctor || {}),
       };
     });
   }, [data, batchData]);
-  
+
   // Track component performance
   useEffect(() => {
     // Stop performance tracking when component unmounts
     return () => {
       perfTracker.stop();
     };
-  }, []);
-  
+  }, [perfTracker]);
+
   // Prefetch individual doctor details when hovering
   const prefetchDoctorDetails = (doctorId: string) => {
     // Already prefetched via batch loading
     console.log(`Doctor ${doctorId} data already batch loaded`);
   };
-  
+
   if ((isLoading && !data) || (doctorIds.length > 0 && isBatchLoading && !batchData)) {
     return <DoctorListLoading />;
   }
-  
+
   if (error) {
     return <div className="text-red-500 p-4">Error loading doctors: {error.message}</div>;
   }
-  
+
   const doctors = enhancedDoctors || [];
-  
+
   return (
     <div className="space-y-4">
       <DoctorFilters filters={filters} onFilterChange={setFilters} />
-      
+
       <h2 className="text-xl font-semibold mb-4">Available Doctors</h2>
-      
+
       {doctors.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No doctors found matching your criteria
         </div>
       ) : (
         <div className="space-y-4">
-          {doctors.map((doctor) => (
-            <div 
-              key={doctor.userId}
-              onMouseEnter={() => prefetchDoctorDetails(doctor.userId)}
-            >
+          {doctors.map(doctor => (
+            <div key={doctor.userId} onMouseEnter={() => prefetchDoctorDetails(doctor.userId)}>
               <DoctorItem doctor={doctor} />
             </div>
           ))}
@@ -179,4 +171,4 @@ export default function LazyDoctorList() {
       )}
     </div>
   );
-} 
+}

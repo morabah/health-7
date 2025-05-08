@@ -1,12 +1,13 @@
 /**
  * Network Utilities
- * 
+ *
  * This file contains network-related utilities for handling network state
  * and integrating with our error system.
  */
 
 import { NetworkError } from './errorClasses';
 import { addBreadcrumb } from './errorMonitoring';
+import { useState, useEffect } from 'react';
 
 /**
  * Checks if the user is online
@@ -15,7 +16,7 @@ export function isOnline(): boolean {
   if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
     return navigator.onLine;
   }
-  
+
   // If navigator.onLine is not available, assume online
   return true;
 }
@@ -27,7 +28,7 @@ export function whenOnline(): Promise<void> {
   if (isOnline()) {
     return Promise.resolve();
   }
-  
+
   return new Promise(resolve => {
     const listener = () => {
       if (isOnline()) {
@@ -35,7 +36,7 @@ export function whenOnline(): Promise<void> {
         resolve();
       }
     };
-    
+
     window.addEventListener('online', listener);
   });
 }
@@ -56,21 +57,18 @@ export async function executeWhenOnline<T>(
     waitMessage = 'Waiting for network connection...',
     throwOnTimeout = true,
   } = options;
-  
+
   // Record a breadcrumb for the network state
-  addBreadcrumb(
-    isOnline() ? 'Network is online' : 'Network is offline',
-    'network'
-  );
-  
+  addBreadcrumb(isOnline() ? 'Network is online' : 'Network is offline', 'network');
+
   // If online, execute immediately
   if (isOnline()) {
     return fn();
   }
-  
+
   // Add a breadcrumb that we're waiting for a connection
   addBreadcrumb(waitMessage, 'network', { maxWaitTime });
-  
+
   // Create a timeout promise
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
@@ -82,7 +80,7 @@ export async function executeWhenOnline<T>(
       );
     }, maxWaitTime);
   });
-  
+
   // Race between network connection and timeout
   if (throwOnTimeout) {
     await Promise.race([whenOnline(), timeoutPromise]);
@@ -93,10 +91,10 @@ export async function executeWhenOnline<T>(
       addBreadcrumb('Network timeout occurred, but continuing', 'network', { error });
     }
   }
-  
+
   // Now we're online (or we're ignoring the timeout)
   addBreadcrumb('Network is now available', 'network');
-  
+
   // Execute the function
   return fn();
 }
@@ -108,18 +106,18 @@ export function initNetworkStateMonitoring(): void {
   if (typeof window === 'undefined') {
     return;
   }
-  
+
   // Initial state
   addBreadcrumb(
     isOnline() ? 'Initial network state: online' : 'Initial network state: offline',
     'network'
   );
-  
+
   // Listen for online events
   window.addEventListener('online', () => {
     addBreadcrumb('Network connection restored', 'network');
   });
-  
+
   // Listen for offline events
   window.addEventListener('offline', () => {
     addBreadcrumb('Network connection lost', 'network');
@@ -130,31 +128,34 @@ export function initNetworkStateMonitoring(): void {
  * A hook to detect network connectivity
  */
 export function useNetworkState() {
-  if (typeof window === 'undefined') {
-    // Server-side rendering - assume online
-    return { online: true, offline: false };
-  }
-  
-  const [online, setOnline] = useState(isOnline());
-  
+  // Call Hooks unconditionally at the top
+  const [online, setOnline] = useState(() => {
+    // Calculate initial state conditionally
+    // Assume online during server-side rendering (SSR)
+    return typeof window !== 'undefined' ? isOnline() : true;
+  });
+
   useEffect(() => {
-    // Update network status
+    // Only add listeners if in the browser environment
+    if (typeof window === 'undefined') {
+      return; // Exit early if not in browser
+    }
+
+    // Define handlers
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
-    
+
     // Add event listeners
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    // Cleanup event listeners
+
+    // Cleanup event listeners on unmount
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-  
+  }, []); // Empty dependency array is correct - only runs on mount/unmount
+
+  // Always return the state
   return { online, offline: !online };
 }
-
-// Make sure to add the missing import if used
-import { useState, useEffect } from 'react'; 

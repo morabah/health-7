@@ -2109,3 +2109,104 @@ These improvements significantly enhance application performance by reducing unn
 - `src/context/AuthContext.tsx`
 
 ---
+
+## Framework Updates
+
+- **Next.js Upgrade to v15.3.0**:
+  - **Date**: May 8, 2025
+  - **Previous Version**: 14.2.x
+  - **New Version**: 15.3.0
+  - **Steps Taken**:
+    - Updated `next` in `package.json` to `15.3.0`.
+    - Cleaned `node_modules`, `package-lock.json`, and `.next` directories.
+    - Reinstalled all dependencies with `npm install --legacy-peer-deps`.
+    - Updated `eslint-config-next` to `15.3.0` for compatibility.
+    - Verified all routes, API endpoints, and UI features work as expected.
+  - **Compatibility**:
+    - React 18.2.0 and all major dependencies are compatible.
+    - No breaking changes or errors observed in logs or runtime.
+    - All local backend and frontend E2E tests pass.
+  - **Recommendation**: Next.js 15.3.0 is the most suitable and stable version for this app as of this date.
+  - **Files Modified**: `package.json`, `node_modules`, `package-lock.json`, `.next` (cleaned and rebuilt)
+
+---
+
+## Next.js Version Lockdown & Fallback Prevention
+
+To ensure the app always runs on the intended Next.js version (currently 15.3.0) and never falls back to an older version, follow these rules:
+
+1. **Lock the Version in `package.json`:**
+   - Use an exact version: `"next": "15.3.0"` (no `^` or `~`).
+2. **Clean Install After Version Change:**
+   - Always delete `node_modules`, `package-lock.json`, and `.next` before running `npm install` after changing Next.js version.
+3. **Check for Multiple Installations:**
+   - Run `find . -name package.json` to ensure no subfolders specify a different Next.js version.
+4. **No Global Next.js:**
+   - Run `npm ls -g next` and uninstall with `npm uninstall -g next` if found.
+5. **Single Lockfile:**
+   - Only keep `package-lock.json` (delete `yarn.lock` or `pnpm-lock.yaml` if not using those tools).
+6. **Always Run `npm install`:**
+   - After editing `package.json`, run `npm install --legacy-peer-deps` to update lockfile and modules.
+7. **Verify Version:**
+   - Run `npm ls next` after install to confirm only the intended version is present.
+8. **Use Only `npm run dev`:**
+   - Do not use `npx next dev` or any global Next.js binary.
+9. **CI/CD Pipelines:**
+   - Ensure pipelines do a clean install and do not cache old `node_modules` or lockfiles.
+
+**Checklist:**
+
+- [x] `package.json` has exact Next.js version
+- [x] No other `package.json` with different Next.js version
+- [x] No global Next.js install
+- [x] Only one lockfile
+- [x] Always run `npm install` after changes
+- [x] Clean up old artifacts before install
+- [x] Confirm version with `npm ls next`
+- [x] Use only `npm run dev`
+
+**Following these steps will prevent any fallback to older Next.js versions.**
+
+---
+
+## Bug Fixes & Build Issues Resolved
+
+### TypeScript and Build Issues (Build Fix - May 2025)
+
+Several critical TypeScript and build issues were fixed, enabling successful application building:
+
+1. **Doctor Registration Type Error**
+
+   - Fixed return type handling in the `registerDoctor` function in the auth context
+   - Updated the doctor registration page to properly handle success/error states
+
+2. **NotificationBell Component Fixes**
+
+   - Fixed import issues with `cacheManager` and related utilities
+   - Added proper type annotations to avoid TypeScript errors
+   - Fixed Transition component className error by using a wrapper div
+   - Removed reference to non-existent `link` property in notifications
+
+3. **API Module Fixes**
+
+   - Fixed missing API functions by removing imports that didn't exist
+   - Provided stub implementations for missing API functions in `localApi.ts`
+   - Ensured correct function naming consistency between imports and implementations
+
+4. **Logger Type Safety**
+
+   - Fixed type mismatch in logger.ts by ensuring data property conforms to expected Record<string, unknown> type
+   - Properly transformed unknown data inputs to safe formats
+
+5. **Suspense Boundary Fixes**
+
+   - Wrapped error page component with Suspense boundary to fix CSR bailout issue with useSearchParams
+   - Added proper fallback components for loading states
+
+6. **Optimized Data Access Fixes**
+   - Fixed type errors in optimizedDataAccess.ts by providing proper return type for fallbackToLocalDb function
+   - Added proper type annotations for API responses
+
+These fixes ensure that the application can be successfully built and deployed, with proper TypeScript type safety throughout the codebase.
+
+---

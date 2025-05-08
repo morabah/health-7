@@ -64,22 +64,19 @@ interface ProfileResponse {
 }
 
 // Lazy load the DoctorList component for better performance
-const LazyDoctorList = lazyLoad(
-  () => import('@/components/shared/LazyDoctorList'),
-  { 
-    LoadingComponent: () => (
-      <div className="mt-8 p-4 border rounded-lg animate-pulse bg-gray-50 dark:bg-gray-800">
-        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-1/3"></div>
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-          ))}
-        </div>
+const LazyDoctorList = lazyLoad(() => import('@/components/shared/LazyDoctorList'), {
+  loadingComponent: (
+    <div className="mt-8 p-4 border rounded-lg animate-pulse bg-gray-50 dark:bg-gray-800">
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-1/3"></div>
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        ))}
       </div>
-    ),
-    minimumLoadTime: 500 // Minimum 500ms display time to avoid flicker
-  }
-);
+    </div>
+  ),
+  minimumLoadTime: 500, // Minimum 500ms display time to avoid flicker
+});
 
 /**
  * Re-usable Stat card
@@ -121,7 +118,8 @@ const DashboardErrorFallback = () => (
       <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
       <h2 className="text-2xl font-bold mb-4">Dashboard Error</h2>
       <p className="text-slate-600 dark:text-slate-300 mb-6">
-        We encountered a problem loading your dashboard data. This could be due to connectivity issues or a temporary service disruption.
+        We encountered a problem loading your dashboard data. This could be due to connectivity
+        issues or a temporary service disruption.
       </p>
       <div className="flex justify-center space-x-4">
         <Button onClick={() => window.location.reload()} variant="primary">
@@ -129,9 +127,7 @@ const DashboardErrorFallback = () => (
           Reload Dashboard
         </Button>
         <Link href="/">
-          <Button variant="outline">
-            Go to Home
-          </Button>
+          <Button variant="outline">Go to Home</Button>
         </Link>
       </div>
     </Card>
@@ -141,7 +137,7 @@ const DashboardErrorFallback = () => (
 /**
  * Patient Dashboard Page
  * Main control center for patients to view their information and upcoming appointments
- * 
+ *
  * @returns Patient dashboard component
  */
 function PatientDashboard() {
@@ -149,13 +145,32 @@ function PatientDashboard() {
   const [_, handleError] = useErrorHandler({ simpleMode: true });
 
   // Use combined dashboard hook for stats
-  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError, refetch: refetchDashboard } = useMyDashboard();
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useMyDashboard();
   // Still need profile data for user info
-  const { data: profileData, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = usePatientProfile();
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = usePatientProfile();
   // Fetch real appointments
-  const { data: appointmentsData, isLoading: appointmentsLoading, error: appointmentsError, refetch: refetchAppointments } = usePatientAppointments();
+  const {
+    data: appointmentsData,
+    isLoading: appointmentsLoading,
+    error: appointmentsError,
+    refetch: refetchAppointments,
+  } = usePatientAppointments();
   // Real-time notifications
-  const { data: notificationsData, isLoading: notificationsLoading, refetch: refetchNotifications } = useNotifications();
+  const {
+    data: notificationsData,
+    isLoading: notificationsLoading,
+    refetch: refetchNotifications,
+  } = useNotifications();
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
@@ -165,56 +180,59 @@ function PatientDashboard() {
     if (criticalError) {
       // Log the error first
       logError('Critical error in patient dashboard', { error: criticalError });
-      
+
       // Only propagate to error boundary for persistent/serious errors
-      const errorMessage = criticalError instanceof Error ? criticalError.message : String(criticalError);
-      if (errorMessage.includes('authentication') || 
-          errorMessage.includes('network') || 
-          errorMessage.includes('permission') ||
-          errorMessage.includes('token') ||
-          errorMessage.includes('server')) {
+      const errorMessage =
+        criticalError instanceof Error ? criticalError.message : String(criticalError);
+      if (
+        errorMessage.includes('authentication') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('permission') ||
+        errorMessage.includes('token') ||
+        errorMessage.includes('server')
+      ) {
         handleError(criticalError);
       }
     }
   }, [dashboardError, profileError, appointmentsError, handleError]);
 
   // Extract data from dashboard response with type assertions
-  const upcomingCount = (dashboardData as DashboardResponse | undefined)?.success 
-    ? (dashboardData as DashboardResponse).upcomingCount 
+  const upcomingCount = (dashboardData as DashboardResponse | undefined)?.success
+    ? (dashboardData as DashboardResponse).upcomingCount
     : 0;
-    
-  const pastCount = (dashboardData as DashboardResponse | undefined)?.success 
-    ? (dashboardData as DashboardResponse).pastCount 
+
+  const pastCount = (dashboardData as DashboardResponse | undefined)?.success
+    ? (dashboardData as DashboardResponse).pastCount
     : 0;
-    
-  const notifUnread = (notificationsData as NotificationsResponse | undefined)?.success 
-    ? (notificationsData as NotificationsResponse).notifications.filter(n => !n.isRead).length 
+
+  const notifUnread = (notificationsData as NotificationsResponse | undefined)?.success
+    ? (notificationsData as NotificationsResponse).notifications.filter(n => !n.isRead).length
     : 0;
 
   // Get upcoming appointments for the quick view (from real data) with type assertions
-  const allAppointments = (appointmentsData as AppointmentsResponse | undefined)?.success 
-    ? (appointmentsData as AppointmentsResponse).appointments 
+  const allAppointments = (appointmentsData as AppointmentsResponse | undefined)?.success
+    ? (appointmentsData as AppointmentsResponse).appointments
     : [];
-    
+
   const now = new Date();
   const upcomingAppointments = allAppointments
     .filter((a: any) => {
       // Convert appointment date to a proper Date object
-      const appointmentDate = a.appointmentDate.includes('T') 
-        ? new Date(a.appointmentDate) 
+      const appointmentDate = a.appointmentDate.includes('T')
+        ? new Date(a.appointmentDate)
         : new Date(`${a.appointmentDate}T${a.startTime}`);
-      
+
       return appointmentDate > now && a.status !== 'CANCELED' && a.status !== 'canceled';
     })
     .sort((a: any, b: any) => {
-      const dateA = a.appointmentDate.includes('T') 
-        ? new Date(a.appointmentDate) 
+      const dateA = a.appointmentDate.includes('T')
+        ? new Date(a.appointmentDate)
         : new Date(`${a.appointmentDate}T${a.startTime}`);
-      
-      const dateB = b.appointmentDate.includes('T') 
-        ? new Date(b.appointmentDate) 
+
+      const dateB = b.appointmentDate.includes('T')
+        ? new Date(b.appointmentDate)
         : new Date(`${b.appointmentDate}T${b.startTime}`);
-      
+
       return dateA.getTime() - dateB.getTime();
     })
     .slice(0, 3);
@@ -248,13 +266,15 @@ function PatientDashboard() {
   if (dashboardError || profileError || appointmentsError) {
     const error = dashboardError || profileError || appointmentsError;
     const errorMessage = error instanceof Error ? error.message : String(error || 'Unknown error');
-    
+
     // Only show an error alert for non-critical errors that don't trigger the boundary
-    if (!errorMessage.includes('authentication') && 
-        !errorMessage.includes('network') && 
-        !errorMessage.includes('permission') &&
-        !errorMessage.includes('token') &&
-        !errorMessage.includes('server')) {
+    if (
+      !errorMessage.includes('authentication') &&
+      !errorMessage.includes('network') &&
+      !errorMessage.includes('permission') &&
+      !errorMessage.includes('token') &&
+      !errorMessage.includes('server')
+    ) {
       return (
         <Alert variant="error" className="mb-6">
           <h3 className="font-semibold mb-2">Error loading dashboard data</h3>
@@ -272,11 +292,12 @@ function PatientDashboard() {
     firstName: '',
     lastName: '',
     email: '',
-    phone: ''
+    phone: '',
   };
-  const displayName = userProfile.firstName && userProfile.lastName
-    ? `${userProfile.firstName} ${userProfile.lastName}`
-    : 'Patient';
+  const displayName =
+    userProfile.firstName && userProfile.lastName
+      ? `${userProfile.firstName} ${userProfile.lastName}`
+      : 'Patient';
 
   return (
     <div className="space-y-12">
@@ -291,11 +312,19 @@ function PatientDashboard() {
               <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-1 tracking-tight">
                 Welcome, {profileLoading ? <Spinner className="inline-block ml-2" /> : displayName}
               </h1>
-              <p className="text-base text-slate-500 dark:text-slate-400">Your health at a glance</p>
+              <p className="text-base text-slate-500 dark:text-slate-400">
+                Your health at a glance
+              </p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 mt-6 md:mt-0">
-            <button onClick={handleRefresh} disabled={dashboardLoading || profileLoading || appointmentsLoading || notificationsLoading} className="rounded-full p-2 bg-white/70 dark:bg-slate-800/80 shadow hover:scale-110 transition-transform disabled:opacity-50">
+            <button
+              onClick={handleRefresh}
+              disabled={
+                dashboardLoading || profileLoading || appointmentsLoading || notificationsLoading
+              }
+              className="rounded-full p-2 bg-white/70 dark:bg-slate-800/80 shadow hover:scale-110 transition-transform disabled:opacity-50"
+            >
               <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
             </button>
             <span className="inline-block px-3 py-1 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 mt-1">
@@ -307,31 +336,31 @@ function PatientDashboard() {
 
       {/* Stats Grid - Glassmorphism */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        <StatCard 
-          title="Upcoming" 
-          value={upcomingCount} 
-          Icon={CalendarCheck} 
-          isLoading={dashboardLoading} 
+        <StatCard
+          title="Upcoming"
+          value={upcomingCount}
+          Icon={CalendarCheck}
+          isLoading={dashboardLoading}
           className="glass-card border-l-4 border-blue-400 hover:scale-105 transition-transform"
         />
-        <StatCard 
-          title="Past" 
-          value={pastCount} 
-          Icon={FileText} 
-          isLoading={dashboardLoading} 
+        <StatCard
+          title="Past"
+          value={pastCount}
+          Icon={FileText}
+          isLoading={dashboardLoading}
           className="glass-card border-l-4 border-cyan-400 hover:scale-105 transition-transform"
         />
-        <StatCard 
-          title="Prescriptions" 
-          value="0" 
-          Icon={Pill} 
+        <StatCard
+          title="Prescriptions"
+          value="0"
+          Icon={Pill}
           className="glass-card border-l-4 border-blue-200 hover:scale-105 transition-transform"
         />
-        <StatCard 
-          title="Notifications" 
-          value={notifUnread} 
-          Icon={Bell} 
-          isLoading={notificationsLoading} 
+        <StatCard
+          title="Notifications"
+          value={notifUnread}
+          Icon={Bell}
+          isLoading={notificationsLoading}
           className="glass-card border-l-4 border-cyan-200 hover:scale-105 transition-transform"
         />
       </section>
@@ -342,7 +371,9 @@ function PatientDashboard() {
       {/* Upcoming appointments - Carousel/Timeline */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold dark:text-white tracking-tight">Upcoming Appointments</h2>
+          <h2 className="text-xl font-bold dark:text-white tracking-tight">
+            Upcoming Appointments
+          </h2>
           <Link href="/patient/appointments">
             <Button variant="outline" size="sm" className="flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4 ml-1" />
@@ -357,20 +388,35 @@ function PatientDashboard() {
               </div>
             ) : upcomingAppointments.length > 0 ? (
               upcomingAppointments.map((appointment: any) => (
-                <div key={appointment.id} className="min-w-[320px] max-w-full md:w-auto flex-1 glass-card rounded-xl p-5 flex flex-col gap-2 shadow-md hover:shadow-xl transition-shadow border border-slate-100 dark:border-slate-800">
+                <div
+                  key={appointment.id}
+                  className="min-w-[320px] max-w-full md:w-auto flex-1 glass-card rounded-xl p-5 flex flex-col gap-2 shadow-md hover:shadow-xl transition-shadow border border-slate-100 dark:border-slate-800"
+                >
                   <div className="flex items-center gap-3 mb-1">
                     <div className="w-12 h-12 rounded-full bg-blue-200 dark:bg-slate-700 flex items-center justify-center text-xl font-bold text-blue-700 dark:text-blue-200">
-                      {appointment.doctorName ? appointment.doctorName.split(' ').map((n: string) => n[0]).join('') : <UserCircle className="w-8 h-8" />}
+                      {appointment.doctorName ? (
+                        appointment.doctorName
+                          .split(' ')
+                          .map((n: string) => n[0])
+                          .join('')
+                      ) : (
+                        <UserCircle className="w-8 h-8" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 dark:text-white">{appointment.doctorName}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {appointment.doctorName}
+                        </span>
                         <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 rounded px-2 py-0.5 ml-2">
                           {appointment.doctorSpecialty}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        <span>{format(new Date(appointment.appointmentDate), 'PPP')} at {appointment.startTime}</span>
+                        <span>
+                          {format(new Date(appointment.appointmentDate), 'PPP')} at{' '}
+                          {appointment.startTime}
+                        </span>
                         <span className="inline-block px-2 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-200 ml-2">
                           {appointment.appointmentType}
                         </span>
@@ -379,7 +425,10 @@ function PatientDashboard() {
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <Link href={`/book-appointment/${appointment.doctorId}`}>
-                      <button className="rounded-full p-2 bg-blue-500 hover:bg-blue-600 text-white shadow transition-colors" title="Book Again">
+                      <button
+                        className="rounded-full p-2 bg-blue-500 hover:bg-blue-600 text-white shadow transition-colors"
+                        title="Book Again"
+                      >
                         <CalendarCheck className="w-5 h-5" />
                       </button>
                     </Link>
@@ -434,7 +483,9 @@ function PatientDashboard() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Name:</span>
-                      <span>{userProfile.firstName} {userProfile.lastName}</span>
+                      <span>
+                        {userProfile.firstName} {userProfile.lastName}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Email:</span>
@@ -456,7 +507,10 @@ function PatientDashboard() {
         </Card>
         {/* Floating Action Button for Edit Profile */}
         <Link href="/patient/profile">
-          <button className="absolute top-4 right-4 md:top-8 md:right-8 z-10 rounded-full p-3 bg-blue-500 hover:bg-cyan-500 text-white shadow-lg transition-colors" title="Edit Profile">
+          <button
+            className="absolute top-4 right-4 md:top-8 md:right-8 z-10 rounded-full p-3 bg-blue-500 hover:bg-cyan-500 text-white shadow-lg transition-colors"
+            title="Edit Profile"
+          >
             <Edit2 className="w-5 h-5" />
           </button>
         </Link>
@@ -465,10 +519,14 @@ function PatientDashboard() {
   );
 }
 
-// Export with error boundary
-export default withErrorBoundary(PatientDashboard, {
-  fallback: <DashboardErrorFallback />,
-  onError: (error) => {
-    logError('PatientDashboard error boundary caught error', error);
-  }
-}); 
+// Change the default export to use a wrapper that can be type-checked
+// and use 'any' for the props
+export default function PatientDashboardPage(_props: any) {
+  // We're not using any params here, so we just render the component directly
+  const EnhancedComponent = withErrorBoundary(PatientDashboard, {
+    fallback: <DashboardErrorFallback />,
+    componentName: 'PatientDashboard',
+  });
+
+  return <EnhancedComponent />;
+}

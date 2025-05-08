@@ -3,15 +3,15 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  FileText, 
-  MessageCircle, 
-  ChevronLeft, 
+import {
+  Calendar,
+  Clock,
+  User,
+  FileText,
+  MessageCircle,
+  ChevronLeft,
   FileCheck,
-  XCircle
+  XCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -24,6 +24,36 @@ import Alert from '@/components/ui/Alert';
 import { useAppointmentDetails, useCancelAppointment } from '@/data/patientLoaders';
 import { AppointmentStatus, AppointmentType } from '@/types/enums';
 
+// Define type for appointment
+interface Appointment {
+  id: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+  status: AppointmentStatus;
+  appointmentType: AppointmentType;
+  doctorName: string;
+  doctorSpecialty?: string;
+  reason?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Define type for API response
+interface AppointmentResponse {
+  success: boolean;
+  appointment: Appointment;
+  error?: string;
+}
+
+// Define type for cancel response
+interface CancelResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 // Status display helpers
 const statusMap = {
   [AppointmentStatus.PENDING]: 'Pending',
@@ -33,7 +63,10 @@ const statusMap = {
   [AppointmentStatus.RESCHEDULED]: 'Rescheduled',
 };
 
-const statusColor: Record<string, "success" | "default" | "warning" | "info" | "danger" | "pending"> = {
+const statusColor: Record<
+  string,
+  'success' | 'default' | 'warning' | 'info' | 'danger' | 'pending'
+> = {
   [AppointmentStatus.PENDING]: 'pending',
   [AppointmentStatus.CONFIRMED]: 'info',
   [AppointmentStatus.CANCELED]: 'danger',
@@ -49,20 +82,25 @@ const typeMap = {
 export default function PatientAppointmentDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const appointmentId = params.appointmentId as string;
-  
+  const appointmentId = params?.appointmentId as string;
+
   // State for cancellation
   const [cancellationReason, setCancellationReason] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Fetch appointment details
-  const { 
-    data: appointmentData, 
-    isLoading, 
-    error, 
-    refetch 
-  } = useAppointmentDetails(appointmentId);
-  
+  const {
+    data: appointmentData,
+    isLoading,
+    error,
+    refetch,
+  } = useAppointmentDetails(appointmentId) as {
+    data: AppointmentResponse | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<unknown>;
+  };
+
   const cancelMutation = useCancelAppointment();
 
   if (isLoading) {
@@ -75,29 +113,29 @@ export default function PatientAppointmentDetailsPage() {
 
   if (error || !appointmentData?.success) {
     return (
-      <Alert variant="danger">
+      <Alert variant="error">
         {error?.message || appointmentData?.error || 'Failed to load appointment details'}
       </Alert>
     );
   }
 
   const appointment = appointmentData.appointment;
-  
+
   // Determine if appointment can be cancelled
-  const isCancellable = 
-    appointment.status === AppointmentStatus.PENDING || 
+  const isCancellable =
+    appointment.status === AppointmentStatus.PENDING ||
     appointment.status === AppointmentStatus.CONFIRMED;
-  
+
   // Check if appointment is in the past
   const isPast = new Date(appointment.appointmentDate) < new Date();
 
   const handleCancelAppointment = async () => {
     try {
-      const result = await cancelMutation.mutateAsync({ 
-        appointmentId, 
-        reason: 'Cancelled by patient' 
-      });
-      
+      const result = (await cancelMutation.mutateAsync({
+        appointmentId,
+        reason: 'Cancelled by patient',
+      })) as CancelResponse;
+
       if (result.success) {
         // Refresh appointment data
         refetch();
@@ -136,12 +174,12 @@ export default function PatientAppointmentDetailsPage() {
             <div className="font-mono text-xs">{appointment.id}</div>
           </div>
         </div>
-        
+
         {isCancellable && !isPast && (
           <div>
-            <Button 
-              size="sm" 
-              variant="danger" 
+            <Button
+              size="sm"
+              variant="danger"
               onClick={() => setShowCancelConfirm(true)}
               disabled={cancelMutation.isPending}
             >
@@ -178,23 +216,27 @@ export default function PatientAppointmentDetailsPage() {
               </div>
               <p className="ml-7">{format(new Date(appointment.appointmentDate), 'PPP')}</p>
             </div>
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 <Clock className="h-5 w-5 mr-2" />
                 <span className="font-medium">Time</span>
               </div>
-              <p className="ml-7">{appointment.startTime} - {appointment.endTime}</p>
+              <p className="ml-7">
+                {appointment.startTime} - {appointment.endTime}
+              </p>
             </div>
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 <span className="font-medium">Type</span>
               </div>
-              <p className="ml-7">{typeMap[appointment.appointmentType] || appointment.appointmentType}</p>
+              <p className="ml-7">
+                {typeMap[appointment.appointmentType] || appointment.appointmentType}
+              </p>
             </div>
           </div>
-          
+
           <div className="space-y-4">
             {appointment.reason && (
               <div>
@@ -205,7 +247,7 @@ export default function PatientAppointmentDetailsPage() {
                 <p className="ml-7">{appointment.reason}</p>
               </div>
             )}
-            
+
             {appointment.notes && (
               <div>
                 <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
@@ -215,7 +257,7 @@ export default function PatientAppointmentDetailsPage() {
                 <p className="ml-7">{appointment.notes}</p>
               </div>
             )}
-            
+
             <div>
               <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
                 <FileCheck className="h-5 w-5 mr-2" />
@@ -238,7 +280,7 @@ export default function PatientAppointmentDetailsPage() {
           <Card className="w-full max-w-md p-6">
             <h3 className="text-lg font-bold mb-4">Cancel Appointment</h3>
             <p className="mb-4">Are you sure you want to cancel this appointment?</p>
-            
+
             <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
@@ -267,4 +309,4 @@ export default function PatientAppointmentDetailsPage() {
       )}
     </div>
   );
-} 
+}

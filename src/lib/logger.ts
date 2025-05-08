@@ -151,7 +151,11 @@ const log = (level: LogLevel, message: string, data?: unknown): void => {
   const logPayload: LogEventPayload = {
     level,
     message,
-    data,
+    data: data
+      ? typeof data === 'object'
+        ? (data as Record<string, unknown>)
+        : { value: data }
+      : undefined,
     timestamp,
   };
 
