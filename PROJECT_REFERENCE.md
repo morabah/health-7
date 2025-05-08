@@ -2210,3 +2210,189 @@ Several critical TypeScript and build issues were fixed, enabling successful app
 These fixes ensure that the application can be successfully built and deployed, with proper TypeScript type safety throughout the codebase.
 
 ---
+
+## Batch API Implementation (Ongoing)
+
+**Date:** [Current Date]
+
+**Summary:**
+Continuing the implementation of the Batch API pattern to optimize data fetching across the application.
+
+**Changes Made (Admin Dashboard):**
+
+1.  **`src/data/dashboardLoaders.ts` (`useDashboardBatch` & `useBatchResultsCache`):**
+    *   Modified `buildDashboardOperations` to include additional operations for the Admin role:
+        *   `adminGetAllUsers` (keyed as `allUsers`, with `limit: 100, page: 1`)
+        *   `adminGetAllDoctors` (keyed as `allDoctors`, with `limit: 100, page: 1` for the full list)
+        *   `adminGetAllAppointments` (keyed as `allAppointments`, with `limit: 100, page: 1`)
+    *   The existing `adminGetDashboardData` (keyed as `adminStats`) and `adminGetAllDoctors` (for pending, keyed as `pendingDoctors`) remain.
+    *   Updated `useBatchResultsCache` to correctly set React Query cache for the new keys: `allUsers`, `allDoctors`, `allAppointments`. The cache key for `adminStats` was also updated to `adminDashboardStats` for clarity.
+
+2.  **`src/app/(platform)/admin/dashboard/page.tsx` (`AdminDashboardContent`):**
+    *   Refactored the component to use `useDashboardBatch` for fetching all necessary data.
+    *   Removed individual data fetching hooks (`useAdminDashboardData`, `useAllUsers`, `useAllDoctors`, `useAllAppointments`).
+    *   Utilized `useBatchData` to extract `adminStats`, `allUsers`, `allDoctors`, `allAppointments`, and `pendingDoctors` from the batch response.
+    *   Adjusted data consumption, loading states, and error handling to use the unified batch API hooks.
+    *   Resolved linter errors related to Spinner size, `logValidation` arguments, and `Stat` component usage (ensuring `href` prop for navigation and a single `Stat` component definition with `useRouter`).
+
+**Impact:**
+
+- The Admin Dashboard now fetches its primary data requirements (stats, user lists, doctor lists, appointment lists, pending verifications) through a single batched API call, reducing network overhead.
+- Code within the Admin Dashboard component is simplified by consolidating data fetching logic.
+
+**Next Steps:**
+
+- Implement batch operations for appointment management (e.g., batch status updates).
+- Implement batch operations for admin user management (e.g., batch user status updates, batch role assignments).
+
+### Prompt: Batch API Implementation - Admin Dashboard & Appointment Status (Ongoing)
+
+**Date:** [Current Date]
+
+**Summary:**
+Continued the implementation of the Batch API pattern. Updated the Admin Dashboard to use batched data fetching and added a new batch operation for managing appointment statuses.
+
+**Changes Made:**
+
+1.  **Admin Dashboard Batch Update (`src/data/dashboardLoaders.ts`, `src/app/(platform)/admin/dashboard/page.tsx`):**
+    *   Modified `useDashboardBatch` to include operations for `adminGetAllUsers`, `adminGetAllDoctors` (full list), and `adminGetAllAppointments` for admin users.
+    *   Updated `useBatchResultsCache` to handle these new data keys.
+    *   Refactored `AdminDashboardContent` to use `useDashboardBatch` and `useBatchData`, removing individual data fetching hooks and consolidating data access.
+    *   Resolved associated linter errors.
+
+2.  **New Batch Operation: `batchUpdateAppointmentStatus`**
+    *   **Zod Schema (`src/types/schemas.ts`):**
+        *   Added `BatchUpdateAppointmentStatusSchema` to validate payloads containing an array of `appointmentIds` and a new `status`.
+        *   Defined `BatchUpdateAppointmentStatusPayload` type.
+    *   **Backend Function (`src/lib/api/adminFunctions.ts`):**
+        *   Created `batchUpdateAppointmentStatus` function.
+        *   Validates payload against `BatchUpdateAppointmentStatusSchema`.
+        *   Iterates through `appointmentIds`, updates the status of each appointment directly in the `appointments.json` data (via `getAppointments`/`saveAppointments`).
+        *   Creates notifications (`NotificationType.SYSTEM_ALERT`) for affected patients and doctors.
+        *   Returns a summary of successes, failures, and any specific errors.
+        *   Resolved linter errors related to `NotificationType` usage, `saveAppointments` import, and error return types.
+    *   **API Exposure (`src/lib/localApiFunctions.ts`):**
+        *   Added `batchUpdateAppointmentStatus` to the `localApi` object, making it available for client-side calls.
+
+**Impact:**
+
+- The Admin Dashboard is more efficient due to batched data fetching.
+- A new capability for administrators to update multiple appointment statuses in a single operation is now available, which can be leveraged by UI components (e.g., an admin appointments table with batch actions).
+
+**Next Steps:**
+
+- Implement UI components to utilize the `batchUpdateAppointmentStatus` operation.
+- Continue with other planned batch operations (e.g., for admin user management).
+
+### Prompt: Batch API Implementation - Admin Dashboard, Appt Status, User Status (Ongoing)
+
+**Date:** [Current Date]
+
+**Summary:**
+Continued implementation of the Batch API. Updated Admin Dashboard, added batch appointment status updates, and introduced batch user status updates.
+
+**Changes Made:**
+
+1.  **Admin Dashboard Batch Update (`src/data/dashboardLoaders.ts`, `src/app/(platform)/admin/dashboard/page.tsx`):**
+    *   (Details as previously documented - completed)
+
+2.  **New Batch Operation: `batchUpdateAppointmentStatus` (`src/types/schemas.ts`, `src/lib/api/adminFunctions.ts`, `src/lib/localApiFunctions.ts`):**
+    *   (Details as previously documented - completed)
+
+3.  **New Batch Operation: `batchUpdateUserStatus`**
+    *   **Zod Schema (`src/types/schemas.ts`):**
+        *   Added `BatchUpdateUserStatusSchema` for validating payloads with `userIds` (array of strings) and a new `isActive` (boolean) status. Includes optional `adminNotes`.
+        *   Defined `BatchUpdateUserStatusPayload` type.
+    *   **Backend Function (`src/lib/api/adminFunctions.ts`):**
+        *   Created `batchUpdateUserStatus` function for admins.
+        *   Validates payload against `BatchUpdateUserStatusSchema`.
+        *   Iterates `userIds`, updates `isActive` status and `updatedAt` for each user in `users.json` (via `getUsers`/`saveUsers`).
+        *   Prevents an admin from deactivating their own account via this batch method.
+        *   Creates `ACCOUNT_STATUS_CHANGE` notifications for affected users, including optional admin notes in the message.
+        *   Returns a summary of successes, failures, and errors.
+        *   Addressed linter errors related to JSDoc comments and variable usage.
+    *   **API Exposure (`src/lib/localApiFunctions.ts`):**
+        *   Added `batchUpdateUserStatus` to the `localApi` object.
+
+**Impact:**
+
+- Admin Dashboard is more efficient.
+- Admins can now update multiple appointment statuses in a single operation.
+- Admins can now update multiple user active/inactive statuses in a single operation.
+
+**Next Steps:**
+
+- Implement UI components to utilize the new batch operations.
+- Consider other batch operations for user management (e.g., batch role changes, though this is more complex).
+
+<!-- Potentially append to existing Batch API section or create new entry -->
+
+## Doctor Dashboard Enhancements
+
+### Added Upcoming Appointments Section
+- Modified `buildDashboardOperations` in `src/data/dashboardLoaders.ts` to load both today's appointments and upcoming appointments for doctors
+- Updated the doctor dashboard UI in `src/app/(platform)/doctor/dashboard/page.tsx` to display upcoming appointments in a separate card
+- Enhanced the data extraction to properly handle the upcomingAppointments from the batch request
+- This shows doctors a more complete view of their appointments schedule, including both today's appointments and future appointments
+
+The doctor dashboard now properly displays both today's appointments and upcoming appointments that are visible in the appointments page with the filter=upcoming parameter.
+
+## UI/UX Improvements
+
+### Dashboard Redesigns
+
+#### Patient Dashboard Enhancement
+- **Implementation Date**: [Current Date]
+- **Files Modified**: `src/app/(platform)/patient/dashboard/page.tsx`
+- **Key Improvements**:
+  - Enhanced user profile display with avatar and better layout
+  - Improved health metrics display with branded stat cards
+  - Redesigned appointment cards with status indicators and better visual hierarchy
+  - Added health reminders section for preventive care notifications
+  - Added quick actions panel for common patient tasks
+  - Implemented responsive design for mobile and desktop
+  - Fixed profile loading error display with better UX for error states
+  - Added visual distinction for unread notifications
+  - Enhanced overall typography and spacing for better readability
+  - Created dedicated sections for upcoming appointments and notifications
+  - Fixed profile data extraction from batch API response
+  - Added dark mode support for all dashboard components
+
+The patient dashboard now follows modern healthcare UI principles with a clear focus on important health information and upcoming appointments. The new design helps patients quickly find their most important information and take action on common tasks directly from the dashboard.
+
+### Patient Health Management Pages
+
+#### Health Records Page
+- **Implementation Date**: [Current Date]
+- **Files Created**: `src/app/(platform)/patient/health-records/page.tsx`
+- **Features**:
+  - Tabbed interface for different types of health records (lab results, medical history, visit summaries)
+  - Document cards with download functionality
+  - Upload capability for patients to add their own records
+  - Sort and filter options for finding specific records
+  - Responsive design for all device sizes
+  - Integration with patient dashboard health metrics
+
+#### Medications Management Page
+- **Implementation Date**: [Current Date]
+- **Files Created**: `src/app/(platform)/patient/medications/page.tsx`
+- **Features**:
+  - Comprehensive medication cards with dosage, instructions, and refill information
+  - Search functionality to quickly find medications
+  - Prescription refill request capability
+  - Medication schedule and reminders
+  - Organized by prescribing doctor
+  - Integration with patient dashboard for quick access
+
+These patient-focused pages enhance the overall patient experience by providing centralized access to important health information and tools for managing their healthcare journey.
+
+#### Doctor Dashboard Enhancement
+- **Implementation Date**: [Earlier Date]
+- **Files Modified**: `src/app/(platform)/doctor/dashboard/page.tsx`
+- **Key Improvements**:
+  - Improved UI for doctor profile summary
+  - Enhanced stat cards with modern styling and better readability
+  - Added tabs for today's appointments and upcoming appointments
+  - Improved notification display with better visual hierarchy
+  - Added availability management section for quick access
+  - Redesigned appointment cards with clear patient information and status indicators

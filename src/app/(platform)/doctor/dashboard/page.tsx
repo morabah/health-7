@@ -32,684 +32,466 @@ import {
   Activity,
   CalendarDays,
   AlarmClock,
+  Settings,
+  Video,
 } from 'lucide-react';
-import {
-  useDoctorProfile,
-  useDoctorAppointments,
-  useCompleteAppointment,
-  useDoctorCancelAppointment,
-} from '@/data/doctorLoaders';
-import { useNotifications } from '@/data/sharedLoaders';
+import type { LucideIcon } from 'lucide-react'; // Import LucideIcon type
 import {
   format,
-  isToday,
-  startOfWeek,
-  endOfWeek,
-  isWithinInterval,
   isValid,
   parseISO,
-  isFuture,
-  isAfter,
-  addDays,
 } from 'date-fns';
-import { AppointmentStatus, VerificationStatus } from '@/types/enums';
+import { AppointmentStatus, VerificationStatus, AppointmentType } from '@/types/enums';
 import { logValidation } from '@/lib/logger';
-import type { Notification } from '@/types/schemas';
+import type { Notification, UserProfile } from '@/types/schemas'; // Assuming UserProfile type exists
 import Avatar from '@/components/ui/Avatar';
-import ProgressBar from '@/components/ui/ProgressBar';
-import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
-import CancelAppointmentModal from '@/components/doctor/CancelAppointmentModal';
 import { z } from 'zod';
 import { AppointmentSchema } from '@/types/schemas';
+import { useAuth } from '@/context/AuthContext';
+import { useSafeBatchData } from '@/hooks/useSafeBatchData';
+import { logInfo } from '@/lib/logger';
+import { trackPerformance } from '@/lib/performance';
+import { useDashboardBatch } from '@/data/dashboardLoaders';
+import { Tab } from '@headlessui/react'; // Import Tab
+import clsx from 'clsx'; // Import clsx for conditional classes
 
 type Appointment = z.infer<typeof AppointmentSchema> & { id: string };
 
-// Define types for API responses
-interface AppointmentsResponse {
-  success: boolean;
-  appointments: Appointment[];
-  error?: string;
-}
-
-interface NotificationsResponse {
-  success: boolean;
-  notifications: Notification[];
-  error?: string;
-}
-
-interface ProfileResponse {
-  success: boolean;
-  firstName?: string;
-  lastName?: string;
-  specialty?: string;
-  verificationStatus?: VerificationStatus;
-  profileCompleted?: boolean;
-  error?: string;
-}
-
-// Helper function to safely create dates
-const safeDate = (dateStr: string | undefined): Date | null => {
-  if (!dateStr) return null;
-  const date = new Date(dateStr);
-  return isValid(date) ? date : null;
-};
-
-// Helper function for safe date comparisons
-const safeDateCompare = (
-  dateStr: string | undefined,
-  comparisonFn: (date: Date) => boolean
-): boolean => {
-  const date = safeDate(dateStr);
-  return date ? comparisonFn(date) : false;
-};
-
 // Helper to safely format dates
-const safeFormat = (date: Date | null, formatStr: string): string => {
-  if (!date || !isValid(date)) return 'Invalid date';
+const safeFormat = (dateStr: string | undefined, formatStr: string): string => {
+  if (!dateStr) return 'Invalid Date';
   try {
+    const date = parseISO(dateStr);
+    if (!isValid(date)) return 'Invalid Date';
     return format(date, formatStr);
   } catch (e) {
-    return 'Invalid date';
-  }
-};
-
-// Helper function to safely create date objects with error handling
-const createSafeDate = (dateStr: string, timeStr: string): Date | null => {
-  try {
-    if (!dateStr || !timeStr) return null;
-    const fullDateString = `${dateStr}T${timeStr}`;
-    const date = parseISO(fullDateString);
-    if (!isValid(date)) {
-      console.warn(`Invalid date created from: ${fullDateString}`);
-      return null;
-    }
-    return date;
-  } catch (error) {
-    console.error('Error creating date object:', error);
-    return null;
+    return 'Invalid Date';
   }
 };
 
 // Helper for badge variant
-const getStatusVariant = (status: string) => {
+const getStatusVariant = (status?: AppointmentStatus): 'info' | 'success' | 'danger' | 'default' => {
   switch (status) {
-    case 'CONFIRMED':
+    case AppointmentStatus.CONFIRMED:
+    case AppointmentStatus.PENDING:
       return 'info';
-    case 'COMPLETED':
+    case AppointmentStatus.COMPLETED:
       return 'success';
-    case 'CANCELED':
+    case AppointmentStatus.CANCELED:
       return 'danger';
     default:
       return 'default';
   }
 };
 
+// Stat Card component (similar to Patient Dashboard)
+const StatCard = ({
+  title,
+  value,
+  Icon,
+  isLoading = false,
+  className,
+  href,
+}: {
+  title: string;
+  value: number;
+  Icon: LucideIcon;
+  isLoading?: boolean;
+  className?: string;
+  href?: string;
+}) => (
+  <Card className={`flex items-center gap-4 p-5 transition-colors hover:shadow-md ${href ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} ${className || ''}`}>
+    <div className={`p-3 rounded-full bg-primary-100 dark:bg-primary-900/30`}>
+        <Icon size={22} className="text-primary" />
+    </div>
+    <div className="flex-1">
+      <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-medium">{title}</p>
+      {isLoading ? (
+        <div className="h-8 mt-1 flex items-center">
+          <Spinner size="sm" />
+        </div>
+      ) : (
+        <p className="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100">{value}</p>
+      )}
+    </div>
+    {href && (
+      <Link href={href} className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
+          <ChevronRight size={24} />
+      </Link>
+    )}
+  </Card>
+);
+
+/**
+ * Doctor Dashboard Page using Batch API
+ */
 export default function DoctorDashboardPage() {
-  const {
-    data: profileData,
-    isLoading: profileLoading,
-    error: profileError,
-  } = useDoctorProfile() as {
-    data: ProfileResponse | undefined;
-    isLoading: boolean;
-    error: Error | null;
-  };
-
-  const {
-    data: appointmentsData,
-    isLoading: appointmentsLoading,
-    error: appointmentsError,
-    refetch: refetchAppointments,
-  } = useDoctorAppointments() as {
-    data: AppointmentsResponse | undefined;
-    isLoading: boolean;
-    error: Error | null;
-    refetch: () => Promise<unknown>;
-  };
-
-  const {
-    data: notificationsData,
-    isLoading: notificationsLoading,
-    error: notificationsError,
-    refetch: refetchNotifications,
-  } = useNotifications() as {
-    data: NotificationsResponse | undefined;
-    isLoading: boolean;
-    error: Error | null;
-    refetch: () => Promise<unknown>;
-  };
-  const completeAppointmentMutation = useCompleteAppointment();
-  const cancelAppointmentMutation = useDoctorCancelAppointment();
-
-  const appointments = appointmentsData?.success ? appointmentsData.appointments : [];
-  const unreadNotifications = notificationsData?.success
-    ? notificationsData.notifications.filter((n: Notification) => !n.isRead).length
-    : 0;
-
-  // Calculate stats with defensive checks
-  const todayAppointments = appointments.filter((a: Appointment) => {
-    const date = safeDate(a.appointmentDate);
-    return date && isToday(date) && a.status !== AppointmentStatus.CANCELED;
-  });
-
-  const thisWeekStart = startOfWeek(new Date());
-  const thisWeekEnd = endOfWeek(new Date());
-
-  const completedThisWeek = appointments.filter((a: Appointment) => {
-    const date = safeDate(a.appointmentDate);
-    return (
-      a.status === AppointmentStatus.COMPLETED &&
-      date &&
-      isWithinInterval(date, {
-        start: thisWeekStart,
-        end: thisWeekEnd,
-      })
-    );
-  });
-
-  // Get unique patient count
-  const uniquePatientIds = new Set(appointments.map((a: Appointment) => a.patientId));
-  const totalPatients = uniquePatientIds.size;
-
-  // Get upcoming appointments (exclude today) with defensive checks
-  const upcomingAppointments = appointments
-    .filter((a: Appointment) => {
-      const date = safeDate(a.appointmentDate);
-      const now = new Date();
-      return date && !isToday(date) && date > now && a.status !== AppointmentStatus.CANCELED;
-    })
-    .sort((a: Appointment, b: Appointment) => {
-      const dateA = safeDate(a.appointmentDate);
-      const dateB = safeDate(b.appointmentDate);
-      if (!dateA || !dateB) return 0;
-      return dateA.getTime() - dateB.getTime();
-    });
-
-  // Upcoming week appointments
-  const nextWeekAppointments = appointments
-    .filter((a: Appointment) => {
-      const date = safeDate(a.appointmentDate);
-      const now = new Date();
-      const oneWeekFromNow = addDays(now, 7);
-      return (
-        date && date > now && date <= oneWeekFromNow && a.status !== AppointmentStatus.CANCELED
-      );
-    })
-    .sort((a: Appointment, b: Appointment) => {
-      const dateA = safeDate(a.appointmentDate);
-      const dateB = safeDate(b.appointmentDate);
-      if (!dateA || !dateB) return 0;
-      return dateA.getTime() - dateB.getTime();
-    });
-
+  // Start performance tracking
   useEffect(() => {
-    try {
-      logValidation('4.10', 'success', 'Doctor dashboard connected to real data via local API');
-    } catch (e) {
-      // Error handling for validation logging
-    }
+    const perf = trackPerformance('DoctorDashboardPage-render');
+    return () => {
+      perf.stop();
+    };
   }, []);
 
-  // Show error if any API calls fail
-  if (profileError || appointmentsError || notificationsError) {
+  // Fetch all dashboard data in a single batch request
+  const batchResult = useDashboardBatch();
+
+  // Extract and process data from batch response
+  const {
+    data,
+    isLoading,
+    error
+  } = useSafeBatchData(
+    batchResult,
+    ['userProfile', 'notifications', 'todayAppointments', 'upcomingAppointments', 'stats', 'availability']
+  );
+
+  // Log insights about the batch operation
+  useEffect(() => {
+    if (!isLoading && !error) {
+      const successKeys = Object.keys(data).filter(key => data[key]?.success);
+      logInfo('Doctor dashboard batch data loaded', {
+        totalKeys: Object.keys(data).length,
+        successKeys,
+        errorKeys: Object.keys(data).filter(key => !data[key]?.success)
+      });
+    }
+  }, [isLoading, error, data]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <Alert variant="error">
-        Error loading dashboard data:{' '}
-        {(profileError || appointmentsError || notificationsError)?.toString()}
+        <div>
+          <h3 className="font-medium">{error.message}</h3>
+          <p>Error loading dashboard</p>
+        </div>
       </Alert>
     );
   }
 
-  // After fetching profileData
-  const userProfile = profileData?.success ? profileData : ({} as ProfileResponse);
-  const displayName =
-    userProfile.firstName && userProfile.lastName
-      ? `Dr. ${userProfile.firstName} ${userProfile.lastName}`
-      : 'Doctor';
+  // Extract data for components
+  const userProfileData = data.userProfile?.success ? data.userProfile : null;
+  const notifications = data.notifications?.success ? data.notifications.notifications || [] : [];
+  const todayAppointments = data.todayAppointments?.success
+    ? data.todayAppointments.appointments || []
+    : [];
+  const upcomingAppointments = data.upcomingAppointments?.success
+    ? (data.upcomingAppointments.appointments || []) as Appointment[]
+    : [] as Appointment[];
+  const statsData = data.stats?.success ? data.stats : null;
+  const availability = data.availability?.success ? data.availability : null;
 
-  const initials = (userProfile.firstName?.[0] || '') + (userProfile.lastName?.[0] || '');
-  const specialty = userProfile.specialty || profileData?.specialty || '';
-  const isVerified =
-    userProfile.verificationStatus === VerificationStatus.VERIFIED ||
-    profileData?.verificationStatus === VerificationStatus.VERIFIED;
-  const profileCompletion = userProfile.profileCompleted ? 100 : 80; // Example: 100% if completed, else 80%
+  // Filter upcoming appointments to exclude those already covered in todayAppointments
+  const todayAppointmentIds = new Set(todayAppointments.map((a: Appointment) => a.id));
+  const filteredUpcoming = upcomingAppointments.filter((a: Appointment) => !todayAppointmentIds.has(a.id));
 
-  // Add a refresh handler
-  const handleRefresh = () => {
-    refetchAppointments();
-    refetchNotifications();
-  };
-
-  // State for modals
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
-  const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleOpenComplete = (appt: Appointment) => {
-    setSelectedAppointment(appt);
-    setCompleteModalOpen(true);
-  };
-
-  const handleOpenCancel = (appt: Appointment) => {
-    setSelectedAppointment(appt);
-    setCancelModalOpen(true);
-  };
-
-  const handleCloseModals = () => {
-    setCompleteModalOpen(false);
-    setCancelModalOpen(false);
-    setSelectedAppointment(null);
-  };
-
-  const handleConfirmComplete = async (appointmentId: string, notes: string) => {
-    setIsSubmitting(true);
-    try {
-      await completeAppointmentMutation.mutateAsync({ appointmentId, notes });
-      handleCloseModals();
-    } catch (error) {
-      console.error('Error completing appointment:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleConfirmCancel = async (appointmentId: string, reason: string) => {
-    setIsSubmitting(true);
-    try {
-      await cancelAppointmentMutation.mutateAsync({ appointmentId, reason });
-      handleCloseModals();
-    } catch (error) {
-      console.error('Error canceling appointment:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Helper function to format dates for display
-  const formatAppointmentDate = (dateStr: string) => {
-    const date = safeDate(dateStr);
-    if (!date) return 'Invalid date';
-
-    if (isToday(date)) {
-      return 'Today';
-    }
-
-    return format(date, 'EEE, MMM d');
-  };
+  // Derived states for easier access
+  const profile = userProfileData?.user as UserProfile | null;
+  const upcomingCount = statsData?.upcomingCount ?? 0;
+  const pastCount = statsData?.pastCount ?? 0;
+  const unreadNotifications = statsData?.notifUnread ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-6 mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{displayName}</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
-              {specialty ? specialty : 'Welcome to your dashboard'}
-              {isVerified && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Verified
-                </span>
-              )}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            className="text-slate-600 dark:text-slate-300"
-            onClick={handleRefresh}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh Dashboard
-          </Button>
-        </div>
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-2">Doctor Dashboard</h1>
+
+      {profile && (
+        <DoctorProfileSummary profile={profile} />
+      )}
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <StatCard title="Today's Appointments" value={todayAppointments.length} Icon={CalendarCheck} isLoading={isLoading} href="/doctor/appointments?filter=today" />
+          {/* We use upcomingCount from stats, as todayAppointments might not include future ones today */}
+          <StatCard title="Upcoming Appointments" value={upcomingCount as number} Icon={AlarmClock} isLoading={isLoading} href="/doctor/appointments?filter=upcoming" />
+          <StatCard title="Unread Notifications" value={unreadNotifications as number} Icon={Bell} isLoading={isLoading} href="/notifications" />
+          {/* Example: Past Count - Consider if this is useful here */}
+          {/* <StatCard title="Past Appointments" value={pastCount} Icon={ClipboardList} isLoading={isLoading} href="/doctor/appointments?filter=past" /> */}
       </div>
-
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="p-5 border-l-4 border-blue-500 shadow-sm hover:shadow transition-shadow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-sm font-medium text-slate-500">Total Patients</h3>
-              {appointmentsLoading ? (
-                <Spinner className="w-4 h-4" />
-              ) : (
-                <p className="text-2xl font-bold mt-1">{totalPatients}</p>
-              )}
-            </div>
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
-              <Users className="h-5 w-5 text-blue-500" />
-            </div>
+      
+      {/* Debug info */}
+      {process.env.NODE_ENV !== 'production' && (
+        <Card className="p-4 bg-yellow-50 border-yellow-200 mb-4">
+          <h3 className="font-semibold mb-2">Debug Information</h3>
+          <div className="text-sm space-y-1">
+            <p>Stats API upcomingCount: {upcomingCount}</p>
+            <p>Upcoming appointments from API: {upcomingAppointments.length}</p>
+            <p>Filtered upcoming appointments: {filteredUpcoming.length}</p>
+            <details>
+              <summary className="cursor-pointer text-blue-600">Show api payload</summary>
+              <pre className="bg-gray-100 p-2 mt-2 rounded text-xs overflow-auto max-h-40">
+                {JSON.stringify({stats: statsData, upcomingApptsPayload: data.upcomingAppointments}, null, 2)}
+              </pre>
+            </details>
           </div>
         </Card>
+      )}
 
-        <Card className="p-5 border-l-4 border-green-500 shadow-sm hover:shadow transition-shadow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-sm font-medium text-slate-500">Today&apos;s Appointments</h3>
-              {appointmentsLoading ? (
-                <Spinner className="w-4 h-4" />
-              ) : (
-                <p className="text-2xl font-bold mt-1">{todayAppointments.length}</p>
-              )}
-            </div>
-            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-full">
-              <CalendarCheck className="h-5 w-5 text-green-500" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-purple-500 shadow-sm hover:shadow transition-shadow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-sm font-medium text-slate-500">This Week</h3>
-              {appointmentsLoading ? (
-                <Spinner className="w-4 h-4" />
-              ) : (
-                <p className="text-2xl font-bold mt-1">{completedThisWeek.length}</p>
-              )}
-            </div>
-            <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-full">
-              <CheckCircle className="h-5 w-5 text-purple-500" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-red-500 shadow-sm hover:shadow transition-shadow">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-sm font-medium text-slate-500">Notifications</h3>
-              {notificationsLoading ? (
-                <Spinner className="w-4 h-4" />
-              ) : (
-                <p className="text-2xl font-bold mt-1">{unreadNotifications}</p>
-              )}
-            </div>
-            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-full">
-              <Bell className="h-5 w-5 text-red-500" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Main Content Grid */}
+      {/* Main Content Area - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Schedule - Expanded */}
-        <div className="lg:col-span-2">
-          <Card className="shadow-sm h-full">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlarmClock className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Today&apos;s Schedule</h2>
-              </div>
-              <Button
-                as={Link}
-                href="/doctor/appointments"
-                size="sm"
-                variant="outline"
-                className="flex items-center gap-1"
-              >
-                View All <ArrowRight className="h-3 w-3" />
-              </Button>
-            </div>
 
-            <div className="p-5">
-              {appointmentsLoading ? (
-                <div className="flex justify-center py-10">
-                  <Spinner />
-                </div>
-              ) : todayAppointments.length === 0 ? (
-                <div className="text-center py-10 text-slate-500">
-                  <Calendar className="h-10 w-10 mx-auto mb-3 text-slate-400" />
-                  <p>No appointments scheduled for today.</p>
-                  <Button
-                    as={Link}
-                    href="/doctor/availability"
-                    variant="link"
-                    size="sm"
-                    className="mt-2"
-                  >
-                    Update your availability
-                  </Button>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {todayAppointments.map((appt: Appointment) => {
-                    const initials = (
-                      appt.patientName
-                        ?.split(' ')
-                        .map(n => n[0])
-                        .join('') || 'P'
-                    ).toUpperCase();
-                    return (
-                      <div
-                        key={appt.id}
-                        className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar initials={initials} size={44} />
-                          <div>
-                            <div className="font-medium">{appt.patientName || 'Patient'}</div>
-                            <div className="text-slate-500 text-sm flex flex-wrap items-center gap-2">
-                              <span className="whitespace-nowrap">
-                                {appt.startTime} - {appt.endTime}
-                              </span>
-                              <Badge variant={getStatusVariant(appt.status)}>{appt.status}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                        {appt.status === AppointmentStatus.CONFIRMED && (
-                          <div className="flex flex-wrap gap-2 ml-12 sm:ml-0">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              onClick={() => handleOpenComplete(appt)}
-                            >
-                              <CheckCircle className="h-3 w-3 mr-1" /> Complete
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => handleOpenCancel(appt)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* Right Column: Upcoming & Notifications */}
-        <div className="space-y-6">
-          {/* Upcoming Appointments */}
-          <Card className="shadow-sm">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Upcoming Week</h2>
-              </div>
-            </div>
-
-            <div className="p-5">
-              {appointmentsLoading ? (
-                <div className="flex justify-center py-6">
-                  <Spinner />
-                </div>
-              ) : nextWeekAppointments.length === 0 ? (
-                <div className="text-center py-6 text-slate-500">
-                  <p>No upcoming appointments for the next 7 days.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {nextWeekAppointments.slice(0, 5).map((appt: Appointment) => {
-                    const initials = (
-                      appt.patientName
-                        ?.split(' ')
-                        .map(n => n[0])
-                        .join('') || 'P'
-                    ).toUpperCase();
-                    return (
-                      <div
-                        key={appt.id}
-                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60"
-                      >
-                        <Avatar initials={initials} size={36} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">
-                            {appt.patientName || 'Patient'}
-                          </div>
-                          <div className="text-slate-500 text-sm">
-                            {formatAppointmentDate(appt.appointmentDate)} • {appt.startTime}
-                          </div>
-                        </div>
-                        <Badge variant={getStatusVariant(appt.status)} className="text-xs">
-                          {appt.status}
-                        </Badge>
-                      </div>
-                    );
-                  })}
-
-                  {nextWeekAppointments.length > 5 && (
-                    <div className="text-center mt-2">
-                      <Button as={Link} href="/doctor/appointments" variant="link" size="sm">
-                        View {nextWeekAppointments.length - 5} more
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <Button
-                  as={Link}
-                  href="/doctor/appointments"
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-center"
-                >
-                  View Full Schedule
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Quick Actions Card */}
-          <Card className="shadow-sm">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Quick Actions
-              </h2>
-            </div>
-
-            <div className="p-4 grid grid-cols-1 gap-3">
-              <Button as={Link} href="/doctor/profile" variant="outline" className="justify-start">
-                <User className="h-4 w-4 mr-2" />
-                Update Profile
-              </Button>
-              <Button
-                as={Link}
-                href="/doctor/availability"
-                variant="outline"
-                className="justify-start"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Set Availability
-              </Button>
-              <Button as={Link} href="/notifications" variant="outline" className="justify-start">
-                <Bell className="h-4 w-4 mr-2" />
-                Check Notifications
-                {unreadNotifications > 0 && (
-                  <Badge variant="danger" className="ml-auto text-xs">
-                    {unreadNotifications}
-                  </Badge>
-                )}
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Notifications List */}
-      <Card className="shadow-sm">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Recent Notifications</h2>
-          </div>
-          <Button
-            as={Link}
-            href="/notifications"
-            size="sm"
-            variant="outline"
-            className="flex items-center gap-1"
-          >
-            View All <ArrowRight className="h-3 w-3" />
-          </Button>
-        </div>
-
-        <div className="p-5">
-          {notificationsLoading ? (
-            <div className="flex justify-center py-6">
-              <Spinner />
-            </div>
-          ) : notificationsError ? (
-            <div className="text-center text-red-500 py-6">Error loading notifications.</div>
-          ) : notificationsData?.success && notificationsData.notifications.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {notificationsData.notifications
-                .slice(0, 6)
-                .map((notif: Notification, idx: number) => (
-                  <div
-                    key={notif.id || idx}
-                    className={`p-4 rounded-lg border ${notif.isRead ? 'border-slate-200 bg-white' : 'border-primary/20 bg-primary/5'} shadow-sm`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`p-2 rounded-full ${notif.isRead ? 'bg-slate-100' : 'bg-primary/10'}`}
-                      >
-                        <Bell
-                          className={`h-4 w-4 ${notif.isRead ? 'text-slate-500' : 'text-primary'}`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm truncate">{notif.title}</h3>
-                        <p className="text-slate-500 text-sm line-clamp-2 mt-1">{notif.message}</p>
-                        <div className="text-xs text-slate-400 mt-2">
-                          {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : ''}
-                        </div>
-                      </div>
-                    </div>
+        {/* Left Column (Wider) - Appointments & Availability */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Appointments Tab Section */}
+          <Card>
+            <Tab.Group>
+              <Tab.List className="flex space-x-1 rounded-t-lg bg-slate-100 dark:bg-slate-800 p-1">
+                <Tab className={({ selected }) =>
+                    clsx(
+                      'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
+                      'ring-white/60 ring-offset-2 ring-offset-primary-400 focus:outline-none focus:ring-2',
+                      selected
+                        ? 'bg-white dark:bg-slate-700 text-primary shadow'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-white/[0.12] hover:text-primary'
+                    )
+                  }>
+                  Today ({todayAppointments.length})
+                </Tab>
+                <Tab className={({ selected }) =>
+                    clsx(
+                      'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
+                      'ring-white/60 ring-offset-2 ring-offset-primary-400 focus:outline-none focus:ring-2',
+                      selected
+                        ? 'bg-white dark:bg-slate-700 text-primary shadow'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-white/[0.12] hover:text-primary'
+                    )
+                  }>
+                  Upcoming ({filteredUpcoming.length})
+                </Tab>
+              </Tab.List>
+              <Tab.Panels className="mt-2 p-4">
+                <Tab.Panel>
+                  <AppointmentsList
+                      appointments={todayAppointments}
+                      emptyMessage="No appointments scheduled for today."
+                  />
+                  <div className="mt-4 text-right">
+                     <Link href="/doctor/appointments?filter=today">
+                        <Button variant="link" size="sm">View All Today's</Button>
+                     </Link>
                   </div>
-                ))}
-            </div>
-          ) : (
-            <div className="text-center text-slate-500 py-8">No notifications yet.</div>
+                </Tab.Panel>
+                <Tab.Panel>
+                  <AppointmentsList
+                      appointments={filteredUpcoming}
+                      emptyMessage="No other upcoming appointments scheduled."
+                  />
+                   <div className="mt-4 text-right">
+                     <Link href="/doctor/appointments?filter=upcoming">
+                        <Button variant="link" size="sm">View All Upcoming</Button>
+                     </Link>
+                  </div>
+                </Tab.Panel>
+              </Tab.Panels>
+            </Tab.Group>
+          </Card>
+
+          {availability && (
+             <Card>
+                 <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                     <h2 className="text-lg font-semibold">Your Availability</h2>
+                     <Link href="/doctor/availability">
+                         <Button variant="ghost" size="sm">
+                             Manage
+                             <ArrowRight className="ml-1 h-4 w-4" />
+                         </Button>
+                     </Link>
+                 </div>
+                 <div className="p-4">
+                     <AvailabilitySummary availability={availability} />
+                 </div>
+             </Card>
           )}
         </div>
-      </Card>
 
-      {/* Render the modals */}
-      <CompleteAppointmentModal
-        isOpen={completeModalOpen}
-        onClose={handleCloseModals}
-        appt={selectedAppointment}
-        onConfirm={handleConfirmComplete}
-        isSubmitting={isSubmitting}
-      />
-      <CancelAppointmentModal
-        isOpen={cancelModalOpen}
-        onClose={handleCloseModals}
-        appt={selectedAppointment}
-        onConfirm={handleConfirmCancel}
-        isSubmitting={isSubmitting}
-      />
+        {/* Right Column - Notifications & Quick Actions */}
+        <div className="space-y-6">
+           <Card>
+               <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                   <h2 className="text-lg font-semibold">Recent Notifications</h2>
+                   <Link href="/notifications">
+                       <Button variant="ghost" size="sm">
+                           View All
+                           <ArrowRight className="ml-1 h-4 w-4" />
+                       </Button>
+                   </Link>
+               </div>
+               <div className="p-4">
+                   <NotificationsList
+                       notifications={notifications.slice(0, 5)} // Show limited notifications
+                       emptyMessage="No new notifications."
+                   />
+               </div>
+           </Card>
+
+           <Card>
+               <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+                   <h2 className="text-lg font-semibold">Quick Actions</h2>
+               </div>
+               <div className="p-4 space-y-3">
+                   <Link href="/doctor/availability" className="block">
+                       <Button variant="outline" className="w-full justify-start">
+                           <CalendarDays className="mr-2 h-4 w-4" /> Manage Availability
+                       </Button>
+                   </Link>
+                   <Link href="/doctor/appointments" className="block">
+                       <Button variant="outline" className="w-full justify-start">
+                           <ClipboardList className="mr-2 h-4 w-4" /> View All Appointments
+                       </Button>
+                   </Link>
+                   <Link href="/doctor/profile" className="block">
+                       <Button variant="outline" className="w-full justify-start">
+                           <User className="mr-2 h-4 w-4" /> Edit Profile
+                       </Button>
+                   </Link>
+                   {/* Add more actions as needed, e.g., Messages */}
+                   {/* <Link href="/doctor/messages" className="block">
+                       <Button variant="outline" className="w-full justify-start">
+                           <MessageSquare className="mr-2 h-4 w-4" /> View Messages
+                       </Button>
+                   </Link> */} 
+               </div>
+           </Card>
+        </div>
+
+      </div>
     </div>
+  );
+}
+
+// --- Updated Components ---
+
+function DoctorProfileSummary({ profile }: { profile: UserProfile | null }) {
+  if (!profile) return null;
+
+  return (
+    <Card className="p-4 mb-6 flex items-center gap-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/30 dark:to-secondary-900/30">
+      <Avatar
+        src={profile.profilePictureUrl ?? undefined}
+        initials={`${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`}
+        alt={`${profile.firstName || ''} ${profile.lastName || ''}`}
+        size={64}
+      />
+      <div className="flex-1">
+        <h2 className="text-xl font-semibold">
+          Welcome back, Dr. {profile.lastName || profile.firstName}!
+        </h2>
+        <p className="text-slate-600 dark:text-slate-400 text-sm">
+          {profile.email || 'Email not set'}
+        </p>
+      </div>
+      <Link href="/doctor/profile">
+           <Button variant="outline" size="sm"><Settings className="h-4 w-4 mr-1"/> Profile Settings</Button>
+      </Link>
+    </Card>
+  );
+}
+
+// Removed DashboardStats - replaced by StatCard grid
+
+function AppointmentsList({ appointments, emptyMessage }: { appointments: Appointment[]; emptyMessage: string }) {
+  if (appointments.length === 0) {
+    return <p className="text-slate-500 text-sm p-4 text-center">{emptyMessage}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {appointments.map(appointment => (
+        <Card key={appointment.id} className="p-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            <div className="flex-shrink-0">
+                 {appointment.appointmentType === AppointmentType.VIDEO ? 
+                     <Video className="h-5 w-5 text-primary"/> : 
+                     <User className="h-5 w-5 text-secondary"/>
+                 }
+            </div>
+            <div className="flex-1">
+                <p className="font-medium">
+                  {appointment.patientName || 'Patient Name Missing'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {safeFormat(appointment.appointmentDate, 'hh:mm a')} ({appointment.appointmentType})
+                </p>
+            </div>
+             <Badge variant={getStatusVariant(appointment.status)} size="sm">{appointment.status}</Badge>
+            <Link href={`/doctor/appointments/${appointment.id}`}>
+                <Button size="sm" variant="ghost">
+                  Details <ChevronRight className="h-4 w-4 ml-1"/>
+                </Button>
+            </Link>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function NotificationsList({ notifications, emptyMessage }: { notifications: Notification[]; emptyMessage: string }) {
+  if (notifications.length === 0) {
+    return <p className="text-slate-500 text-sm p-4 text-center">{emptyMessage}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {notifications.map(notification => (
+        <Card key={notification.id} className={`p-3 border-l-4 ${notification.isRead ? 'border-transparent' : 'border-primary'} hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}>
+          <div className="flex justify-between items-start gap-2">
+              <div className="flex-1">
+                  <p className={`font-medium text-sm ${!notification.isRead ? 'text-primary-700 dark:text-primary-300' : ''}`}>
+                      {notification.title}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2">
+                      {notification.message}
+                  </p>
+              </div>
+              {!notification.isRead && <div className="w-2 h-2 bg-primary rounded-full mt-1 flex-shrink-0"></div>}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+            {safeFormat(notification.createdAt, 'MMM d, hh:mm a')}
+          </p>
+          {/* Add Link/Button if notifications are actionable */} 
+          {/* <Button size="xs" variant="link" className="mt-1">View Details</Button> */} 
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function AvailabilitySummary({ availability }: { availability: any }) {
+  if (!availability?.weeklySchedule) {
+       return <p className="text-slate-500 text-sm">Availability not set up.</p>;
+  }
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+  return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {days.map(day => {
+            const daySchedule = availability.weeklySchedule[day];
+            const isActive = Array.isArray(daySchedule) && daySchedule.length > 0;
+            return (
+              <div key={day} className={`p-2 rounded border ${isActive ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20'}`}>
+                <p className={`text-sm font-medium capitalize mb-1 ${isActive ? 'text-green-800 dark:text-green-200' : 'text-slate-600 dark:text-slate-300'}`}>{day}</p>
+                {isActive ? (
+                    <div className="space-y-0.5">
+                        {daySchedule.map((slot: any, index: number) => (
+                            <p key={index} className="text-xs text-green-700 dark:text-green-300">
+                                {slot.startTime} - {slot.endTime}
+                            </p>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Unavailable</p>
+                )}
+              </div>
+            );
+        })}
+      </div>
   );
 }

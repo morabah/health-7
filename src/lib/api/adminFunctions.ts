@@ -5,7 +5,7 @@
  */
 
 import type { z } from 'zod';
-import { UserType, VerificationStatus, NotificationType } from '@/types/enums';
+import { UserType, VerificationStatus, NotificationType, AppointmentStatus } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
 import {
@@ -14,6 +14,7 @@ import {
   getDoctors,
   saveDoctors,
   getAppointments,
+  saveAppointments,
   getNotifications,
   saveNotifications,
 } from '@/lib/localDb';
@@ -35,6 +36,10 @@ import {
   AdminGetAllDoctorsSchema,
   AdminGetAllAppointmentsSchema,
   AdminGetDoctorByIdSchema,
+  BatchUpdateAppointmentStatusSchema,
+  type BatchUpdateAppointmentStatusPayload,
+  BatchUpdateUserStatusSchema,
+  type BatchUpdateUserStatusPayload,
 } from '@/types/schemas';
 
 /**
@@ -884,6 +889,203 @@ export async function adminGetDoctorById(
   } catch (e) {
     logError('adminGetDoctorById failed', e);
     return { success: false, error: 'Error fetching doctor' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Admin batch update appointment statuses
+ */
+export async function batchUpdateAppointmentStatus(
+  ctx: { uid: string; role: UserType },
+  payload: BatchUpdateAppointmentStatusPayload
+): Promise<ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }> | ResultErr> {
+  const perf = trackPerformance('batchUpdateAppointmentStatus');
+  const { uid, role } = ctx;
+
+  logInfo('batchUpdateAppointmentStatus called', { uid, role, newStatus: payload.status, count: payload.appointmentIds.length });
+
+  if (role !== UserType.ADMIN) {
+    return { success: false, error: 'Unauthorized. Only admins can perform this action.' };
+  }
+
+  const validationResult = BatchUpdateAppointmentStatusSchema.safeParse(payload);
+  if (!validationResult.success) {
+    logError('[batchUpdateAppointmentStatus] Payload validation failed', {
+      payload,
+      error: validationResult.error.format(),
+    });
+    return { success: false, error: 'Invalid request payload for batch updating appointment statuses.' };
+  }
+
+  const { appointmentIds, status: newStatus } = validationResult.data;
+  const timestamp = nowIso();
+  let successCount = 0;
+  let failureCount = 0;
+  const errors: Record<string, string> = {};
+
+  try {
+    const appointments = await getAppointments();
+    const notifications = await getNotifications();
+    let appointmentsModified = false;
+
+    for (const appointmentId of appointmentIds) {
+      const appointmentIndex = appointments.findIndex(appt => appt.id === appointmentId);
+
+      if (appointmentIndex === -1) {
+        errors[appointmentId] = 'Appointment not found.';
+        failureCount++;
+        continue;
+      }
+
+      const appointment = { ...appointments[appointmentIndex] };
+
+      if (appointment.status === newStatus) {
+        successCount++; // Already in desired state, count as success
+        continue;
+      }
+
+      appointment.status = newStatus;
+      appointment.updatedAt = timestamp;
+      appointments[appointmentIndex] = appointment;
+      appointmentsModified = true;
+      successCount++;
+
+      // Use a general notification type for admin-initiated changes
+      const notificationTypeForChange = NotificationType.SYSTEM_ALERT;
+
+      const patientNotification: Notification = {
+        id: generateId(),
+        userId: appointment.patientId,
+        title: 'Appointment Status Updated by Admin',
+        message: `An administrator has updated the status of your appointment on ${new Date(appointment.appointmentDate).toLocaleDateString()} with Dr. ${appointment.doctorName} to: ${newStatus}.`,
+        isRead: false,
+        createdAt: timestamp,
+        type: notificationTypeForChange,
+        relatedId: appointment.id,
+      };
+      notifications.push(patientNotification);
+
+      const doctorNotification: Notification = {
+        id: generateId(),
+        userId: appointment.doctorId,
+        title: 'Appointment Status Updated by Admin',
+        message: `An administrator has updated the status of the appointment on ${new Date(appointment.appointmentDate).toLocaleDateString()} for ${appointment.patientName} to: ${newStatus}.`,
+        isRead: false,
+        createdAt: timestamp,
+        type: notificationTypeForChange,
+        relatedId: appointment.id,
+      };
+      notifications.push(doctorNotification);
+    }
+
+    if (appointmentsModified) {
+      await saveAppointments(appointments);
+      await saveNotifications(notifications);
+    }
+
+    logInfo('Batch appointment status update completed', { successCount, failureCount, errors });
+    return { success: true, successCount, failureCount, errors };
+
+  } catch (e) {
+    logError('Error during batch update of appointment statuses', e);
+    // Ensure the returned error object matches ResultErr type exactly
+    return { success: false, error: 'A server error occurred during the batch update process.' };
+  } finally {
+    perf.stop();
+  }
+}
+
+/**
+ * Admin batch update user statuses (isActive)
+ */
+export async function batchUpdateUserStatus(
+  ctx: { uid: string; role: UserType },
+  payload: BatchUpdateUserStatusPayload
+): Promise<ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }> | ResultErr> {
+  const perf = trackPerformance('batchUpdateUserStatus');
+  const { uid, role } = ctx;
+
+  logInfo('batchUpdateUserStatus called', { uid, role, newIsActiveStatus: payload.isActive, count: payload.userIds.length });
+
+  if (role !== UserType.ADMIN) {
+    return { success: false, error: 'Unauthorized. Only admins can perform this action.' };
+  }
+
+  const validationResult = BatchUpdateUserStatusSchema.safeParse(payload);
+  if (!validationResult.success) {
+    logError('[batchUpdateUserStatus] Payload validation failed', {
+      payload,
+      error: validationResult.error.format(),
+    });
+    return { success: false, error: 'Invalid request payload for batch updating user statuses.' };
+  }
+
+  const { userIds, isActive: newIsActiveStatus, adminNotes } = validationResult.data;
+  const timestamp = nowIso();
+  let successCount = 0;
+  let failureCount = 0;
+  const errors: Record<string, string> = {};
+
+  try {
+    const users = await getUsers();
+    const notifications = await getNotifications();
+    let usersModified = false;
+
+    for (const userId of userIds) {
+      const userIndex = users.findIndex(u => u.id === userId);
+
+      if (userIndex === -1) {
+        errors[userId] = 'User not found.';
+        failureCount++;
+        continue;
+      }
+
+      const user = { ...users[userIndex] };
+
+      if (user.id === uid && !newIsActiveStatus) {
+        errors[userId] = 'Admin cannot deactivate their own account via batch update.';
+        failureCount++;
+        continue;
+      }
+
+      if (user.isActive === newIsActiveStatus) {
+        successCount++;
+        continue;
+      }
+
+      user.isActive = newIsActiveStatus;
+      user.updatedAt = timestamp;
+      users[userIndex] = user;
+      usersModified = true;
+      successCount++;
+
+      const statusText = newIsActiveStatus ? 'activated' : 'deactivated';
+      const userNotification: Notification = {
+        id: generateId(),
+        userId: user.id,
+        title: 'Account Status Updated',
+        message: `An administrator has ${statusText} your account. ${adminNotes ? `Admin notes: ${adminNotes}` : ''}`.trim(),
+        isRead: false,
+        createdAt: timestamp,
+        type: NotificationType.ACCOUNT_STATUS_CHANGE,
+        relatedId: user.id,
+      };
+      notifications.push(userNotification);
+    }
+
+    if (usersModified) {
+      await saveUsers(users);
+      await saveNotifications(notifications);
+    }
+
+    logInfo('Batch user status update completed', { successCount, failureCount, errors, adminNotesProvided: !!adminNotes });
+    return { success: true, successCount, failureCount, errors };
+
+  } catch (e) {
+    logError('Error during batch update of user statuses', e);
+    return { success: false, error: 'A server error occurred during the batch user status update process.' };
   } finally {
     perf.stop();
   }

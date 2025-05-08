@@ -71,6 +71,16 @@ export async function getMyDashboardStats(
 
     // Calculate upcomingCount: appointments that are in future and not cancelled
     const now = new Date();
+    logInfo('Date comparison using now:', { 
+      now: now.toISOString(), 
+      appointments: myAppointments.length,
+      sampleAppointmentDates: myAppointments.slice(0, 5).map(a => ({
+        id: a.id,
+        date: a.appointmentDate,
+        status: a.status
+      }))
+    });
+    
     const upcomingCount = myAppointments.filter(a => {
       // Handle different date formats
       const appointmentDate = a.appointmentDate.includes('T')
@@ -78,8 +88,25 @@ export async function getMyDashboardStats(
         : new Date(`${a.appointmentDate}T${a.startTime}`);
 
       const status = a.status.toLowerCase();
-      return appointmentDate > now && status !== 'canceled';
+      const isInFuture = appointmentDate > now;
+      const isNotCanceled = status !== 'canceled';
+      const isUpcoming = isInFuture && isNotCanceled;
+      
+      // Debug log
+      logInfo(`Appointment evaluation for upcoming count:`, {
+        id: a.id,
+        date: a.appointmentDate,
+        appointmentParsedDate: appointmentDate.toISOString(),
+        status,
+        isInFuture,
+        isNotCanceled,
+        isUpcoming
+      });
+      
+      return isUpcoming;
     }).length;
+    
+    logInfo('Dashboard stats calculated:', { upcomingCount, uid, role });
 
     // Calculate pastCount: appointments that are in past or completed
     const pastCount = myAppointments.filter(a => {
@@ -121,13 +148,16 @@ export async function getMyDashboardStats(
       };
     }
 
-    return {
+    const baseReturnData: ResultOk<{ upcomingCount: number; pastCount: number; notifUnread: number; }> = {
       success: true,
       upcomingCount,
       pastCount,
       notifUnread: unreadCount,
-      adminStats,
     };
+
+    return role === UserType.ADMIN
+      ? { ...baseReturnData, adminStats }
+      : baseReturnData;
   } catch (e) {
     logError('getMyDashboardStats failed', e);
     return { success: false, error: 'Error fetching dashboard stats' };

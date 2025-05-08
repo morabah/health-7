@@ -26,6 +26,9 @@ import {
   adminUpdateUserProfile,
   adminCreateUser,
   adminGetAllAppointments,
+  adminGetDoctorById,
+  batchUpdateAppointmentStatus,
+  batchUpdateUserStatus,
 } from './api/adminFunctions';
 
 import {
@@ -72,6 +75,8 @@ import { BatchGetDoctorDataSchema, BatchGetDoctorsDataSchema } from '@/types/sch
 import { BatchGetPatientDataSchema } from '@/types/schemas';
 import type { PatientProfile } from '@/types/schemas';
 import { getPatients } from './localDb';
+import { BatchOperation } from './batchApiUtils';
+import { startMeasurement, endMeasurement } from './performanceMetrics';
 
 /**
  * Batch get doctor data to reduce multiple API calls
@@ -355,6 +360,62 @@ async function batchGetPatientsData(
   }
 }
 
+/**
+ * Execute multiple API operations in a single batch request
+ * 
+ * @param context Authentication context
+ * @param payload Batch operations payload
+ * @returns Results for all operations
+ */
+async function executeBatchOperations(context: any, payload: any) {
+  const perfId = startMeasurement('localApi.executeBatchOperations', { operationCount: payload?.operations?.length });
+  
+  try {
+    const { operations } = payload;
+    
+    if (!Array.isArray(operations)) {
+      return { success: false, error: 'Invalid operations format' };
+    }
+    
+    const results: Record<string, unknown> = {};
+    
+    // Execute each operation in parallel using Promise.all
+    await Promise.all(
+      operations.map(async (op: BatchOperation) => {
+        try {
+          // Skip if operation is invalid
+          if (!op.method || !op.key) return;
+          
+          // Check if method exists in localApi using type-safe approach
+          const apiMethod = op.method as keyof typeof localApi;
+          if (typeof localApi[apiMethod] !== 'function') {
+            results[op.key] = { success: false, error: `Method ${op.method} not found` };
+            return;
+          }
+          
+          // Execute the method with context and payload
+          const result = await (localApi[apiMethod] as Function)(context, op.payload || {});
+          results[op.key] = result;
+        } catch (error) {
+          results[op.key] = { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          };
+        }
+      })
+    );
+    
+    endMeasurement(perfId, { resultCount: Object.keys(results).length });
+    return { success: true, results };
+  } catch (error) {
+    endMeasurement(perfId, { error: error instanceof Error ? error.message : 'Unknown error' });
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown batch operation error' 
+    };
+  }
+}
+
 // Define the LocalApi type with function signatures that match implementations
 export type LocalApi = {
   login: (
@@ -393,6 +454,10 @@ export type LocalApi = {
   batchGetDoctorData: typeof batchGetDoctorData;
   batchGetDoctorsData: typeof batchGetDoctorsData;
   batchGetPatientsData: typeof batchGetPatientsData;
+  executeBatchOperations: typeof executeBatchOperations;
+  adminGetDoctorById: typeof adminGetDoctorById;
+  batchUpdateAppointmentStatus: typeof batchUpdateAppointmentStatus;
+  batchUpdateUserStatus: typeof batchUpdateUserStatus;
 };
 
 // Create a flat localApi object that directly exports all functions
@@ -444,6 +509,10 @@ export const localApi: LocalApi = {
   batchGetDoctorData,
   batchGetDoctorsData,
   batchGetPatientsData,
+  executeBatchOperations,
+  adminGetDoctorById,
+  batchUpdateAppointmentStatus,
+  batchUpdateUserStatus,
 };
 
 // Add validation logging
@@ -509,6 +578,14 @@ export {
   batchGetDoctorData,
   batchGetDoctorsData,
   batchGetPatientsData,
+
+  // New batch operations function
+  executeBatchOperations,
+
+  // New admin functions
+  adminGetDoctorById,
+  batchUpdateAppointmentStatus,
+  batchUpdateUserStatus,
 };
 
 // Export default localApi for compatibility

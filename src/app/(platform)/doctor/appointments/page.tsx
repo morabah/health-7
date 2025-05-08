@@ -23,7 +23,7 @@ import {
 import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
 import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
 import { AppointmentStatus } from '@/types/enums';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { logValidation } from '@/lib/logger';
 import type { Appointment } from '@/types/schemas';
 import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
@@ -107,25 +107,37 @@ function DoctorAppointmentsContent() {
     
     let passesDateFilter = true;
     
-    if (dateFilter === 'today') {
-      passesDateFilter = appointmentDate.toDateString() === today.toDateString();
-    } else if (dateFilter === 'tomorrow') {
-      passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
-    } else if (dateFilter === 'week') {
-      passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
-    } else if (dateFilter === 'month') {
-      passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
+    if (dateFilter !== 'all') {
+      if (!appointmentDate || !isValid(appointmentDate)) {
+        passesDateFilter = false; // Exclude invalid dates if a filter is active
+      } else if (dateFilter === 'today') {
+        passesDateFilter = appointmentDate.toDateString() === today.toDateString();
+      } else if (dateFilter === 'tomorrow') {
+        passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
+      } else if (dateFilter === 'week') {
+        passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
+      } else if (dateFilter === 'month') {
+        passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
+      } else if (dateFilter === 'upcoming') {
+         // Match dashboard logic: future date AND not canceled
+         const now = new Date();
+         passesDateFilter = appointmentDate > now && appointment.status !== AppointmentStatus.CANCELED;
+      }
     }
     
     // Status filtering
     let passesStatusFilter = true;
     
-    if (statusFilter === 'scheduled') {
-      passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
-    } else if (statusFilter === 'completed') {
-      passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
-    } else if (statusFilter === 'cancelled') {
-      passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
+    if (dateFilter !== 'upcoming' || statusFilter !== 'all') {
+        if (statusFilter === 'scheduled') {
+          passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
+        } else if (statusFilter === 'completed') {
+          passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
+        } else if (statusFilter === 'cancelled') {
+          passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
+        } else {
+           passesStatusFilter = true; // 'all' status filter passes
+        }
     }
     
     return passesDateFilter && passesStatusFilter;
@@ -246,6 +258,7 @@ function DoctorAppointmentsContent() {
               <option value="tomorrow">Tomorrow</option>
               <option value="week">This Week</option>
               <option value="month">This Month</option>
+              <option value="upcoming">Upcoming</option>
             </Select>
           </div>
           <div className="w-full sm:w-auto">
@@ -265,6 +278,30 @@ function DoctorAppointmentsContent() {
           <div className="flex-grow" />
         </div>
       </Card>
+      
+      {/* Debug info */}
+      {process.env.NODE_ENV !== 'production' && (
+        <Card className="p-4 bg-yellow-50 border-yellow-200 mt-4">
+          <h3 className="font-semibold mb-2">Debug Information</h3>
+          <div className="text-sm space-y-1">
+            <p>Total appointments: {appointments.length}</p>
+            <p>My appointments: {myAppointments.length}</p>
+            <p>Filtered appointments: {filteredAppointments.length}</p>
+            <p>Current filters: Date={dateFilter}, Status={statusFilter}</p>
+            <details>
+              <summary className="cursor-pointer text-blue-600">Show upcoming details</summary>
+              <div className="bg-gray-100 p-2 mt-2 rounded text-xs overflow-auto max-h-40">
+                <p>Number of upcoming appointments (now &gt; date & !canceled): {myAppointments.filter(a => {
+                  const apptDate = new Date(a.appointmentDate);
+                  const now = new Date();
+                  return apptDate > now && a.status !== AppointmentStatus.CANCELED;
+                }).length}</p>
+                <p>Current date (for reference): {new Date().toISOString()}</p>
+              </div>
+            </details>
+          </div>
+        </Card>
+      )}
 
       {/* Loading, Error and Empty States */}
       {isLoading && (

@@ -478,7 +478,30 @@ export async function getMyAppointments(
 
     // Apply filters if provided
     if (filters.status) {
-      myAppointments = myAppointments.filter(a => a.status === filters.status);
+      if (filters.status === 'upcoming') {
+        // Special handling for 'upcoming' filter - match the dashboard logic:
+        // Future date AND not canceled
+        const now = new Date();
+        myAppointments = myAppointments.filter(a => {
+          const appointmentDate = a.appointmentDate.includes('T')
+            ? new Date(a.appointmentDate)
+            : new Date(`${a.appointmentDate}T${a.startTime}`);
+          
+          const status = a.status.toLowerCase();
+          return appointmentDate > now && status !== 'canceled';
+        });
+        
+        // Log the filter application for debugging
+        logInfo('Applied special upcoming filter', { 
+          totalAppointments: appointments.length,
+          filteredCount: myAppointments.length,
+          uid,
+          now: now.toISOString()
+        });
+      } else {
+        // Regular status filter
+        myAppointments = myAppointments.filter(a => a.status === filters.status);
+      }
     }
 
     if (filters.startDate) {

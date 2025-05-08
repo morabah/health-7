@@ -920,7 +920,7 @@ export const GetAppointmentDetailsSchema = z.object({
 export const GetMyAppointmentsSchema = z
   .object({
     // Optional filter parameters
-    status: z.nativeEnum(AppointmentStatus).optional(),
+    status: z.union([z.nativeEnum(AppointmentStatus), z.literal('upcoming')]).optional(),
     startDate: isoDateTimeStringSchema.optional(),
     endDate: isoDateTimeStringSchema.optional(),
     limit: z.number().int().min(1).max(100).optional(),
@@ -1277,3 +1277,37 @@ export const SignInSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required'),
 });
+
+/**
+ * Zod schema for validating the payload to update the status of multiple appointments in batch.
+ */
+export const BatchUpdateAppointmentStatusSchema = z.object({
+  appointmentIds: z.array(z.string().min(1, "Appointment ID cannot be empty"))
+    .nonempty("At least one appointment ID must be provided.")
+    .max(50, "Cannot update more than 50 appointments at once.") // Safety limit
+    .describe("An array of appointment IDs to update."),
+  status: z.nativeEnum(AppointmentStatus)
+    .describe("The new status to apply to all specified appointments."),
+  // Optional: Add admin notes or reason for batch update if needed
+  // adminNotes: z.string().optional().describe("Optional notes from the admin for this batch update.")
+}).strict(); // Ensure no extra properties are passed
+
+/** TypeScript type inferred from BatchUpdateAppointmentStatusSchema. */
+export type BatchUpdateAppointmentStatusPayload = z.infer<typeof BatchUpdateAppointmentStatusSchema>;
+
+/**
+ * Zod schema for validating the payload to update the status of multiple users in batch.
+ */
+export const BatchUpdateUserStatusSchema = z.object({
+  userIds: z.array(z.string().min(1, "User ID cannot be empty"))
+    .nonempty("At least one user ID must be provided.")
+    .max(50, "Cannot update more than 50 users at once.") // Safety limit
+    .describe("An array of user IDs to update."),
+  isActive: z.boolean()
+    .describe("The new active status to apply to all specified users (true for active, false for inactive)."),
+  // Optional: Add admin notes or reason for batch update
+  adminNotes: z.string().optional().describe("Optional notes from the admin for this batch update.")
+}).strict();
+
+/** TypeScript type inferred from BatchUpdateUserStatusSchema. */
+export type BatchUpdateUserStatusPayload = z.infer<typeof BatchUpdateUserStatusSchema>;

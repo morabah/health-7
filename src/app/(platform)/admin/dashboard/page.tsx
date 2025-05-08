@@ -23,17 +23,17 @@ import {
   Settings,
 } from 'lucide-react';
 import {
-  useAdminDashboardData,
-  useAllUsers,
-  useAllDoctors,
-  useAllAppointments,
-} from '@/data/adminLoaders';
+  useDashboardBatch
+} from '@/data/dashboardLoaders';
+import { useSafeBatchData } from '@/hooks/useSafeBatchData';
 import { VerificationStatus, UserType, AppointmentStatus } from '@/types/enums';
 import { logInfo, logValidation } from '@/lib/logger';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { formatDistanceToNow } from 'date-fns';
 import Badge from '@/components/ui/Badge';
 import AdminDashboardErrorBoundary from '@/components/error-boundaries/AdminDashboardErrorBoundary';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 // Stat component for dashboard statistics with trend indicator
 function Stat({
@@ -43,7 +43,8 @@ function Stat({
   isLoading = false,
   trend = null, // Can be positive, negative, or null
   subtitle = '',
-  onClick = null,
+  onClick: customOnClick = null,
+  href = null,
 }: {
   title: string;
   value: number | string;
@@ -52,11 +53,21 @@ function Stat({
   trend?: 'positive' | 'negative' | null;
   subtitle?: string;
   onClick?: (() => void) | null;
+  href?: string | null;
 }) {
+  const router = useRouter();
+  const handleClick = () => {
+    if (customOnClick) {
+      customOnClick();
+    } else if (href) {
+      router.push(href);
+    }
+  };
+
   return (
     <Card
-      className={`p-6 ${onClick ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`}
-      onClick={onClick || undefined}
+      className={`p-6 ${(customOnClick || href) ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`}
+      onClick={handleClick}
     >
       <div className="flex items-center space-x-3 mb-3">
         <div className="p-2 bg-primary-50 dark:bg-primary-900/30 rounded-full">
@@ -216,443 +227,326 @@ export default function AdminDashboard() {
   );
 }
 
+// Define the keys array outside for AdminDashboardContent for stability
+const adminDashboardKeys = [
+  'adminStats',
+  'allUsers',
+  'allDoctors',
+  'allAppointments',
+  'pendingDoctors'
+];
+
 function AdminDashboardContent() {
-  // Use unified dashboard data loader
-  const {
-    data: dashboardData,
-    isLoading: dashboardLoading,
-    error: dashboardError,
-  } = useAdminDashboardData() as {
-    data: DashboardDataResponse | undefined;
-    isLoading: boolean;
-    error: unknown;
-  };
-
-  // Still need these for the user and doctor lists
-  const {
-    data: usersData,
-    isLoading: usersLoading,
-    error: usersError,
-  } = useAllUsers() as {
-    data: UsersDataResponse | undefined;
-    isLoading: boolean;
-    error: unknown;
-  };
+  const { user } = useAuth();
+  const batchResult = useDashboardBatch();
 
   const {
-    data: doctorsData,
-    isLoading: doctorsLoading,
-    error: doctorsError,
-  } = useAllDoctors() as {
-    data: DoctorsDataResponse | undefined;
-    isLoading: boolean;
-    error: unknown;
-  };
+    data: extractedData,
+    isLoading: batchLoading,
+    error: batchError,
+  } = useSafeBatchData(batchResult, adminDashboardKeys); // Use the new safe version
 
-  const {
-    data: appointmentsData,
-    isLoading: appointmentsLoading,
-    error: appointmentsError,
-  } = useAllAppointments() as {
-    data: AppointmentsDataResponse | undefined;
-    isLoading: boolean;
-    error: unknown;
-  };
+  // Extracted data pieces
+  const adminStats = extractedData?.adminStats?.adminStats;
+  const usersData = extractedData?.allUsers?.users;
+  const doctorsData = extractedData?.allDoctors?.doctors;
+  const appointmentsData = extractedData?.allAppointments?.appointments;
+  const pendingDoctorsData = extractedData?.pendingDoctors?.doctors;
 
-  // Get stats from dashboard data
-  const totalUsers = dashboardData?.success ? dashboardData.adminStats?.totalUsers || 0 : 0;
-  const totalPatients = dashboardData?.success ? dashboardData.adminStats?.totalPatients || 0 : 0;
-  const totalDoctors = dashboardData?.success ? dashboardData.adminStats?.totalDoctors || 0 : 0;
-  const pendingVerifications = dashboardData?.success
-    ? dashboardData.adminStats?.pendingVerifications || 0
-    : 0;
-  const totalAppointments = appointmentsData?.success ? appointmentsData.totalCount || 0 : 0;
+  // Consolidate loading and error states
+  const isLoading = batchLoading;
+  const error = batchError;
 
-  // Get derived statistics - memoize to prevent infinite render loops
-  const verifiedDoctorsCount = useMemo(
-    () =>
-      doctorsData?.success
-        ? doctorsData.doctors.filter(
-            (doctor: Doctor) => doctor.verificationStatus === VerificationStatus.VERIFIED
-          ).length
-        : 0,
-    [doctorsData]
-  );
+  // Derived states (examples, adjust as per actual data structure)
+  const totalUsers = adminStats?.totalUsers ?? 0;
+  const totalPatients = adminStats?.totalPatients ?? 0;
+  const totalDoctors = adminStats?.totalDoctors ?? 0;
+  const pendingVerifications = adminStats?.pendingVerifications ?? 0;
+  
+  const recentUsers = usersData?.slice(0, 5) ?? [];
+  const recentDoctors = doctorsData?.slice(0, 5) ?? [];
+  const recentAppointments = appointmentsData?.slice(0, 5) ?? [];
+  const doctorsToVerify = pendingDoctorsData?.slice(0, 5) ?? [];
 
-  const doctorVerificationRate = useMemo(
-    () => (totalDoctors > 0 ? Math.round((verifiedDoctorsCount / totalDoctors) * 100) : 0),
-    [totalDoctors, verifiedDoctorsCount]
-  );
-
-  // Get recent users and pending doctors - memoize to prevent infinite render loops
-  const recentUsers = useMemo(
-    () =>
-      usersData?.success
-        ? usersData.users
-            .sort(
-              (a: User, b: User) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            )
-            .slice(0, 5)
-        : [],
-    [usersData]
-  );
-
-  const pendingDoctors = useMemo(
-    () =>
-      doctorsData?.success
-        ? doctorsData.doctors
-            .filter((doctor: Doctor) => doctor.verificationStatus === VerificationStatus.PENDING)
-            .slice(0, 5)
-        : [],
-    [doctorsData]
-  );
-
-  // Get upcoming appointments - memoize to prevent infinite render loops
-  const upcomingAppointments = useMemo(
-    () =>
-      appointmentsData?.success
-        ? appointmentsData.appointments
-            .filter((appt: Appointment) => appt.status === AppointmentStatus.CONFIRMED)
-            .sort(
-              (a: Appointment, b: Appointment) =>
-                new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
-            )
-            .slice(0, 5)
-        : [],
-    [appointmentsData]
-  );
-
-  // Combined error state
-  const hasError = dashboardError || usersError || doctorsError || appointmentsError;
-  const errorMessage = dashboardError
-    ? String(dashboardError)
-    : usersError
-      ? String(usersError)
-      : doctorsError
-        ? String(doctorsError)
-        : appointmentsError
-          ? String(appointmentsError)
-          : '';
-
-  // Activity feed data (combined from various sources)
+  // Example activity feed generation (replace with actual logic)
   const [activityFeed, setActivityFeed] = useState<ActivityFeedItem[]>([]);
 
-  // Use effect to generate activity feed from various sources
   useEffect(() => {
-    const activities: ActivityFeedItem[] = [];
-
-    // Only proceed if we have data and no errors
-    if (hasError || dashboardLoading || usersLoading || doctorsLoading || appointmentsLoading) {
-      return;
+    const newFeed: ActivityFeedItem[] = [];
+    if (usersData) {
+      usersData.slice(0, 2).forEach((u: any) => 
+        newFeed.push({
+          id: `user-${u.id}`,
+          title: `New user registered: ${u.firstName} ${u.lastName}`,
+          time: formatDistanceToNow(new Date(u.createdAt), { addSuffix: true }),
+          status: u.userType === UserType.DOCTOR ? 'Doctor' : 'Patient',
+          icon: UserRound,
+          statusColor: 'bg-blue-500',
+          timestamp: new Date(u.createdAt).getTime(),
+        })
+      );
     }
+    if (appointmentsData) {
+      appointmentsData.slice(0, 2).forEach((appt: any) => 
+        newFeed.push({
+          id: `appt-${appt.id}`,
+          title: `New appointment: ${appt.patientName} with ${appt.doctorName}`,
+          time: formatDistanceToNow(new Date(appt.appointmentDate), { addSuffix: true }),
+          status: appt.status,
+          icon: Calendar,
+          statusColor: 'bg-green-500',
+          timestamp: new Date(appt.appointmentDate).getTime(),
+        })
+      );
+    }
+    if (pendingDoctorsData) {
+        pendingDoctorsData.slice(0,1).forEach((doc:any) => 
+            newFeed.push({
+                id: `verify-${doc.id}`,
+                title: `Doctor pending verification: ${doc.firstName} ${doc.lastName}`,
+                time: formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true }),
+                status: 'Pending',
+                icon: ShieldAlert,
+                statusColor: 'bg-orange-500',
+                timestamp: new Date(doc.createdAt).getTime(),
+            })
+        );
+    }
+    setActivityFeed(newFeed.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5));
+  }, [usersData, appointmentsData, pendingDoctorsData]);
+  
+  // Log data for validation - MOVED UP
+  useEffect(() => {
+    if (!isLoading && !error) { 
+      logInfo('Admin Dashboard Data Loaded', { adminStats, usersData, doctorsData, appointmentsData, pendingDoctorsData });
 
-    // Add recent users
-    const userActivities = recentUsers.map((user: User) => {
-      const createdAt = new Date(user.createdAt);
-      return {
-        id: `user-${user.id}`,
-        title: `New ${user.userType.toLowerCase()}: ${user.firstName} ${user.lastName}`,
-        time: formatDistanceToNow(createdAt, { addSuffix: true }),
-        status: 'Registered',
-        icon: user.userType === UserType.DOCTOR ? Stethoscope : UserRound,
-        statusColor: 'bg-blue-500',
-        timestamp: createdAt.getTime(),
-      };
-    });
+      // Collect missing keys for better diagnostics
+      const missing: string[] = [];
+      if (!adminStats) missing.push('adminStats');
+      if (!usersData) missing.push('allUsers');
+      if (!doctorsData) missing.push('allDoctors');
+      if (!appointmentsData) missing.push('allAppointments');
+      if (!pendingDoctorsData) missing.push('pendingDoctors');
 
-    // Add pending doctors
-    const doctorActivities = pendingDoctors.map((doctor: Doctor) => {
-      const createdAt = new Date(doctor.createdAt);
-      return {
-        id: `doctor-${doctor.id}`,
-        title: `${doctor.firstName} ${doctor.lastName} (${doctor.specialty})`,
-        time: formatDistanceToNow(createdAt, { addSuffix: true }),
-        status: 'Pending Verification',
-        icon: ShieldAlert,
-        statusColor: 'bg-yellow-500',
-        timestamp: createdAt.getTime(),
-      };
-    });
+      if (missing.length > 0) {
+        logValidation(
+          `Admin dashboard missing some data from batch after load: missing [${missing.join(', ')}]`,
+          'failure',
+          `ExtractedData: ${JSON.stringify(extractedData)}`
+        );
+      }
+    }
+  }, [adminStats, usersData, doctorsData, appointmentsData, pendingDoctorsData, isLoading, error]);
 
-    // Add upcoming appointments
-    const appointmentActivities = upcomingAppointments.map((appt: Appointment) => {
-      const apptDate = new Date(appt.appointmentDate);
-      return {
-        id: `appointment-${appt.id}`,
-        title: `${appt.patientName} with ${appt.doctorName}`,
-        time: formatDistanceToNow(apptDate, { addSuffix: true }),
-        status: appt.status,
-        icon: Calendar,
-        statusColor: 'bg-green-500',
-        timestamp: apptDate.getTime(),
-      };
-    });
-
-    // Combine and sort by timestamp (newest first)
-    activities.push(...userActivities, ...doctorActivities, ...appointmentActivities);
-    activities.sort((a, b) => b.timestamp - a.timestamp);
-
-    // Take the most recent 8 activities
-    setActivityFeed(activities.slice(0, 8));
-  }, [
-    hasError,
-    dashboardLoading,
-    usersLoading,
-    doctorsLoading,
-    appointmentsLoading,
-    recentUsers,
-    pendingDoctors,
-    upcomingAppointments,
-  ]);
-
-  // Handle error display
-  if (hasError) {
+  if (isLoading) {
     return (
-      <div className="p-8">
-        <Alert variant="error" className="mb-4">
-          {errorMessage}
-        </Alert>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
+      <div className="flex justify-center items-center h-screen">
+        <Spinner size="lg" />
       </div>
     );
   }
 
-  // Handle loading state
-  if (dashboardLoading || usersLoading || doctorsLoading || appointmentsLoading) {
+  if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="text-center">
-          <Spinner className="h-8 w-8 mx-auto mb-4" />
-          <p className="text-gray-500">Loading dashboard data...</p>
-        </div>
-      </div>
+      <Alert variant="error" title="Error Loading Dashboard">
+        {(error as Error).message || 'An unexpected error occurred.'}
+      </Alert>
     );
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
-        <p className="text-slate-500 dark:text-slate-400">
-          Manage users, appointments, and system health.
-        </p>
-      </div>
+    <div className="p-4 md:p-8 space-y-6">
+      <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Admin Dashboard</h1>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat
-          title="Total Users"
-          value={totalUsers}
-          Icon={Users}
-          onClick={() => (window.location.href = '/admin/users')}
-        />
-        <Stat
-          title="Patients"
-          value={totalPatients}
-          Icon={UserRound}
-          onClick={() => (window.location.href = '/admin/users?type=patient')}
-        />
-        <Stat
-          title="Doctors"
-          value={totalDoctors}
-          Icon={Stethoscope}
-          onClick={() => (window.location.href = '/admin/doctors')}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Stat title="Total Users" value={totalUsers} Icon={Users} isLoading={isLoading} href="/admin/users" />
+        <Stat title="Total Patients" value={totalPatients} Icon={UserRound} isLoading={isLoading} href="/admin/users?type=patient" />
+        <Stat title="Total Doctors" value={totalDoctors} Icon={Stethoscope} isLoading={isLoading} href="/admin/doctors" />
         <Stat
           title="Pending Verifications"
           value={pendingVerifications}
           Icon={ShieldAlert}
-          trend={pendingVerifications > 5 ? 'negative' : null}
-          subtitle={pendingVerifications > 5 ? 'Needs attention' : ''}
-          onClick={() => (window.location.href = '/admin/doctors?status=PENDING')}
+          isLoading={isLoading}
+          href="/admin/doctor-verification"
         />
       </div>
 
-      {/* Stats Grid Row 2 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat
-          title="Total Appointments"
-          value={totalAppointments}
-          Icon={Calendar}
-          onClick={() => (window.location.href = '/admin/appointments')}
-        />
-        <Stat
-          title="Doctor Verification Rate"
-          value={`${doctorVerificationRate}%`}
-          Icon={CheckCircle}
-          subtitle={`${verifiedDoctorsCount} of ${totalDoctors} doctors`}
-        />
-        <Stat
-          title="System Status"
-          value="Healthy"
-          Icon={Activity}
-          trend="positive"
-          subtitle="All systems operational"
-        />
-        <Stat
-          title="API Response Time"
-          value="280ms"
-          Icon={Clock}
-          subtitle="Last 24 hours average"
-        />
-      </div>
+      {/* Main Content Area - Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column (Activity Feed & Quick Actions) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Recent Activity Feed */}
+          <Card>
+            <HeaderWithLink title="Recent Activity" href="/admin/audit-log" linkText="View Audit Log" />
+            <div className="p-4 space-y-3">
+              {activityFeed.length > 0 ? (
+                activityFeed.map((item) => (
+                  <ActivityItem key={item.id} {...item} />
+                ))
+              ) : (
+                <p className="text-slate-500 text-sm p-4 text-center">No recent activity.</p>
+              )}
+            </div>
+          </Card>
 
-      {/* Content cards grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Recent Users */}
-        <Card className="col-span-1">
-          <HeaderWithLink title="Recent Users" href="/admin/users" />
-          <div className="divide-y">
-            {recentUsers.map((user: User) => (
-              <div key={user.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="text-sm text-gray-500">{user.email}</p>
-                  </div>
-                  <Badge variant={user.userType === UserType.DOCTOR ? 'info' : 'success'}>
-                    {user.userType}
-                  </Badge>
+          {/* Quick Actions or Key Metrics */}
+          <Card>
+            <HeaderWithLink title="System Health Overview" href="/admin/system-status" />
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-md font-semibold mb-2">Database Status</h3>
+                <div className="flex items-center">
+                  <CheckCircle className="h-5 w-5 text-success mr-2" />
+                  <span>Operational</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Registered {formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
-                </p>
               </div>
-            ))}
-          </div>
-        </Card>
+              <div>
+                <h3 className="text-md font-semibold mb-2">API Response Time</h3>
+                <div className="flex items-center">
+                  <Activity className="h-5 w-5 text-primary mr-2" />
+                  <span>Avg. 80ms</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-md font-semibold mb-2">Active Sessions</h3>
+                <div className="flex items-center">
+                  <Users className="h-5 w-5 text-primary mr-2" />
+                  <span>125</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-md font-semibold mb-2">Error Rate</h3>
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-warning mr-2" />
+                  <span>0.5%</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
 
-        {/* Pending Verifications */}
-        <Card className="col-span-1">
-          <HeaderWithLink title="Pending Verifications" href="/admin/doctors?status=PENDING" />
-          <div className="divide-y">
-            {pendingDoctors.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No pending verifications</div>
-            ) : (
-              pendingDoctors.map((doctor: Doctor) => (
-                <div key={doctor.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800">
+        {/* Right Column (Key Lists like Pending Verifications, Recent Users) */}
+        <div className="space-y-6">
+          {/* Doctors Pending Verification */}
+          {doctorsToVerify.length > 0 && (
+            <Card>
+              <HeaderWithLink title="Doctors Pending Verification" href="/admin/doctor-verification" />
+              <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                {doctorsToVerify.map((doctor: any) => (
+                  <Link
+                    key={doctor.id}
+                    href={`/admin/doctor-verification/${doctor.id}`}
+                    className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">
+                          {doctor.firstName} {doctor.lastName}
+                        </p>
+                        <p className="text-xs text-slate-500">{doctor.specialty}</p>
+                      </div>
+                      <Badge variant={doctor.verificationStatus === VerificationStatus.PENDING ? 'warning' : 'default'}>
+                        {doctor.verificationStatus}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Recently Registered Users */}
+          <Card>
+            <HeaderWithLink title="Recently Registered Users" href="/admin/users" />
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {recentUsers.map((userItem: any) => (
+                <Link
+                  key={userItem.id}
+                  href={`/admin/users/${userItem.id}`}
+                  className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-medium">
-                        {doctor.firstName} {doctor.lastName}
+                        {userItem.firstName} {userItem.lastName}
                       </p>
-                      <p className="text-sm text-gray-500">{doctor.specialty}</p>
+                      <p className="text-xs text-slate-500">{userItem.email}</p>
                     </div>
-                    <Link href={`/admin/doctor-verification/${doctor.id}`}>
-                      <Button size="sm" variant="outline">
-                        Verify
-                      </Button>
-                    </Link>
+                    <Badge variant={userItem.userType === UserType.DOCTOR ? 'info' : 'secondary'}>
+                      {userItem.userType}
+                    </Badge>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Applied {formatDistanceToNow(new Date(doctor.createdAt), { addSuffix: true })}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* Activity Feed */}
-        <Card className="col-span-1">
-          <HeaderWithLink title="Activity Feed" href="/admin/activity" />
-          <div className="divide-y">
-            {activityFeed.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No recent activity</div>
-            ) : (
-              activityFeed.map(activity => (
-                <ActivityItem
-                  key={activity.id}
-                  title={activity.title}
-                  time={activity.time}
-                  status={activity.status}
-                  icon={activity.icon}
-                  statusColor={activity.statusColor}
-                />
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Quick Links */}
-      <div className="mb-8">
-        <Card>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="font-medium">Quick Actions</h2>
-          </div>
-          <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href="/admin/users" className="block">
-              <div className="p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-center">
-                <Users className="h-6 w-6 mx-auto mb-2 text-blue-500" />
-                <span className="text-sm font-medium">Manage Users</span>
-              </div>
-            </Link>
-            <Link href="/admin/doctors?status=PENDING" className="block">
-              <div className="p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-center">
-                <ShieldAlert className="h-6 w-6 mx-auto mb-2 text-yellow-500" />
-                <span className="text-sm font-medium">Verify Doctors</span>
-              </div>
-            </Link>
-            <Link href="/admin/appointments" className="block">
-              <div className="p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-center">
-                <Calendar className="h-6 w-6 mx-auto mb-2 text-green-500" />
-                <span className="text-sm font-medium">Appointments</span>
-              </div>
-            </Link>
-            <Link href="/admin/settings" className="block">
-              <div className="p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-center">
-                <Settings className="h-6 w-6 mx-auto mb-2 text-gray-500" />
-                <span className="text-sm font-medium">Settings</span>
-              </div>
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      {/* System Health Section */}
-      <div className="mb-8">
-        <Card>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="font-medium">System Health</h2>
-          </div>
-          <div className="p-4">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">Database</span>
-                  <span className="text-sm text-success">Operational</span>
-                </div>
-                <ProgressBar value={92} className="bg-success-500" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">API Services</span>
-                  <span className="text-sm text-success">Operational</span>
-                </div>
-                <ProgressBar value={98} className="bg-success-500" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">Storage</span>
-                  <span className="text-sm text-warning">65% Used</span>
-                </div>
-                <ProgressBar value={65} className="bg-warning-500" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">Memory</span>
-                  <span className="text-sm text-success">Optimal</span>
-                </div>
-                <ProgressBar value={30} className="bg-success-500" />
-              </div>
+                </Link>
+              ))}
             </div>
-          </div>
-        </Card>
+          </Card>
+           {/* Recent Appointments (Simplified) */}
+          <Card>
+            <HeaderWithLink title="Recent Appointments" href="/admin/appointments" />
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {recentAppointments.map((appt: any) => (
+                <Link 
+                  key={appt.id} 
+                  href={`/admin/appointments/${appt.id}`}
+                  className="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                        <p className="text-sm font-medium">{appt.patientName} with Dr. {appt.doctorName}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(appt.appointmentDate).toLocaleDateString()} - {new Date(appt.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                    </div>
+                    <Badge variant={ appt.status === AppointmentStatus.CONFIRMED ? 'success' : (appt.status === AppointmentStatus.CANCELED ? 'danger' : 'default') }>
+                        {appt.status}
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
+
+      {/* Quick Links/Management Sections */}
+      <Card>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-medium">Quick Management</h2>
+        </div>
+        <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <Link href="/admin/users">
+            <Button variant="outline" className="w-full justify-start">
+              <Users className="mr-2 h-4 w-4" /> User Management
+            </Button>
+          </Link>
+          <Link href="/admin/doctors">
+            <Button variant="outline" className="w-full justify-start">
+              <Stethoscope className="mr-2 h-4 w-4" /> Doctor Management
+            </Button>
+          </Link>
+          <Link href="/admin/appointments">
+            <Button variant="outline" className="w-full justify-start">
+              <Calendar className="mr-2 h-4 w-4" /> Appointment Logs
+            </Button>
+          </Link>
+          <Link href="/cms">
+            <Button variant="outline" className="w-full justify-start">
+              <LinkIcon className="mr-2 h-4 w-4" /> CMS Portal
+            </Button>
+          </Link>
+          <Link href="/admin/settings">
+            <Button variant="outline" className="w-full justify-start">
+                <Settings className="mr-2 h-4 w-4" /> System Settings
+            </Button>
+          </Link>
+          <Link href="/admin/doctor-verification">
+            <Button variant="outline" className="w-full justify-start">
+                <ShieldAlert className="mr-2 h-4 w-4" /> Doctor Verification
+            </Button>
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }

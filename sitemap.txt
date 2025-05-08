@@ -23,6 +23,8 @@
 │   │   ├── dashboard/              →  /patient/dashboard       *
 │   │   ├── appointments/           →  /patient/appointments    *
 │   │   ├── profile/                →  /patient/profile         *
+│   │   ├── health-records/         →  /patient/health-records  | Patient medical records *
+│   │   ├── medications/            →  /patient/medications     | Patient medications management *
 │   │   └── appointments/
 │   │       └── cancel/[id]/        →  /patient/appointments/:id/cancel  (modal shell) *
 │   │
@@ -64,6 +66,7 @@
 │
 ├── (dev)                           # Stripped in prod build
 │   ├── ui-test/                    →  /dev/ui-test         | Primitive showcase ✓
-│   └── cms/validation/             →  /dev/cms/validation  | Data integrity tool ✓
+│   ├── cms/validation/             →  /dev/cms/validation  | Data integrity tool ✓
+│   └── batch-api/                  →  /dev/batch-api       | Batch API documentation
 │
 └── not-found.tsx                   →  404 fallback global  | Shared
