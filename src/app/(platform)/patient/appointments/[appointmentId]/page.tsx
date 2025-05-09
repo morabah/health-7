@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import React from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import {
@@ -79,10 +80,16 @@ const typeMap = {
   [AppointmentType.VIDEO]: 'Video Call',
 };
 
-export default function PatientAppointmentDetailsPage() {
-  const params = useParams();
+// Define the expected params shape
+interface AppointmentPageParams {
+  appointmentId: string;
+}
+
+export default function PatientAppointmentDetailsPage(props: any) {
+  // Use React.use() to unwrap the params object which is now a Promise in newer Next.js versions
+  const params = React.use(props.params) as AppointmentPageParams;
   const router = useRouter();
-  const appointmentId = params?.appointmentId as string;
+  const appointmentId = params.appointmentId;
 
   // State for cancellation
   const [cancellationReason, setCancellationReason] = useState('');

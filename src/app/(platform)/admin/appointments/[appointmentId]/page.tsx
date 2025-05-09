@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import React from 'react';
 import Link from 'next/link';
 import { useState } from 'react';
 import {
@@ -34,9 +34,15 @@ interface AppointmentResponse {
   error?: string;
 }
 
-export default function AdminAppointmentDetailsPage() {
-  const params = useParams();
-  const appointmentId = params?.appointmentId as string;
+// Define the expected params shape
+interface AppointmentPageParams {
+  appointmentId: string;
+}
+
+export default function AdminAppointmentDetailsPage(props: any) {
+  // Use React.use() to unwrap the params object which is now a Promise in newer Next.js versions
+  const params = React.use(props.params) as AppointmentPageParams;
+  const appointmentId = params.appointmentId;
 
   if (!appointmentId) {
     return <Alert variant="error">Missing appointment ID</Alert>;
