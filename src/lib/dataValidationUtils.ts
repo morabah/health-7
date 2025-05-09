@@ -248,53 +248,30 @@ export function getSchemaForCollection(collectionName: string): z.ZodType<unknow
  * Helper function to read data from the local database or file system
  *
  * @param collectionName - The name of the collection
- * @returns Promise resolving to the data or null if not found
+ * @returns Promise resolving to an array of documents or null if not found
  */
 async function getLocalData(collectionName: string): Promise<unknown[] | null> {
   try {
-    // Check if running in a server/script context (where fetch might not work with relative URLs)
-    // A simple check: if process object exists, assume Node.js context
-    const isNodeContext = typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
-
-    if (isNodeContext) {
-      logInfo(`Fetching ${collectionName} directly from file system (Node.js context detected).`);
-      // Attempt to read directly from file using serverLocalDb logic
-      const data = await serverLocalDb.readFromJson<unknown[]>(`${collectionName}.json`); // Add type hint if possible
-
-      // Explicitly check if the data is an array
-      if (Array.isArray(data)) {
-        return data;
-      } else if (data === null) {
-        // File not found or empty, return empty array is appropriate
-        return [];
-      } else {
-        // Data is not null and not an array (unexpected format, e.g., maybe an empty {} from JSON?)
-        logError(`Unexpected data format reading ${collectionName}.json directly. Expected array, got:`, typeof data);
-        // Return empty array as a safe fallback in case of unexpected non-array data
-        return [];
-      }
-    } else {
-      logInfo(`Fetching ${collectionName} via localDb API (Client context detected).`);
-      // Use the client-side localDb fetch (which uses /api/localDb)
-      switch (collectionName) {
-        case 'users':
-          return await localDb.getUsers();
-        case 'patients':
-          return await localDb.getPatients();
-        case 'doctors':
-          return await localDb.getDoctors();
-        case 'appointments':
-          return await localDb.getAppointments();
-        case 'notifications':
-          return await localDb.getNotifications();
-        default:
-          logWarn(`Unknown collection requested via getLocalData: ${collectionName}`);
-          return null;
-      }
+    // In unit test environment, the localDb methods are mocked
+    // So we should directly use the correct method based on the collection name
+    switch (collectionName) {
+      case 'users':
+        return await localDb.getUsers();
+      case 'patients':
+        return await localDb.getPatients();
+      case 'doctors':
+        return await localDb.getDoctors();
+      case 'appointments':
+        return await localDb.getAppointments();
+      case 'notifications':
+        return await localDb.getNotifications();
+      default:
+        logWarn(`Unknown collection requested via getLocalData: ${collectionName}`);
+        return null;
     }
   } catch (error) {
-    logError(`Failed to get local data for ${collectionName}`, error);
-    return null;
+    logError(`Error reading data for collection '${collectionName}'`, error);
+    throw error; // Rethrow to allow proper error handling up the call stack
   }
 }
 

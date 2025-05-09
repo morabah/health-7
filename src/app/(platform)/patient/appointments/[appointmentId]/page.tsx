@@ -26,17 +26,27 @@ import { useAppointmentDetails, useCancelAppointment } from '@/data/patientLoade
 import { AppointmentStatus, AppointmentType } from '@/types/enums';
 
 // Define type for appointment
+interface AppointmentResponse {
+  appointment: Appointment | null;
+  success: boolean;
+  error?: string;
+}
+
 interface Appointment {
   id: string;
+  patientId: string;
+  doctorId: string;
+  patientName: string;
+  doctorName: string;
   appointmentDate: string;
   startTime: string;
   endTime: string;
   status: AppointmentStatus;
   appointmentType: AppointmentType;
-  doctorName: string;
-  doctorSpecialty?: string;
-  reason?: string;
-  notes?: string;
+  appointmentNotes?: string;
+  medicalNotes?: string;
+  cancellationReason?: string;
+  location?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,235 +95,262 @@ interface AppointmentPageParams {
   appointmentId: string;
 }
 
-export default function PatientAppointmentDetailsPage(props: any) {
-  // Use React.use() to unwrap the params object which is now a Promise in newer Next.js versions
-  const params = React.use(props.params) as AppointmentPageParams;
+// Define proper page props with complete typing
+interface AppointmentPageProps {
+  params: Promise<AppointmentPageParams>;
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+export default function AppointmentDetail(props: AppointmentPageProps) {
   const router = useRouter();
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  
+  // Use React.use() to unwrap the params object which is now a Promise in newer Next.js versions
+  const params = React.use(props.params);
   const appointmentId = params.appointmentId;
 
-  // State for cancellation
-  const [cancellationReason, setCancellationReason] = useState('');
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-
   // Fetch appointment details
+  const { data, isLoading, error } = useAppointmentDetails(appointmentId);
+  const appointment = data?.appointment || null;
+
+  // Hook for cancellation
   const {
-    data: appointmentData,
-    isLoading,
-    error,
-    refetch,
-  } = useAppointmentDetails(appointmentId) as {
-    data: AppointmentResponse | undefined;
-    isLoading: boolean;
-    error: Error | null;
-    refetch: () => Promise<unknown>;
-  };
-
-  const cancelMutation = useCancelAppointment();
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (error || !appointmentData?.success) {
-    return (
-      <Alert variant="error">
-        {error?.message || appointmentData?.error || 'Failed to load appointment details'}
-      </Alert>
-    );
-  }
-
-  const appointment = appointmentData.appointment;
-
-  // Determine if appointment can be cancelled
-  const isCancellable =
-    appointment.status === AppointmentStatus.PENDING ||
-    appointment.status === AppointmentStatus.CONFIRMED;
-
-  // Check if appointment is in the past
-  const isPast = new Date(appointment.appointmentDate) < new Date();
+    cancelAppointment,
+    isLoading: isCancelling,
+    error: cancelError,
+    success: cancelSuccess,
+  } = useCancelAppointment();
 
   const handleCancelAppointment = async () => {
-    try {
-      const result = (await cancelMutation.mutateAsync({
-        appointmentId,
-        reason: 'Cancelled by patient',
-      })) as CancelResponse;
-
-      if (result.success) {
-        // Refresh appointment data
-        refetch();
-        setShowCancelConfirm(false);
-      } else {
-        alert('Failed to cancel appointment: ' + result.error);
-      }
-    } catch (err) {
-      console.error('Error cancelling appointment:', err);
-      alert('An error occurred while cancelling your appointment');
+    if (!appointment) return;
+    await cancelAppointment({
+      appointmentId: appointment.id,
+      reason: cancellationReason,
+    });
+    if (!cancelError) {
+      setShowCancelModal(false);
+      // Refresh data or redirect
+      router.refresh();
     }
   };
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(new Date(dateString), 'MMMM d, yyyy');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error || !appointment) {
+    return (
+      <div className="p-4">
+        <Alert variant="danger">
+          <h3 className="text-lg font-semibold">Error Loading Appointment</h3>
+          <p>{error || 'Appointment not found'}</p>
+          <Link href="/patient/appointments">
+            <Button className="mt-4" variant="outline">
+              <ChevronLeft className="mr-2" size={16} />
+              Back to Appointments
+            </Button>
+          </Link>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Render the modal for cancellation
+  const CancelModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <Card className="max-w-md w-full p-6">
+        <h2 className="text-xl font-bold mb-4">Cancel Appointment</h2>
+        <p className="mb-4">
+          Are you sure you want to cancel your appointment with Dr. {appointment.doctorName} on{' '}
+          {formatDate(appointment.appointmentDate)}?
+        </p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Reason for cancellation:</label>
+          <textarea
+            className="w-full p-2 border rounded-md"
+            rows={3}
+            value={cancellationReason}
+            onChange={(e) => setCancellationReason(e.target.value)}
+            placeholder="Please provide a reason for cancellation"
+          />
+        </div>
+        <div className="flex justify-end space-x-3">
+          <Button variant="outline" onClick={() => setShowCancelModal(false)} disabled={isCancelling}>
+            Nevermind
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={handleCancelAppointment}
+            disabled={isCancelling}
+          >
+            {isCancelling ? <Spinner size="sm" className="mr-2" /> : <XCircle size={16} className="mr-2" />}
+            Confirm Cancellation
+          </Button>
+        </div>
+        {cancelError && (
+          <Alert variant="danger" className="mt-3">
+            {cancelError}
+          </Alert>
+        )}
+      </Card>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Appointment Details</h1>
+    <div className="p-4 md:p-6">
+      <div className="mb-6">
         <Link href="/patient/appointments">
-          <Button variant="outline" size="sm">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to My Appointments
+          <Button variant="ghost" className="mb-4">
+            <ChevronLeft className="mr-2" size={16} />
+            Back to Appointments
           </Button>
         </Link>
+        <h1 className="text-2xl font-bold">Appointment Details</h1>
       </div>
 
-      {/* Status Card */}
-      <Card className="p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="mr-4">
-            <Badge variant={statusColor[appointment.status] || 'default'}>
-              {statusMap[appointment.status] || 'Unknown'}
-            </Badge>
-          </div>
+      <Card className="mb-6 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">
+            Appointment with Dr. {appointment.doctorName}
+          </h2>
+          <Badge variant={getBadgeVariant(appointment.status)}>
+            {appointment.status}
+          </Badge>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <div className="text-sm text-slate-500">Appointment ID</div>
-            <div className="font-mono text-xs">{appointment.id}</div>
+            <h3 className="font-medium mb-4">Appointment Information</h3>
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <Calendar className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                <div>
+                  <div className="font-medium">Date</div>
+                  <div>{formatDate(appointment.appointmentDate)}</div>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <Clock className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                <div>
+                  <div className="font-medium">Time</div>
+                  <div>{appointment.startTime} - {appointment.endTime}</div>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <User className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                <div>
+                  <div className="font-medium">Doctor</div>
+                  <div>Dr. {appointment.doctorName}</div>
+                  <Link href={`/doctor-profile/${appointment.doctorId}`}>
+                    <span className="text-primary-600 text-sm hover:underline">View Profile</span>
+                  </Link>
+                </div>
+              </div>
+
+              {appointment.location && (
+                <div className="flex items-start">
+                  <User className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                  <div>
+                    <div className="font-medium">Location</div>
+                    <div>{appointment.location}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-4">Appointment Details</h3>
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <FileText className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                <div>
+                  <div className="font-medium">Type</div>
+                  <div>{appointment.appointmentType}</div>
+                </div>
+              </div>
+
+              {appointment.appointmentNotes && (
+                <div className="flex items-start">
+                  <MessageCircle className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                  <div>
+                    <div className="font-medium">Notes</div>
+                    <div className="whitespace-pre-wrap">{appointment.appointmentNotes}</div>
+                  </div>
+                </div>
+              )}
+
+              {appointment.medicalNotes && appointment.status === AppointmentStatus.COMPLETED && (
+                <div className="flex items-start">
+                  <FileCheck className="w-5 h-5 mt-0.5 mr-3 text-primary-600" />
+                  <div>
+                    <div className="font-medium">Medical Notes</div>
+                    <div className="whitespace-pre-wrap">{appointment.medicalNotes}</div>
+                  </div>
+                </div>
+              )}
+
+              {appointment.cancellationReason && (
+                <div className="flex items-start">
+                  <XCircle className="w-5 h-5 mt-0.5 mr-3 text-red-500" />
+                  <div>
+                    <div className="font-medium">Cancellation Reason</div>
+                    <div className="whitespace-pre-wrap">{appointment.cancellationReason}</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {isCancellable && !isPast && (
-          <div>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => setShowCancelConfirm(true)}
-              disabled={cancelMutation.isPending}
+        {/* Actions Section */}
+        {appointment.status === AppointmentStatus.SCHEDULED && (
+          <div className="mt-8 flex justify-end">
+            <Button 
+              variant="danger" 
+              onClick={() => setShowCancelModal(true)}
             >
-              <XCircle className="h-4 w-4 mr-1" />
+              <XCircle size={16} className="mr-2" />
               Cancel Appointment
             </Button>
           </div>
         )}
       </Card>
 
-      {/* Doctor Information */}
-      <Card className="p-6">
-        <h2 className="text-lg font-bold mb-4">Doctor Information</h2>
-        <div className="flex items-center mb-4">
-          <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 mr-4">
-            <User className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="font-medium text-lg">{appointment.doctorName}</h3>
-            <p className="text-sm text-slate-500">{appointment.doctorSpecialty}</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Appointment Details */}
-      <Card className="p-6">
-        <h2 className="text-lg font-bold mb-4">Appointment Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <Calendar className="h-5 w-5 mr-2" />
-                <span className="font-medium">Date</span>
-              </div>
-              <p className="ml-7">{format(new Date(appointment.appointmentDate), 'PPP')}</p>
-            </div>
-
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <Clock className="h-5 w-5 mr-2" />
-                <span className="font-medium">Time</span>
-              </div>
-              <p className="ml-7">
-                {appointment.startTime} - {appointment.endTime}
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <span className="font-medium">Type</span>
-              </div>
-              <p className="ml-7">
-                {typeMap[appointment.appointmentType] || appointment.appointmentType}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {appointment.reason && (
-              <div>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                  <FileText className="h-5 w-5 mr-2" />
-                  <span className="font-medium">Reason</span>
-                </div>
-                <p className="ml-7">{appointment.reason}</p>
-              </div>
-            )}
-
-            {appointment.notes && (
-              <div>
-                <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  <span className="font-medium">Notes</span>
-                </div>
-                <p className="ml-7">{appointment.notes}</p>
-              </div>
-            )}
-
-            <div>
-              <div className="flex items-center text-slate-600 dark:text-slate-300 mb-2">
-                <FileCheck className="h-5 w-5 mr-2" />
-                <span className="font-medium">Created</span>
-              </div>
-              <p className="ml-7">{format(new Date(appointment.createdAt), 'PPp')}</p>
-              {appointment.updatedAt !== appointment.createdAt && (
-                <p className="ml-7 text-sm text-slate-500">
-                  Updated: {format(new Date(appointment.updatedAt), 'PPp')}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Cancel confirmation modal would go here */}
-      {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md p-6">
-            <h3 className="text-lg font-bold mb-4">Cancel Appointment</h3>
-            <p className="mb-4">Are you sure you want to cancel this appointment?</p>
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCancelConfirm(false)}
-                disabled={cancelMutation.isPending}
-              >
-                No, Keep It
-              </Button>
-              <Button
-                variant="danger"
-                onClick={handleCancelAppointment}
-                disabled={cancelMutation.isPending}
-              >
-                {cancelMutation.isPending ? (
-                  <>
-                    <Spinner className="w-4 h-4 mr-2" />
-                    Cancelling...
-                  </>
-                ) : (
-                  'Yes, Cancel'
-                )}
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      {/* Conditionally render the cancel modal */}
+      {showCancelModal && <CancelModal />}
     </div>
   );
+}
+
+// Helper function to determine badge variant based on status
+function getBadgeVariant(status?: AppointmentStatus): 'info' | 'success' | 'danger' | 'default' {
+  if (!status) return 'default';
+  
+  switch (status) {
+    case AppointmentStatus.SCHEDULED:
+      return 'info';
+    case AppointmentStatus.COMPLETED:
+      return 'success';
+    case AppointmentStatus.CANCELLED:
+      return 'danger';
+    default:
+      return 'default';
+  }
 }

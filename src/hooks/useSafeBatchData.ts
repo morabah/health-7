@@ -6,19 +6,46 @@
  */
 
 import { useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, QueryClient } from '@tanstack/react-query';
 import { logInfo } from '@/lib/logger';
 
-interface BatchDataOptions {
+/**
+ * Generic type for a batch data result with success and error
+ */
+interface BatchDataResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Type for the batch result that comes from a useSomeBatch hook
+ */
+interface BatchQueryResult<T> {
+  data?: { [key: string]: BatchDataResult<T> };
+  isLoading: boolean;
+  error: Error | null;
+}
+
+interface BatchDataOptions<T, R> {
   /**
    * Process data before returning it (transform data format)
    */
-  processData?: (data: Record<string, any>) => Record<string, any>;
+  processData?: (data: Record<string, BatchDataResult<T>>) => Record<string, R>;
   
   /**
    * Auto-update React Query cache with batch results
    */
   updateCache?: boolean;
+}
+
+/**
+ * Hook result type
+ */
+interface SafeBatchDataResult<T, R> {
+  data: Record<string, R>;
+  isLoading: boolean;
+  error: Error | null;
 }
 
 /**
@@ -29,26 +56,26 @@ interface BatchDataOptions {
  * @param options Hook options
  * @returns Processed data, loading state, and any errors
  */
-export function useSafeBatchData(
-  batchResult: any,
+export function useSafeBatchData<T, R = BatchDataResult<T>>(
+  batchResult: BatchQueryResult<T>,
   keys: string[],
-  options: BatchDataOptions = {}
-) {
+  options: BatchDataOptions<T, R> = {}
+): SafeBatchDataResult<T, R> {
   const queryClient = useQueryClient();
   
   // Default options
   const { 
-    processData = (d) => d,
+    processData = ((d: Record<string, BatchDataResult<T>>) => d as unknown as Record<string, R>),
     updateCache = true
   } = options;
   
   // Use useMemo to derive the result without state updates
   const result = useMemo(() => {
     // Base result with defaults
-    const baseResult = {
-      data: {} as Record<string, any>,
+    const baseResult: SafeBatchDataResult<T, R> = {
+      data: {} as Record<string, R>,
       isLoading: true,
-      error: null as Error | null
+      error: null
     };
     
     // Handle missing batch result or loading state
@@ -72,7 +99,7 @@ export function useSafeBatchData(
     
     // Process the data if we have it
     try {
-      const extractedData: Record<string, any> = {};
+      const extractedData: Record<string, BatchDataResult<T>> = {};
       
       // Extract requested keys from batch result
       keys.forEach(key => {
@@ -110,7 +137,7 @@ export function useSafeBatchData(
     } catch (err) {
       // Handle errors in processing
       return {
-        data: {},
+        data: {} as Record<string, R>,
         isLoading: false,
         error: err instanceof Error ? err : new Error('Error processing batch data')
       };
@@ -123,9 +150,9 @@ export function useSafeBatchData(
 /**
  * Helper to update React Query cache with batch data
  */
-function updateQueryCache(key: string, data: any, queryClient: any) {
+function updateQueryCache<T>(key: string, data: BatchDataResult<T>, queryClient: QueryClient): void {
   // Determine the appropriate query key based on the data type
-  let queryKey;
+  let queryKey: unknown[];
   switch (key) {
     case 'notifications':
       queryKey = ['notifications'];

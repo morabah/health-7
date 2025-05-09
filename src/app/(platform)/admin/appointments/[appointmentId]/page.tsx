@@ -39,9 +39,15 @@ interface AppointmentPageParams {
   appointmentId: string;
 }
 
-export default function AdminAppointmentDetailsPage(props: any) {
+// Define proper page props with complete typing
+interface AppointmentPageProps {
+  params: Promise<AppointmentPageParams>;
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+export default function AdminAppointmentDetailsPage(props: AppointmentPageProps) {
   // Use React.use() to unwrap the params object which is now a Promise in newer Next.js versions
-  const params = React.use(props.params) as AppointmentPageParams;
+  const params = React.use(props.params);
   const appointmentId = params.appointmentId;
 
   if (!appointmentId) {

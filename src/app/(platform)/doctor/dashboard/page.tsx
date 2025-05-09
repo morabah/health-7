@@ -1177,7 +1177,12 @@ function NotificationsList({
 }
 
 // Enhanced function for availability summary
-function AvailabilitySummary({ availability }: { availability: any }) {
+interface AvailabilitySummary {
+  activeDays?: number;
+  activeHours?: number;
+}
+
+function AvailabilitySummary({ availability }: { availability: AvailabilitySummary | null }) {
   if (!availability) {
     return (
       <div className="text-center py-6">
