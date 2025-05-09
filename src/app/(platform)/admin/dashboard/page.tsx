@@ -21,10 +21,18 @@ import {
   CheckCircle,
   Link as LinkIcon,
   Settings,
+  Move,
+  Eye,
+  EyeOff,
+  Save,
+  UserCog,
+  ChevronRight,
+  ClipboardList,
+  ListChecks,
+  CheckSquare,
+  UserPlus,
 } from 'lucide-react';
-import {
-  useDashboardBatch
-} from '@/data/dashboardLoaders';
+import { useDashboardBatch } from '@/data/dashboardLoaders';
 import { useSafeBatchData } from '@/hooks/useSafeBatchData';
 import { VerificationStatus, UserType, AppointmentStatus } from '@/types/enums';
 import { logInfo, logValidation } from '@/lib/logger';
@@ -34,6 +42,94 @@ import Badge from '@/components/ui/Badge';
 import AdminDashboardErrorBoundary from '@/components/error-boundaries/AdminDashboardErrorBoundary';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { trackPerformance } from '@/lib/performance';
+
+// Define dashboard section types for personalization
+interface DashboardSection {
+  id: string;
+  title: string;
+  visible: boolean;
+  order: number;
+}
+
+// Define user preferences for dashboard
+interface DashboardPreferences {
+  sections: DashboardSection[];
+  layout: 'default' | 'compact' | 'expanded';
+  theme: 'system' | 'light' | 'dark';
+}
+
+// Default dashboard preferences
+const defaultDashboardPreferences: DashboardPreferences = {
+  sections: [
+    { id: 'stats', title: 'Dashboard Stats', visible: true, order: 0 },
+    { id: 'verification', title: 'Doctor Verifications', visible: true, order: 1 },
+    { id: 'recent-users', title: 'Recent Users', visible: true, order: 2 },
+    { id: 'recent-appointments', title: 'Recent Appointments', visible: true, order: 3 },
+    { id: 'system-status', title: 'System Status', visible: true, order: 4 },
+    { id: 'quick-actions', title: 'Quick Actions', visible: true, order: 5 },
+  ],
+  layout: 'default',
+  theme: 'system',
+};
+
+// Add skeleton components for loading states
+const StatCardSkeleton = () => (
+  <Card className="p-6">
+    <div className="flex items-center space-x-3 mb-3 animate-pulse">
+      <div className="p-2 bg-gray-200 dark:bg-gray-700 rounded-full w-9 h-9"></div>
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+    </div>
+    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+  </Card>
+);
+
+const VerificationCardSkeleton = () => (
+  <Card>
+    <div className="animate-pulse">
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between">
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-40"></div>
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+      </div>
+      <div className="p-4 space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex items-start gap-3 p-3">
+            <div className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 w-8 h-8"></div>
+            <div className="flex-1">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </Card>
+);
+
+const UserCardSkeleton = () => (
+  <Card>
+    <div className="animate-pulse">
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between">
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-40"></div>
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+      </div>
+      <div className="p-4 space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex items-center justify-between p-3">
+            <div className="flex items-center">
+              <div className="rounded-full bg-gray-200 dark:bg-gray-700 w-8 h-8"></div>
+              <div className="ml-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+              </div>
+            </div>
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </Card>
+);
 
 // Stat component for dashboard statistics with trend indicator
 function Stat({
@@ -66,7 +162,7 @@ function Stat({
 
   return (
     <Card
-      className={`p-6 ${(customOnClick || href) ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`}
+      className={`p-6 ${customOnClick || href ? 'cursor-pointer transition-transform hover:scale-[1.02]' : ''}`}
       onClick={handleClick}
     >
       <div className="flex items-center space-x-3 mb-3">
@@ -233,320 +329,807 @@ const adminDashboardKeys = [
   'allUsers',
   'allDoctors',
   'allAppointments',
-  'pendingDoctors'
+  'pendingDoctors',
 ];
 
 function AdminDashboardContent() {
   const { user } = useAuth();
   const batchResult = useDashboardBatch();
 
+  const [progressiveLoad, setProgressiveLoad] = useState({
+    stats: false,
+    verification: false,
+    users: false,
+    appointments: false,
+  });
+
+  const [dashboardPreferences, setDashboardPreferences] = useState<DashboardPreferences>(
+    defaultDashboardPreferences
+  );
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draggedSection, setDraggedSection] = useState<string | null>(null);
+
+  // Load saved preferences from local storage on component mount
+  useEffect(() => {
+    try {
+      const savedPreferences = localStorage.getItem('adminDashboardPreferences');
+      if (savedPreferences) {
+        setDashboardPreferences(JSON.parse(savedPreferences));
+      }
+    } catch (error) {
+      logInfo('Failed to load dashboard preferences', error);
+      // Fall back to defaults if there's an error
+      setDashboardPreferences(defaultDashboardPreferences);
+    }
+  }, []);
+
+  // Save preferences to local storage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('adminDashboardPreferences', JSON.stringify(dashboardPreferences));
+    } catch (error) {
+      logInfo('Failed to save dashboard preferences', error);
+    }
+  }, [dashboardPreferences]);
+
+  // Start performance tracking and progressive loading
+  useEffect(() => {
+    const perf = trackPerformance('AdminDashboardPage-render');
+
+    // Simulate progressive loading
+    setTimeout(() => setProgressiveLoad(prev => ({ ...prev, stats: true })), 300);
+    setTimeout(() => setProgressiveLoad(prev => ({ ...prev, verification: true })), 600);
+    setTimeout(() => setProgressiveLoad(prev => ({ ...prev, users: true })), 900);
+    setTimeout(() => setProgressiveLoad(prev => ({ ...prev, appointments: true })), 1200);
+
+    return () => {
+      perf.stop();
+    };
+  }, []);
+
   const {
     data: extractedData,
     isLoading: batchLoading,
     error: batchError,
-  } = useSafeBatchData(batchResult, adminDashboardKeys); // Use the new safe version
+  } = useSafeBatchData(batchResult, adminDashboardKeys);
 
   // Extracted data pieces
   const adminStats = extractedData?.adminStats?.adminStats;
-  const usersData = extractedData?.allUsers?.users;
-  const doctorsData = extractedData?.allDoctors?.doctors;
-  const appointmentsData = extractedData?.allAppointments?.appointments;
-  const pendingDoctorsData = extractedData?.pendingDoctors?.doctors;
+  const allUsers = extractedData?.allUsers?.success ? extractedData.allUsers.users : [];
+  const pendingDoctors = extractedData?.pendingDoctors?.success
+    ? extractedData.pendingDoctors.doctors.filter(
+        d => d.verificationStatus === VerificationStatus.PENDING
+      )
+    : [];
+  const allAppointments = extractedData?.allAppointments?.success
+    ? extractedData.allAppointments.appointments
+    : [];
 
-  // Consolidate loading and error states
-  const isLoading = batchLoading;
-  const error = batchError;
+  // Dashboard statistics derived from API data
+  const totalUsers = adminStats?.totalUsers || 0;
+  const totalDoctors = adminStats?.totalDoctors || 0;
+  const totalPatients = adminStats?.totalPatients || 0;
+  const pendingVerificationsCount = adminStats?.pendingVerifications || 0;
 
-  // Derived states (examples, adjust as per actual data structure)
-  const totalUsers = adminStats?.totalUsers ?? 0;
-  const totalPatients = adminStats?.totalPatients ?? 0;
-  const totalDoctors = adminStats?.totalDoctors ?? 0;
-  const pendingVerifications = adminStats?.pendingVerifications ?? 0;
-  
-  const recentUsers = usersData?.slice(0, 5) ?? [];
-  const recentDoctors = doctorsData?.slice(0, 5) ?? [];
-  const recentAppointments = appointmentsData?.slice(0, 5) ?? [];
-  const doctorsToVerify = pendingDoctorsData?.slice(0, 5) ?? [];
+  // Get recent users (last 5)
+  const recentUsers = useMemo(() => {
+    if (!allUsers || !Array.isArray(allUsers)) return [];
+    return [...allUsers]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+  }, [allUsers]);
 
-  // Example activity feed generation (replace with actual logic)
-  const [activityFeed, setActivityFeed] = useState<ActivityFeedItem[]>([]);
+  // Get recent appointments (last 5)
+  const recentAppointments = useMemo(() => {
+    if (!allAppointments || !Array.isArray(allAppointments)) return [];
+    return [...allAppointments]
+      .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
+      .slice(0, 5);
+  }, [allAppointments]);
 
-  useEffect(() => {
-    const newFeed: ActivityFeedItem[] = [];
-    if (usersData) {
-      usersData.slice(0, 2).forEach((u: any) => 
-        newFeed.push({
-          id: `user-${u.id}`,
-          title: `New user registered: ${u.firstName} ${u.lastName}`,
-          time: formatDistanceToNow(new Date(u.createdAt), { addSuffix: true }),
-          status: u.userType === UserType.DOCTOR ? 'Doctor' : 'Patient',
-          icon: UserRound,
-          statusColor: 'bg-blue-500',
-          timestamp: new Date(u.createdAt).getTime(),
-        })
-      );
+  // Toggle section visibility
+  const toggleSectionVisibility = (sectionId: string) => {
+    setDashboardPreferences(prev => ({
+      ...prev,
+      sections: prev.sections.map(section =>
+        section.id === sectionId ? { ...section, visible: !section.visible } : section
+      ),
+    }));
+  };
+
+  // Handle layout change
+  const changeLayout = (layout: 'default' | 'compact' | 'expanded') => {
+    setDashboardPreferences(prev => ({
+      ...prev,
+      layout,
+    }));
+  };
+
+  // Handle section drag start
+  const handleDragStart = (sectionId: string) => {
+    setDraggedSection(sectionId);
+  };
+
+  // Handle section drag over
+  const handleDragOver = (e: React.DragEvent, sectionId: string) => {
+    e.preventDefault();
+    if (draggedSection && draggedSection !== sectionId) {
+      // Highlight the drop target
+      e.currentTarget.classList.add('border-primary-400', 'border-2');
     }
-    if (appointmentsData) {
-      appointmentsData.slice(0, 2).forEach((appt: any) => 
-        newFeed.push({
-          id: `appt-${appt.id}`,
-          title: `New appointment: ${appt.patientName} with ${appt.doctorName}`,
-          time: formatDistanceToNow(new Date(appt.appointmentDate), { addSuffix: true }),
-          status: appt.status,
-          icon: Calendar,
-          statusColor: 'bg-green-500',
-          timestamp: new Date(appt.appointmentDate).getTime(),
-        })
-      );
-    }
-    if (pendingDoctorsData) {
-        pendingDoctorsData.slice(0,1).forEach((doc:any) => 
-            newFeed.push({
-                id: `verify-${doc.id}`,
-                title: `Doctor pending verification: ${doc.firstName} ${doc.lastName}`,
-                time: formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true }),
-                status: 'Pending',
-                icon: ShieldAlert,
-                statusColor: 'bg-orange-500',
-                timestamp: new Date(doc.createdAt).getTime(),
-            })
-        );
-    }
-    setActivityFeed(newFeed.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5));
-  }, [usersData, appointmentsData, pendingDoctorsData]);
-  
-  // Log data for validation - MOVED UP
-  useEffect(() => {
-    if (!isLoading && !error) { 
-      logInfo('Admin Dashboard Data Loaded', { adminStats, usersData, doctorsData, appointmentsData, pendingDoctorsData });
+  };
 
-      // Collect missing keys for better diagnostics
-      const missing: string[] = [];
-      if (!adminStats) missing.push('adminStats');
-      if (!usersData) missing.push('allUsers');
-      if (!doctorsData) missing.push('allDoctors');
-      if (!appointmentsData) missing.push('allAppointments');
-      if (!pendingDoctorsData) missing.push('pendingDoctors');
+  // Handle section drag leave
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Remove highlighting
+    e.currentTarget.classList.remove('border-primary-400', 'border-2');
+  };
 
-      if (missing.length > 0) {
-        logValidation(
-          `Admin dashboard missing some data from batch after load: missing [${missing.join(', ')}]`,
-          'failure',
-          `ExtractedData: ${JSON.stringify(extractedData)}`
-        );
+  // Handle section drop
+  const handleDrop = (e: React.DragEvent, targetSectionId: string) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-primary-400', 'border-2');
+
+    if (draggedSection && draggedSection !== targetSectionId) {
+      // Reorder sections
+      const updatedSections = [...dashboardPreferences.sections];
+      const draggedSectionObj = updatedSections.find(s => s.id === draggedSection);
+      const targetSectionObj = updatedSections.find(s => s.id === targetSectionId);
+
+      if (draggedSectionObj && targetSectionObj) {
+        // Swap orders
+        const draggedOrder = draggedSectionObj.order;
+        const targetOrder = targetSectionObj.order;
+
+        updatedSections.forEach(section => {
+          if (section.id === draggedSection) {
+            section.order = targetOrder;
+          } else if (section.id === targetSectionId) {
+            section.order = draggedOrder;
+          }
+        });
+
+        setDashboardPreferences(prev => ({
+          ...prev,
+          sections: updatedSections,
+        }));
       }
     }
-  }, [adminStats, usersData, doctorsData, appointmentsData, pendingDoctorsData, isLoading, error]);
 
-  if (isLoading) {
+    setDraggedSection(null);
+  };
+
+  // Show skeleton loaders during initial loading
+  if (batchLoading && !progressiveLoad.stats) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Spinner size="lg" />
+      <div className="space-y-6 p-4 md:p-6">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Admin Dashboard</h1>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <VerificationCardSkeleton />
+          <UserCardSkeleton />
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (batchError) {
     return (
-      <Alert variant="error" title="Error Loading Dashboard">
-        {(error as Error).message || 'An unexpected error occurred.'}
+      <Alert variant="error">
+        <div>
+          <h3 className="font-medium">{batchError.message}</h3>
+          <p>Error loading dashboard data</p>
+        </div>
       </Alert>
     );
   }
 
-  return (
-    <div className="p-4 md:p-8 space-y-6">
-      <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Admin Dashboard</h1>
+  // Sort sections by their order
+  const sortedSections = [...dashboardPreferences.sections].sort((a, b) => a.order - b.order);
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Stat title="Total Users" value={totalUsers} Icon={Users} isLoading={isLoading} href="/admin/users" />
-        <Stat title="Total Patients" value={totalPatients} Icon={UserRound} isLoading={isLoading} href="/admin/users?type=patient" />
-        <Stat title="Total Doctors" value={totalDoctors} Icon={Stethoscope} isLoading={isLoading} href="/admin/doctors" />
-        <Stat
-          title="Pending Verifications"
-          value={pendingVerifications}
-          Icon={ShieldAlert}
-          isLoading={isLoading}
-          href="/admin/doctor-verification"
-        />
-      </div>
+  // Render dashboard sections based on preferences
+  const renderSection = (sectionId: string) => {
+    const section = dashboardPreferences.sections.find(s => s.id === sectionId);
 
-      {/* Main Content Area - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (Activity Feed & Quick Actions) */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Activity Feed */}
-          <Card>
-            <HeaderWithLink title="Recent Activity" href="/admin/audit-log" linkText="View Audit Log" />
-            <div className="p-4 space-y-3">
-              {activityFeed.length > 0 ? (
-                activityFeed.map((item) => (
-                  <ActivityItem key={item.id} {...item} />
-                ))
+    if (!section || !section.visible) return null;
+
+    // Render section content based on ID
+    switch (sectionId) {
+      case 'stats':
+        return (
+          <div
+            className="mb-6"
+            key={sectionId}
+            draggable={isEditMode}
+            onDragStart={() => handleDragStart(sectionId)}
+            onDragOver={e => handleDragOver(e, sectionId)}
+            onDragLeave={handleDragLeave}
+            onDrop={e => handleDrop(e, sectionId)}
+          >
+            {isEditMode && (
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="flex items-center gap-2">
+                  <Move size={16} className="text-gray-400" />
+                  <span className="text-lg font-semibold">{section.title}</span>
+                </h2>
+                <Button
+                  size="sm"
+                  variant={section.visible ? 'ghost' : 'outline'}
+                  onClick={() => toggleSectionVisibility(sectionId)}
+                >
+                  {section.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                </Button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {batchLoading && !progressiveLoad.stats ? (
+                [...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)
               ) : (
-                <p className="text-slate-500 text-sm p-4 text-center">No recent activity.</p>
+                <>
+                  <Stat
+                    title="Total Users"
+                    value={totalUsers}
+                    Icon={Users}
+                    isLoading={batchLoading}
+                    href="/admin/users"
+                  />
+                  <Stat
+                    title="Patients"
+                    value={totalPatients}
+                    Icon={UserRound}
+                    isLoading={batchLoading}
+                    href="/admin/users?role=patient"
+                  />
+                  <Stat
+                    title="Doctors"
+                    value={totalDoctors}
+                    Icon={Stethoscope}
+                    isLoading={batchLoading}
+                    href="/admin/users?role=doctor"
+                  />
+                  <Stat
+                    title="Pending Verifications"
+                    value={pendingVerificationsCount}
+                    Icon={ShieldAlert}
+                    isLoading={batchLoading}
+                    href="/admin/doctor-verification"
+                    trend={pendingVerificationsCount > 0 ? 'negative' : null}
+                    subtitle={pendingVerificationsCount > 0 ? 'Needs attention' : ''}
+                  />
+                </>
               )}
             </div>
-          </Card>
+          </div>
+        );
 
-          {/* Quick Actions or Key Metrics */}
-          <Card>
-            <HeaderWithLink title="System Health Overview" href="/admin/system-status" />
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-md font-semibold mb-2">Database Status</h3>
-                <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-success mr-2" />
-                  <span>Operational</span>
-                </div>
+      default:
+        return null;
+    }
+  };
+
+  // Get visible main grid sections
+  const visibleMainSections = dashboardPreferences.sections
+    .filter(
+      s =>
+        [
+          'verification',
+          'recent-users',
+          'recent-appointments',
+          'system-status',
+          'quick-actions',
+        ].includes(s.id) && s.visible
+    )
+    .sort((a, b) => a.order - b.order);
+
+  return (
+    <div
+      className={`space-y-6 p-4 md:p-6 ${dashboardPreferences.layout === 'compact' ? 'max-w-5xl mx-auto' : ''}`}
+    >
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Admin Dashboard</h1>
+
+        <div className="flex items-center gap-2">
+          {isEditMode ? (
+            <>
+              <Button
+                size="sm"
+                variant="success"
+                onClick={() => setIsEditMode(false)}
+                className="flex items-center gap-1"
+              >
+                <Save size={16} />
+                Save Changes
+              </Button>
+
+              <div className="border-l border-gray-300 dark:border-gray-700 h-8 mx-1"></div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Layout:</span>
+                <select
+                  value={dashboardPreferences.layout}
+                  onChange={e => changeLayout(e.target.value as 'default' | 'compact' | 'expanded')}
+                  className="text-sm border border-gray-300 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-800"
+                >
+                  <option value="default">Default</option>
+                  <option value="compact">Compact</option>
+                  <option value="expanded">Expanded</option>
+                </select>
               </div>
-              <div>
-                <h3 className="text-md font-semibold mb-2">API Response Time</h3>
-                <div className="flex items-center">
-                  <Activity className="h-5 w-5 text-primary mr-2" />
-                  <span>Avg. 80ms</span>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-md font-semibold mb-2">Active Sessions</h3>
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 text-primary mr-2" />
-                  <span>125</span>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-md font-semibold mb-2">Error Rate</h3>
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-warning mr-2" />
-                  <span>0.5%</span>
-                </div>
-              </div>
-            </div>
-          </Card>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditMode(true)}
+              className="flex items-center gap-1"
+            >
+              <Settings size={16} />
+              Customize Dashboard
+            </Button>
+          )}
         </div>
+      </div>
 
-        {/* Right Column (Key Lists like Pending Verifications, Recent Users) */}
+      {/* Render top sections based on preferences */}
+      {sortedSections
+        .filter(s => s.visible && ['stats'].includes(s.id))
+        .map(section => renderSection(section.id))}
+
+      {/* Main Grid Layout */}
+      <div
+        className={`grid grid-cols-1 ${
+          dashboardPreferences.layout === 'expanded'
+            ? 'lg:grid-cols-1'
+            : dashboardPreferences.layout === 'compact'
+              ? 'lg:grid-cols-2 max-w-5xl gap-6'
+              : 'lg:grid-cols-2 gap-6'
+        }`}
+      >
+        {/* Left Column */}
         <div className="space-y-6">
-          {/* Doctors Pending Verification */}
-          {doctorsToVerify.length > 0 && (
-            <Card>
-              <HeaderWithLink title="Doctors Pending Verification" href="/admin/doctor-verification" />
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {doctorsToVerify.map((doctor: any) => (
-                  <Link
-                    key={doctor.id}
-                    href={`/admin/doctor-verification/${doctor.id}`}
-                    className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">
-                          {doctor.firstName} {doctor.lastName}
-                        </p>
-                        <p className="text-xs text-slate-500">{doctor.specialty}</p>
+          {/* Doctor Verification Requests */}
+          {visibleMainSections.find(s => s.id === 'verification') && (
+            <Card
+              key="verification"
+              draggable={isEditMode}
+              onDragStart={() => handleDragStart('verification')}
+              onDragOver={e => handleDragOver(e, 'verification')}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, 'verification')}
+              className={isEditMode ? 'border-dashed' : ''}
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <Move size={16} className="text-gray-400" />
+                    <h2 className="text-lg font-medium">
+                      {dashboardPreferences.sections.find(s => s.id === 'verification')?.title}
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleSectionVisibility('verification')}
+                      className="ml-2"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <h2 className="text-lg font-medium">Doctor Verification Requests</h2>
+                )}
+                <Link href="/admin/doctor-verification">
+                  <Button variant="ghost" size="sm">
+                    View all
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="p-4">
+                {batchLoading && !progressiveLoad.verification ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3">
+                        <div className="p-2 rounded-full mt-1 bg-gray-200 dark:bg-gray-700 w-8 h-8"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        </div>
                       </div>
-                      <Badge variant={doctor.verificationStatus === VerificationStatus.PENDING ? 'warning' : 'default'}>
-                        {doctor.verificationStatus}
-                      </Badge>
-                    </div>
-                  </Link>
-                ))}
+                    ))}
+                  </div>
+                ) : pendingDoctors.length > 0 ? (
+                  <div className="space-y-2">
+                    {pendingDoctors.slice(0, 5).map(doctor => (
+                      <Link href={`/admin/doctor-verification/${doctor.id}`} key={doctor.id}>
+                        <div className="flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                          <div
+                            className={`p-2 rounded-full mt-1 bg-amber-100 dark:bg-amber-900/30`}
+                          >
+                            <Stethoscope className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium">
+                              Dr. {doctor.firstName} {doctor.lastName}
+                            </p>
+                            <div className="flex justify-between mt-1">
+                              <span className="text-xs text-slate-500">
+                                {doctor.specialty || 'No specialty'}
+                              </span>
+                              <Badge variant="warning">Pending</Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle className="h-12 w-12 mx-auto text-success mb-3" />
+                    <p className="text-slate-600 dark:text-slate-400">No pending verifications</p>
+                  </div>
+                )}
               </div>
             </Card>
           )}
 
-          {/* Recently Registered Users */}
-          <Card>
-            <HeaderWithLink title="Recently Registered Users" href="/admin/users" />
-            <div className="divide-y divide-slate-200 dark:divide-slate-700">
-              {recentUsers.map((userItem: any) => (
-                <Link
-                  key={userItem.id}
-                  href={`/admin/users/${userItem.id}`}
-                  className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">
-                        {userItem.firstName} {userItem.lastName}
-                      </p>
-                      <p className="text-xs text-slate-500">{userItem.email}</p>
-                    </div>
-                    <Badge variant={userItem.userType === UserType.DOCTOR ? 'info' : 'secondary'}>
-                      {userItem.userType}
-                    </Badge>
+          {/* Recent Users */}
+          {visibleMainSections.find(s => s.id === 'recent-users') && (
+            <Card
+              key="recent-users"
+              draggable={isEditMode}
+              onDragStart={() => handleDragStart('recent-users')}
+              onDragOver={e => handleDragOver(e, 'recent-users')}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, 'recent-users')}
+              className={isEditMode ? 'border-dashed' : ''}
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <Move size={16} className="text-gray-400" />
+                    <h2 className="text-lg font-medium">
+                      {dashboardPreferences.sections.find(s => s.id === 'recent-users')?.title}
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleSectionVisibility('recent-users')}
+                      className="ml-2"
+                    >
+                      <Eye size={16} />
+                    </Button>
                   </div>
+                ) : (
+                  <h2 className="text-lg font-medium">Recent Users</h2>
+                )}
+                <Link href="/admin/users">
+                  <Button variant="ghost" size="sm">
+                    View all
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </Link>
-              ))}
-            </div>
-          </Card>
-           {/* Recent Appointments (Simplified) */}
-          <Card>
-            <HeaderWithLink title="Recent Appointments" href="/admin/appointments" />
-            <div className="divide-y divide-slate-200 dark:divide-slate-700">
-              {recentAppointments.map((appt: any) => (
-                <Link 
-                  key={appt.id} 
-                  href={`/admin/appointments/${appt.id}`}
-                  className="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                        <p className="text-sm font-medium">{appt.patientName} with Dr. {appt.doctorName}</p>
-                        <p className="text-xs text-slate-500">
-                          {new Date(appt.appointmentDate).toLocaleDateString()} - {new Date(appt.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                    </div>
-                    <Badge variant={ appt.status === AppointmentStatus.CONFIRMED ? 'success' : (appt.status === AppointmentStatus.CANCELED ? 'danger' : 'default') }>
-                        {appt.status}
-                    </Badge>
+              </div>
+              <div className="p-4">
+                {batchLoading && !progressiveLoad.users ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center justify-between p-3">
+                        <div className="flex items-center">
+                          <div className="rounded-full bg-gray-200 dark:bg-gray-700 w-8 h-8"></div>
+                          <div className="ml-3">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2"></div>
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                          </div>
+                        </div>
+                        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                      </div>
+                    ))}
                   </div>
+                ) : recentUsers.length > 0 ? (
+                  <div className="space-y-1">
+                    {recentUsers.map(user => (
+                      <Link href={`/admin/users/${user.id}`} key={user.id}>
+                        <div className="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                          <div className="flex items-center">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                user.userType === UserType.DOCTOR
+                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                  : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                              }`}
+                            >
+                              {user.userType === UserType.DOCTOR ? (
+                                <Stethoscope className="h-4 w-4" />
+                              ) : (
+                                <UserRound className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="ml-3">
+                              <p className="font-medium">
+                                {user.firstName} {user.lastName}
+                              </p>
+                              <p className="text-xs text-slate-500">{user.email}</p>
+                            </div>
+                          </div>
+                          <Badge variant={user.userType === UserType.DOCTOR ? 'info' : 'success'}>
+                            {user.userType}
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-slate-600 dark:text-slate-400">No users found</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* System Status */}
+          {visibleMainSections.find(s => s.id === 'system-status') && (
+            <Card
+              key="system-status"
+              draggable={isEditMode}
+              onDragStart={() => handleDragStart('system-status')}
+              onDragOver={e => handleDragOver(e, 'system-status')}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, 'system-status')}
+              className={isEditMode ? 'border-dashed' : ''}
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <Move size={16} className="text-gray-400" />
+                    <h2 className="text-lg font-medium">
+                      {dashboardPreferences.sections.find(s => s.id === 'system-status')?.title}
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleSectionVisibility('system-status')}
+                      className="ml-2"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <h2 className="text-lg font-medium">System Status</h2>
+                )}
+              </div>
+              <div className="p-6">
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <p className="text-sm font-medium">Database Status</p>
+                      <Badge variant="success">Online</Badge>
+                    </div>
+                    <ProgressBar value={95} max={100} className="h-2" variant="success" />
+                    <p className="text-xs text-right mt-1 text-slate-500">95% optimal</p>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <p className="text-sm font-medium">API Performance</p>
+                      <Badge variant="success">Excellent</Badge>
+                    </div>
+                    <ProgressBar value={90} max={100} className="h-2" variant="success" />
+                    <p className="text-xs text-right mt-1 text-slate-500">90% optimal</p>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <p className="text-sm font-medium">Storage Utilization</p>
+                      <Badge variant="info">Good</Badge>
+                    </div>
+                    <ProgressBar value={60} max={100} className="h-2" variant="info" />
+                    <p className="text-xs text-right mt-1 text-slate-500">60% used</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Recent Appointments */}
+          {visibleMainSections.find(s => s.id === 'recent-appointments') && (
+            <Card
+              key="recent-appointments"
+              draggable={isEditMode}
+              onDragStart={() => handleDragStart('recent-appointments')}
+              onDragOver={e => handleDragOver(e, 'recent-appointments')}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, 'recent-appointments')}
+              className={isEditMode ? 'border-dashed' : ''}
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <Move size={16} className="text-gray-400" />
+                    <h2 className="text-lg font-medium">
+                      {
+                        dashboardPreferences.sections.find(s => s.id === 'recent-appointments')
+                          ?.title
+                      }
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleSectionVisibility('recent-appointments')}
+                      className="ml-2"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <h2 className="text-lg font-medium">Recent Appointments</h2>
+                )}
+                <Link href="/admin/appointments">
+                  <Button variant="ghost" size="sm">
+                    View all
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </Link>
-              ))}
-            </div>
-          </Card>
+              </div>
+              <div className="p-4">
+                {batchLoading && !progressiveLoad.appointments ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                      >
+                        <div className="flex justify-between mb-2">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                        </div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+                        <div className="flex justify-between">
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                          <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentAppointments.length > 0 ? (
+                  <div className="space-y-3">
+                    {recentAppointments.map(appointment => (
+                      <Link href={`/admin/appointments/${appointment.id}`} key={appointment.id}>
+                        <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <div className="flex justify-between mb-1">
+                            <p className="font-medium">{appointment.patientName}</p>
+                            <p className="text-sm">
+                              {
+                                // Format date
+                                new Date(appointment.appointmentDate).toLocaleDateString()
+                              }
+                            </p>
+                          </div>
+                          <p className="text-sm text-slate-500 mb-1">
+                            With Dr. {appointment.doctorName}
+                          </p>
+                          <div className="flex justify-between">
+                            <p className="text-xs text-slate-500">
+                              {
+                                // Try to extract time from appointmentDate
+                                appointment.appointmentDate.includes('T')
+                                  ? new Date(appointment.appointmentDate).toLocaleTimeString([], {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })
+                                  : 'Time not available'
+                              }
+                            </p>
+                            <Badge
+                              variant={
+                                appointment.status === AppointmentStatus.COMPLETED
+                                  ? 'success'
+                                  : appointment.status === AppointmentStatus.CONFIRMED
+                                    ? 'info'
+                                    : appointment.status === AppointmentStatus.CANCELED
+                                      ? 'danger'
+                                      : 'default'
+                              }
+                            >
+                              {appointment.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-slate-600 dark:text-slate-400">No appointments found</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Quick Actions */}
+          {visibleMainSections.find(s => s.id === 'quick-actions') && (
+            <Card
+              key="quick-actions"
+              draggable={isEditMode}
+              onDragStart={() => handleDragStart('quick-actions')}
+              onDragOver={e => handleDragOver(e, 'quick-actions')}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop(e, 'quick-actions')}
+              className={isEditMode ? 'border-dashed' : ''}
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {isEditMode ? (
+                  <div className="flex items-center gap-2">
+                    <Move size={16} className="text-gray-400" />
+                    <h2 className="text-lg font-medium">
+                      {dashboardPreferences.sections.find(s => s.id === 'quick-actions')?.title}
+                    </h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleSectionVisibility('quick-actions')}
+                      className="ml-2"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  </div>
+                ) : (
+                  <h2 className="text-lg font-medium">Quick Actions</h2>
+                )}
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <Link href="/admin/users/create">
+                    <Button variant="outline" className="w-full justify-start">
+                      <UserPlus className="mr-2" size={16} />
+                      Create New User
+                    </Button>
+                  </Link>
+                  <Link href="/admin/doctor-verification">
+                    <Button variant="outline" className="w-full justify-start">
+                      <CheckSquare className="mr-2" size={16} />
+                      <span className="flex-1 text-left">Verify Doctors</span>
+                      {pendingVerificationsCount > 0 && (
+                        <span className="px-2 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-xs font-medium rounded-full ml-2">
+                          {pendingVerificationsCount}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                  <Link href="/admin/appointments">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Calendar className="mr-2" size={16} />
+                      Manage Appointments
+                    </Button>
+                  </Link>
+                  <Link href="/admin/users">
+                    <Button variant="outline" className="w-full justify-start">
+                      <UserCog className="mr-2" size={16} />
+                      User Management
+                    </Button>
+                  </Link>
+                  <Link href="/admin/reports">
+                    <Button variant="outline" className="w-full justify-start">
+                      <BarChart3 className="mr-2" size={16} />
+                      System Reports
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
       </div>
-
-      {/* Quick Links/Management Sections */}
-      <Card>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-medium">Quick Management</h2>
-        </div>
-        <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <Link href="/admin/users">
-            <Button variant="outline" className="w-full justify-start">
-              <Users className="mr-2 h-4 w-4" /> User Management
-            </Button>
-          </Link>
-          <Link href="/admin/doctors">
-            <Button variant="outline" className="w-full justify-start">
-              <Stethoscope className="mr-2 h-4 w-4" /> Doctor Management
-            </Button>
-          </Link>
-          <Link href="/admin/appointments">
-            <Button variant="outline" className="w-full justify-start">
-              <Calendar className="mr-2 h-4 w-4" /> Appointment Logs
-            </Button>
-          </Link>
-          <Link href="/cms">
-            <Button variant="outline" className="w-full justify-start">
-              <LinkIcon className="mr-2 h-4 w-4" /> CMS Portal
-            </Button>
-          </Link>
-          <Link href="/admin/settings">
-            <Button variant="outline" className="w-full justify-start">
-                <Settings className="mr-2 h-4 w-4" /> System Settings
-            </Button>
-          </Link>
-          <Link href="/admin/doctor-verification">
-            <Button variant="outline" className="w-full justify-start">
-                <ShieldAlert className="mr-2 h-4 w-4" /> Doctor Verification
-            </Button>
-          </Link>
-        </div>
-      </Card>
     </div>
   );
 }

@@ -952,5 +952,23 @@
     "appointmentType": "IN_PERSON",
     "videoCallUrl": null,
     "id": "test-future-3-518432"
+  },
+  {
+    "id": "ryw9titwx79fmogglbe5m",
+    "patientId": "u-007",
+    "patientName": "Anita D'AmoreeAsdv3f",
+    "doctorId": "u-001",
+    "doctorName": "Chris Streich",
+    "doctorSpecialty": "Cardiology",
+    "appointmentDate": "2025-05-09T13:00:00.000Z",
+    "startTime": "16:00",
+    "endTime": "16:30",
+    "status": "pending",
+    "reason": null,
+    "notes": null,
+    "appointmentType": "IN_PERSON",
+    "videoCallUrl": null,
+    "createdAt": "2025-05-08T18:33:00.855Z",
+    "updatedAt": "2025-05-08T18:33:00.855Z"
   }
 ]
