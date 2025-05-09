@@ -2434,3 +2434,14 @@ These patient-focused pages enhance the overall patient experience by providing 
   - Improved error states and fallback UI
 
 The dashboard enhancements across all user roles (patient, doctor, admin) now provide a consistent experience with personalization capabilities, improved loading states, and better visual organization of information. Each dashboard is tailored to the specific needs of its user role while maintaining a cohesive design language throughout the application.
+
+## Recent Updates
+
+### 2023-11-01: Updated Next.js route params access
+
+- Fixed Next.js warning about direct params access by implementing `React.use()` to properly unwrap route parameters
+- Updated the following files:
+  - src/app/(platform)/doctor/appointments/[appointmentId]/page.tsx
+  - src/app/(platform)/patient/appointments/[appointmentId]/page.tsx
+  - src/app/(platform)/admin/appointments/[appointmentId]/page.tsx
+- Added proper TypeScript interfaces for route parameters
