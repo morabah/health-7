@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { AppointmentType } from '@/types/enums';
 import Image from 'next/image';
 import type { TimeSlot } from '@/types/schemas';
+import { BookAppointmentSchema } from '@/types/schemas';
 import {
   BookingWorkflowErrorBoundary,
   TimeSlotSelectionErrorBoundary,
@@ -339,7 +340,8 @@ function BookAppointmentPageContent() {
       setAvailabilityError(null);
 
       try {
-        const dateStr = date.toISOString().split('T')[0];
+        // Format date as full ISO 8601 string (YYYY-MM-DDTHH:mm:ss.sssZ)
+        const dateStr = date.toISOString();
 
         // Check our local cache first
         if (cachedSlots.current[dateStr]) {
@@ -392,16 +394,38 @@ function BookAppointmentPageContent() {
           // If error, we still cache an empty array to prevent repeated failed calls
           cachedSlots.current[dateStr] = [];
           if (response.error) {
-            setAvailabilityError(response.error);
+            // Ensure error is always a string
+            let errorMsg =
+              typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
+            setAvailabilityError(errorMsg);
+            logError('Slot availability API error', {
+              error: response.error,
+              doctorId,
+              date: dateStr,
+            });
           }
         }
       } catch (error) {
         if (error instanceof SlotUnavailableError) {
-          setAvailabilityError('No available time slots for this date.');
+          setAvailabilityError('No available time slots for this date.'); // Always a string
+          logError('Slot unavailable error', { error, doctorId, date: date.toISOString() });
         } else if (error instanceof ApiError) {
           setAvailabilityError(`Error fetching time slots: ${error.message}`);
         } else {
-          setAvailabilityError('Failed to fetch available time slots. Please try again.');
+          // Enhanced error extraction and logging
+          let errorMsg = 'Failed to fetch available time slots. Please try again.';
+          if (error && typeof error === 'object') {
+            if ('message' in error && typeof (error as any).message === 'string') {
+              errorMsg = (error as any).message;
+            } else if ('error' in error && typeof (error as any).error === 'string') {
+              errorMsg = (error as any).error;
+            } else {
+              // For dev/debugging, stringify the error object
+              errorMsg = `Slot availability error: ${JSON.stringify(error)}`;
+            }
+          }
+          setAvailabilityError(errorMsg);
+          // Always log the full error object for debugging (per lesson learned)
           logError('Error fetching time slots', { error, doctorId, date: date.toISOString() });
         }
         // Set empty slots if there's an error
@@ -464,53 +488,45 @@ function BookAppointmentPageContent() {
           reason: reason.trim() || undefined,
         };
 
-        // Call booking API
+        // Validate appointment data on client using Zod schema before API call
+        const validation = BookAppointmentSchema.safeParse(bookingPayload);
+        if (!validation.success) {
+          setFormError('Please check your appointment details and try again.');
+          setFieldErrors(validation.error.flatten().fieldErrors as Record<string, string>);
+          return;
+        }
+        // Use callApiWithOptions for booking
         bookAppointmentMutation.mutate(
           {
-            doctorId,
-            appointmentDate,
-            startTime: selectedTimeSlot,
-            endTime: selectedEndTime,
-            appointmentType,
-            reason: reason.trim() || undefined,
+            ...bookingPayload,
           },
           {
-            onSuccess: data => {
-              // Check if component is still mounted
+            onSuccess: (data: BookAppointmentResponse) => {
               if (!isMountedRef.current) return;
-
-              // Validate response
-              const isBookingResult = (value: unknown): value is BookingResult =>
-                typeof value === 'object' &&
-                value !== null &&
-                'success' in value &&
-                typeof value.success === 'boolean';
-
-              if (isBookingResult(data)) {
-                if (data.success) {
-                  // Success will be handled by the useEffect above
-                  perfTracker.current.mark('booking-api-success');
-
-                  // Invalidate relevant queries to refresh data
-                  queryClient.invalidateQueries({ queryKey: ['appointments', user.uid] });
-                } else if (data.error) {
-                  // Handle API error response
-                  throw new ApiError(data.error);
-                }
+              // Standardized response handling
+              if (data.success && data.data?.appointment) {
+                perfTracker.current.mark('booking-api-success');
+                // Success handled by useEffect
+                queryClient.invalidateQueries({ queryKey: ['appointments', user.uid] });
+              } else if (data.error) {
+                setFormError(data.error);
               } else {
-                throw new Error('Invalid response format');
+                setFormError('Unexpected error occurred while booking.');
               }
             },
             onError: error => {
-              // Check if component is still mounted
               if (!isMountedRef.current) return;
-
+              // Improved error handling for slot availability
               if (error instanceof SlotUnavailableError) {
                 setFormError('This time slot is no longer available. Please select another time.');
+                // Optionally refetch slots
+                // refetchSlots();
               } else if (error instanceof ValidationError) {
                 setFormError('Please check your appointment details and try again.');
               } else if (error instanceof AppointmentError) {
                 setFormError(error.message);
+              } else if (error instanceof ApiError) {
+                setFormError(`Service error: ${error.message}`);
               } else {
                 setFormError('Failed to book appointment. Please try again later.');
                 logError('Unhandled booking error', { error });
@@ -533,7 +549,12 @@ function BookAppointmentPageContent() {
           setFormError(error.message);
         } else {
           setFormError('An error occurred while booking your appointment. Please try again.');
-          logError('Error submitting appointment form', { error, doctorId });
+          // Always log error message and stack for better debugging
+          logError('Error submitting appointment form', {
+            error: error instanceof Error ? error.message : JSON.stringify(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            doctorId,
+          });
         }
       } finally {
         perfTracker.current.mark('form-submit-complete');

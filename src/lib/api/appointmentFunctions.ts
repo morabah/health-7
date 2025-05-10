@@ -486,17 +486,17 @@ export async function getMyAppointments(
           const appointmentDate = a.appointmentDate.includes('T')
             ? new Date(a.appointmentDate)
             : new Date(`${a.appointmentDate}T${a.startTime}`);
-          
+
           const status = a.status.toLowerCase();
           return appointmentDate > now && status !== 'canceled';
         });
-        
+
         // Log the filter application for debugging
-        logInfo('Applied special upcoming filter', { 
+        logInfo('Applied special upcoming filter', {
           totalAppointments: appointments.length,
           filteredCount: myAppointments.length,
           uid,
-          now: now.toISOString()
+          now: now.toISOString(),
         });
       } else {
         // Regular status filter
@@ -778,7 +778,8 @@ export async function getAvailableSlots(
     if (!result.success) {
       return {
         success: false,
-        error: `Invalid slot availability request: ${result.error.format()}`,
+        // Always stringify error details for robust frontend display
+        error: `Invalid slot availability request: ${JSON.stringify(result.error.format())}`,
       };
     }
 
