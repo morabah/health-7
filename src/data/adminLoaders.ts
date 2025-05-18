@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callApi } from '@/lib/apiClient';
 import { useAuth } from '@/context/AuthContext';
-import type { VerificationStatus, AccountStatus } from '@/types/enums';
+import { VerificationStatus, AccountStatus } from '@/types/enums';
 import { UserType, VerificationStatus as VerificationStatusEnum } from '@/types/enums';
 import type { DoctorProfile } from '@/types/schemas';
 import { logInfo } from '@/lib/logger';
@@ -16,14 +16,20 @@ import type { Appointment } from '@/types/schemas';
 interface AdminGetAllUsersPayload {
   page?: number;
   limit?: number;
-  filter?: string; // Search query
-  status?: string; // e.g., 'active', 'suspended', 'all'
-  userType?: UserType; // Added userType filter
+  filter?: string; // Changed from search to filter to match schema
+  status?: 'active' | 'inactive' | 'all'; // Use string literals instead of AccountStatus
+  userType?: UserType;
 }
+
+// Use the UserProfile type which includes id, and add accountStatus
+export type AdminUserListItem = z.infer<typeof UserProfileSchema> & { 
+  id: string; 
+  accountStatus: AccountStatus; 
+};
 
 interface AdminGetAllUsersResponse {
   success: boolean;
-  users: z.infer<typeof UserProfileSchema>[];
+  users: AdminUserListItem[];
   totalCount: number;
   error?: string;
 }
@@ -73,30 +79,48 @@ interface AdminGetAllAppointmentsResponse {
 export const useAllUsers = (payload: AdminGetAllUsersPayload = {}) => {
   const { user } = useAuth();
 
-  // Use payload in queryKey to ensure refetching when filters change
   const queryKey = ['admin', 'users', payload];
 
   return useQuery<AdminGetAllUsersResponse, Error>({
-    // Specify return type
     queryKey,
     queryFn: async () => {
       if (!user || user.role !== UserType.ADMIN) {
         throw new UnauthorizedError('Only administrators can access user management');
       }
 
-      // Pass payload to the API call
-      return callApi<AdminGetAllUsersResponse>(
+      // Transform the payload to match the expected schema
+      const apiPayload = {
+        ...payload,
+        // Convert AccountStatus to expected string format if needed
+        status: payload.status === 'all' ? undefined : payload.status,
+      };
+
+      // Assuming callApi returns users matching UserProfileSchema and an id field
+      const response = await callApi<{ success: boolean; users: (z.infer<typeof UserProfileSchema> & { id: string })[]; totalCount: number; error?: string }>(
         'adminGetAllUsers',
         {
           uid: user.uid,
           role: UserType.ADMIN,
         },
-        payload
-      ); // Pass payload as the second argument object
+        apiPayload 
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch users');
+      }
+
+      // Manually map isActive to accountStatus and ensure id is present
+      const processedUsers: AdminUserListItem[] = response.users.map(u => ({
+        ...u, // Spreads properties from UserProfileSchema and the id
+        accountStatus: u.isActive ? AccountStatus.ACTIVE : AccountStatus.DEACTIVATED, // Derive accountStatus
+      }));
+
+      return {
+        ...response,
+        users: processedUsers,
+      };
     },
     enabled: !!user && user.role === UserType.ADMIN,
-    // Consider adding keepPreviousData: true for smoother pagination UX
-    // placeholderData: keepPreviousData, // TanStack Query v5 syntax
   });
 };
 

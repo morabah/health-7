@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -46,26 +46,29 @@ export default function FindDoctorsPage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Handle search form input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle search form input changes - memoize to prevent recreation on every render
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setSearchParams(prev => {
       const updated = { ...prev, [id]: value };
       logInfo('Search params updated', updated);
       return updated;
     });
-  };
+  }, []);
 
-  // Clear filters
-  const handleClear = () => {
+  // Clear filters - memoize to prevent recreation on every render
+  const handleClear = useCallback(() => {
     setSearchParams({ specialty: '', location: '', name: '' });
-  };
+  }, []);
 
+  // Memoize the grid layout classes to prevent recalculation on every render
+  const gridLayoutClasses = useMemo(() => "grid grid-cols-1 lg:grid-cols-4 gap-6", []);
+  
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold dark:text-white">Find Doctors</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className={gridLayoutClasses}>
         {/* Filters Sidebar */}
         <div className="lg:col-span-1 space-y-6">
           {/* Search Filters */}

@@ -1,170 +1,20 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
-import { CalendarPlus, RefreshCw, ArrowLeft, PhoneOutgoing, HelpCircle, AlertCircle } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
-import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
+/**
+ * @deprecated Use CustomizableErrorBoundary instead for more flexibility
+ */
+
+import React, { useState, useEffect } from 'react';
+import { CalendarPlus, RefreshCw, ArrowLeft, PhoneOutgoing, HelpCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import Alert from '@/components/ui/Alert';
+import CustomizableErrorBoundary, { ErrorAction } from './CustomizableErrorBoundary';
+import { appEventBus, LogLevel } from '@/lib/eventBus';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 interface BookingError extends Error {
   code?: string;
   details?: Record<string, unknown>;
 }
-
-/**
- * Booking Workflow Error Fallback UI
- * A specialized UI for booking process-related errors
- */
-const BookingWorkflowErrorFallback: React.FC<{ 
-  error: BookingError | null;
-  resetError: () => void;
-}> = ({ error, resetError }) => {
-  const router = useRouter();
-  
-  // Report error to monitoring service
-  useEffect(() => {
-    if (error) {
-      // Provide enhanced context for booking-specific errors
-      ErrorMonitor.getInstance().reportError(error, {
-        component: 'BookingWorkflow',
-        severity: error.code === 'SLOT_UNAVAILABLE' ? 'warning' : 'error',
-        category: 'appointment' as ErrorCategory,
-        action: 'book_appointment',
-        details: error.details || {}
-      });
-    }
-  }, [error]);
-
-  // Determine error type and message based on error code
-  const getErrorContent = () => {
-    if (!error) return {
-      title: 'Booking Process Error',
-      message: 'We encountered an issue while processing your appointment booking.',
-      suggestion: 'Please try again or choose another time slot.'
-    };
-
-    // Handle specific error types
-    switch(error.code) {
-      case 'SLOT_UNAVAILABLE':
-        return {
-          title: 'Time Slot No Longer Available',
-          message: 'The appointment time slot you selected is no longer available.',
-          suggestion: 'Please select a different time or date for your appointment.'
-        };
-      case 'DOCTOR_UNAVAILABLE':
-        return {
-          title: 'Doctor Not Available',
-          message: 'The doctor you selected is not available at this time.',
-          suggestion: 'Try selecting another doctor or choose a different date.'
-        };
-      case 'BOOKING_CONFLICT':
-        return {
-          title: 'Booking Conflict',
-          message: 'You already have another appointment scheduled at this time.',
-          suggestion: 'Please select a different time slot for your appointment.'
-        };
-      case 'VALIDATION_ERROR':
-        return {
-          title: 'Invalid Booking Information',
-          message: 'Some of the information you provided is not valid.',
-          suggestion: 'Please review your booking details and try again.'
-        };
-      case 'PAYMENT_REQUIRED':
-        return {
-          title: 'Payment Required',
-          message: 'A payment is required to complete this booking.',
-          suggestion: 'Please complete the payment process to confirm your appointment.'
-        };
-      case 'NETWORK_ERROR':
-        return {
-          title: 'Connection Error',
-          message: 'We couldn\'t connect to our servers to complete your booking.',
-          suggestion: 'Please check your internet connection and try again.'
-        };
-      default:
-        return {
-          title: 'Booking Process Error',
-          message: 'We encountered an issue while processing your appointment booking.',
-          suggestion: 'Please try again or contact our support team for assistance.'
-        };
-    }
-  };
-
-  const { title, message, suggestion } = getErrorContent();
-
-  return (
-    <div className="p-6 rounded-lg border border-teal-100 dark:border-teal-900/30 bg-white dark:bg-slate-800 shadow-sm">
-      <div className="flex items-start">
-        <div className="mr-4 mt-1 flex-shrink-0">
-          <CalendarPlus className="h-8 w-8 text-teal-500" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-medium mb-2">
-            {title}
-          </h3>
-          <p className="text-slate-600 dark:text-slate-300 mb-2">
-            {message}
-          </p>
-          
-          <Alert variant="info" className="mb-4">
-            <div className="flex items-start">
-              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{suggestion}</p>
-            </div>
-          </Alert>
-          
-          {error && (
-            <div className="bg-teal-50 dark:bg-teal-900/20 p-3 rounded-md mb-4">
-              <p className="text-sm text-teal-800 dark:text-teal-300">
-                {error.message}
-              </p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3">
-            <Button 
-              onClick={resetError}
-              variant="primary"
-              size="sm"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/find-doctors')}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Find Another Doctor
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              as="a"
-              href="tel:+18001234567"
-            >
-              <PhoneOutgoing className="mr-2 h-4 w-4" />
-              Book by Phone
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              as="a"
-              href="/help/booking-issues"
-            >
-              <HelpCircle className="mr-2 h-4 w-4" />
-              Help
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * Specialized error boundary for booking workflow
@@ -183,6 +33,8 @@ const BookingWorkflowErrorFallback: React.FC<{
  * <BookingWorkflowErrorBoundary componentName="DoctorTimeSelection">
  *   <TimeSlotSelectionComponent />
  * </BookingWorkflowErrorBoundary>
+ * 
+ * @deprecated Use CustomizableErrorBoundary directly for more flexibility
  */
 export default function BookingWorkflowErrorBoundary({ 
   children,
@@ -191,14 +43,154 @@ export default function BookingWorkflowErrorBoundary({
   children: React.ReactNode;
   componentName?: string;
 }) {
-  return (
-    <ErrorBoundary
-      componentName={componentName}
-      fallback={
-        <BookingWorkflowErrorFallback error={null} resetError={() => {}} />
+  // Create a component that will handle the dynamic error message and actions
+  const DynamicBookingErrorHandler: React.FC<{
+    error: Error | null;
+    resetErrorBoundary: () => void;
+  }> = ({ error, resetErrorBoundary }) => {
+    const router = useRouter();
+    const [title, setTitle] = useState('Booking Process Error');
+    const [message, setMessage] = useState('We encountered an issue while processing your appointment booking.');
+    const [suggestion, setSuggestion] = useState('Please try again or choose another time slot.');
+    const [actions, setActions] = useState<ErrorAction[]>([]);
+    const [additionalContext, setAdditionalContext] = useState<Record<string, unknown>>({});
+    
+    useEffect(() => {
+      if (!error) return;
+      
+      // Cast to BookingError to access code and details properties
+      const bookingError = error as BookingError;
+      const errorCode = bookingError.code;
+      const errorDetails = bookingError.details || {};
+      
+      // Emit error event for centralized logging
+      appEventBus.emit('log_event', {
+        level: errorCode === 'SLOT_UNAVAILABLE' ? LogLevel.WARN : LogLevel.ERROR,
+        message: `Booking workflow error: ${error.message}`,
+        data: {
+          component: componentName || 'BookingWorkflow',
+          errorCode,
+          errorDetails,
+          stack: error.stack
+        },
+        timestamp: Date.now()
+      });
+      
+      // Set additional context for error reporting
+      setAdditionalContext({
+        errorCode,
+        errorDetails,
+        workflow: 'booking'
+      });
+      
+      // Determine error type and message based on error code
+      let errorInfo = {
+        title: 'Booking Process Error',
+        message: 'We encountered an issue while processing your appointment booking.',
+        suggestion: 'Please try again or choose another time slot.'
+      };
+      
+      // Handle specific error types
+      switch(errorCode) {
+        case 'SLOT_UNAVAILABLE':
+          errorInfo = {
+            title: 'Time Slot No Longer Available',
+            message: 'The appointment time slot you selected is no longer available.',
+            suggestion: 'Please select a different time or date for your appointment.'
+          };
+          break;
+        case 'DOCTOR_UNAVAILABLE':
+          errorInfo = {
+            title: 'Doctor Not Available',
+            message: 'The doctor you selected is not available at this time.',
+            suggestion: 'Try selecting another doctor or choose a different date.'
+          };
+          break;
+        case 'BOOKING_CONFLICT':
+          errorInfo = {
+            title: 'Booking Conflict',
+            message: 'You already have another appointment scheduled at this time.',
+            suggestion: 'Please select a different time slot for your appointment.'
+          };
+          break;
+        case 'VALIDATION_ERROR':
+          errorInfo = {
+            title: 'Invalid Booking Information',
+            message: 'Some of the information you provided is not valid.',
+            suggestion: 'Please review your booking details and try again.'
+          };
+          break;
+        case 'PAYMENT_REQUIRED':
+          errorInfo = {
+            title: 'Payment Required',
+            message: 'A payment is required to complete this booking.',
+            suggestion: 'Please complete the payment process to confirm your appointment.'
+          };
+          break;
+        case 'NETWORK_ERROR':
+          errorInfo = {
+            title: 'Connection Error',
+            message: 'We couldn\'t connect to our servers to complete your booking.',
+            suggestion: 'Please check your internet connection and try again.'
+          };
+          break;
+        default:
+          errorInfo = {
+            title: 'Booking Process Error',
+            message: error.message || 'We encountered an issue while processing your appointment booking.',
+            suggestion: 'Please try again or contact our support team for assistance.'
+          };
       }
-    >
-      {children}
-    </ErrorBoundary>
-  );
+      
+      setTitle(errorInfo.title);
+      setMessage(`${errorInfo.message} ${errorInfo.suggestion}`);
+      setSuggestion(errorInfo.suggestion);
+      
+      // Set actions based on error
+      const errorActions: ErrorAction[] = [
+        {
+          label: 'Try Again',
+          icon: RefreshCw,
+          onClick: resetErrorBoundary,
+          variant: 'primary'
+        },
+        {
+          label: 'Find Another Doctor',
+          icon: ArrowLeft,
+          onClick: () => router.push('/find-doctors'),
+          variant: 'outline'
+        },
+        {
+          label: 'Book by Phone',
+          icon: PhoneOutgoing,
+          href: 'tel:+18001234567',
+          variant: 'ghost'
+        },
+        {
+          label: 'Help',
+          icon: HelpCircle,
+          href: '/help/booking-issues',
+          variant: 'ghost'
+        }
+      ];
+      
+      setActions(errorActions);
+    }, [error, resetErrorBoundary, router, componentName]);
+    
+    return (
+      <CustomizableErrorBoundary
+        title={title}
+        message={message}
+        icon={CalendarPlus}
+        category="appointment"
+        componentName={componentName}
+        actions={actions}
+        additionalContext={additionalContext}
+      >
+        {children}
+      </CustomizableErrorBoundary>
+    );
+  };
+  
+  return <DynamicBookingErrorHandler error={null} resetErrorBoundary={() => {}} />;
 } 

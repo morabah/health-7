@@ -4,28 +4,68 @@ This directory contains specialized error boundary components for different part
 
 ## Available Error Boundaries
 
+### New Unified Error Boundary (Recommended)
+
+- **CustomizableErrorBoundary**: A flexible, configurable error boundary that can be customized for any context. This is the recommended approach for new components.
+
 ### Core Error Boundaries
 
-- **RootErrorBoundary**: Application-wide error boundary used in ClientLayout
-- **AppointmentErrorBoundary**: For appointment-related components and pages
-- **DoctorProfileErrorBoundary**: For doctor profile components
-- **DataLoadingErrorBoundary**: General-purpose data loading/API error boundary
+- **GlobalErrorBoundary**: Application-wide error boundary that provides standardized error handling (now uses CustomizableErrorBoundary internally)
+- **AppointmentErrorBoundary**: For appointment-related components and pages (now uses CustomizableErrorBoundary internally)
+- **DoctorProfileErrorBoundary**: For doctor profile components (now uses CustomizableErrorBoundary internally)
+- **DataLoadingErrorBoundary**: General-purpose data loading/API error boundary (now uses CustomizableErrorBoundary internally)
 
 ### Additional Specialized Error Boundaries
 
 - **AuthErrorBoundary**: For authentication-related components (login, register, etc.)
-- **AdminDashboardErrorBoundary**: For admin dashboard pages and components
+- **AdminDashboardErrorBoundary**: For admin dashboard pages and components (now uses CustomizableErrorBoundary internally)
 - **PaymentProcessingErrorBoundary**: For payment-related components
-- **BookingWorkflowErrorBoundary**: For appointment booking process components
+- **BookingWorkflowErrorBoundary**: For appointment booking process components (now uses CustomizableErrorBoundary internally)
 
 ### Booking Workflow Specialized Error Boundaries
 
-- **TimeSlotSelectionErrorBoundary**: Specifically for time slot selection components, handling errors like unavailable slots
-- **BookingPaymentErrorBoundary**: For payment processing during the booking workflow with detailed payment error handling
+- **TimeSlotSelectionErrorBoundary**: Specifically for time slot selection components, handling errors like unavailable slots (now uses CustomizableErrorBoundary internally)
+- **BookingPaymentErrorBoundary**: For payment processing during the booking workflow with detailed payment error handling (now uses CustomizableErrorBoundary internally)
 
 ## Usage
 
-### Basic Usage
+### Using the CustomizableErrorBoundary (Recommended)
+
+The new CustomizableErrorBoundary provides a flexible, unified approach to error handling. It accepts props to customize the title, message, icon, and actions:
+
+```tsx
+import { CustomizableErrorBoundary } from '@/components/error-boundaries';
+import { Calendar, RefreshCw, ArrowLeft } from 'lucide-react';
+
+export default function AppointmentsPage() {
+  return (
+    <CustomizableErrorBoundary
+      title="Unable to load appointments"
+      message="We encountered an issue while loading your appointment information."
+      icon={Calendar}
+      category="appointment"
+      actions={[
+        {
+          label: 'Retry',
+          icon: RefreshCw,
+          onClick: () => window.location.reload(),
+          variant: 'primary'
+        },
+        {
+          label: 'Back to Dashboard',
+          icon: ArrowLeft,
+          href: '/dashboard',
+          variant: 'outline'
+        }
+      ]}
+    >
+      <YourAppointmentComponent />
+    </CustomizableErrorBoundary>
+  );
+}
+```
+
+### Using Specialized Error Boundaries
 
 Wrap any component that might throw errors with the appropriate error boundary:
 
@@ -122,8 +162,80 @@ function DoctorBookingPage() {
 3. Consider nesting error boundaries for complex workflows (e.g., a page-level boundary with component-level boundaries inside)
 4. Use the `useBookingError` hook to throw standardized errors that will be properly handled by the specialized boundaries
 
+## CustomizableErrorBoundary API
+
+The CustomizableErrorBoundary component provides a flexible API for creating error boundaries with customized UI and behavior.
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | string | The title displayed in the error UI |
+| `message` | string | The message displayed in the error UI |
+| `icon` | LucideIcon | The icon component to display (from lucide-react) |
+| `category` | ErrorCategory | The category of the error (e.g., 'api', 'data', 'validation') |
+| `actions` | ErrorAction[] | Array of action buttons to display (see below) |
+| `showErrorDetails` | boolean | Whether to show the raw error message (default: true) |
+| `componentName` | string | Name of the component for error reporting |
+| `additionalContext` | object | Additional context data for error reporting |
+| `onError` | function | Optional callback when an error occurs |
+
+### ErrorAction Interface
+
+```typescript
+interface ErrorAction {
+  label: string;              // Button text
+  icon?: LucideIcon;          // Optional icon component
+  onClick?: () => void;       // Click handler (for buttons)
+  href?: string;              // URL (for links)
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost'; // Button style
+}
+```
+
+### Example: Dynamic Error Handling
+
+```tsx
+import { CustomizableErrorBoundary } from '@/components/error-boundaries';
+import { useState, useEffect } from 'react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+
+function DynamicErrorHandler({ children }) {
+  const [actions, setActions] = useState([]);
+  
+  useEffect(() => {
+    // You can dynamically update actions based on error context
+    setActions([
+      {
+        label: 'Retry',
+        icon: RefreshCw,
+        onClick: () => window.location.reload(),
+        variant: 'primary'
+      },
+      {
+        label: 'Home',
+        icon: Home,
+        href: '/',
+        variant: 'outline'
+      }
+    ]);
+  }, []);
+  
+  return (
+    <CustomizableErrorBoundary
+      title="Dynamic Error Handler"
+      message="This error boundary adapts based on the error context."
+      icon={AlertTriangle}
+      actions={actions}
+    >
+      {children}
+    </CustomizableErrorBoundary>
+  );
+}
+```
+
 ## Choosing the Right Error Boundary
 
+- **CustomizableErrorBoundary**: Use for new components where you want full control over the error UI
 - **RootErrorBoundary**: Use for application-wide error handling or as a last-resort fallback
 - **DataLoadingErrorBoundary**: Use for components that primarily fetch data
 - **AuthErrorBoundary**: Use for login, registration, and user authentication flows
@@ -177,13 +289,55 @@ Remember that error boundaries only catch errors in the React component tree, no
    - Provide clear retry options when appropriate
    - Consider navigation alternatives when retry isn't applicable
 
+## GlobalErrorBoundary
+
+The GlobalErrorBoundary has been refactored to use the CustomizableErrorBoundary internally while maintaining backward compatibility with existing code. This provides several benefits:
+
+1. **Consistent Error Handling**: All error boundaries now use the same underlying component
+2. **Improved Maintainability**: Changes to error handling can be made in one place
+3. **Backward Compatibility**: Existing code using GlobalErrorBoundary will continue to work
+
+### Usage
+
+```tsx
+import { GlobalErrorBoundary } from '@/components/error-boundaries';
+
+export default function AppLayout({ children }) {
+  return (
+    <GlobalErrorBoundary
+      componentName="AppLayout"
+      resetOnRouteChange={true}
+      errorContext={{ layout: 'main' }}
+    >
+      {children}
+    </GlobalErrorBoundary>
+  );
+}
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `children` | ReactNode | The components to render |
+| `fallback` | ReactNode or Function | Optional custom fallback UI |
+| `componentName` | string | Name for error reporting |
+| `onError` | function | Optional callback when error occurs |
+| `resetOnRouteChange` | boolean | Whether to reset on route changes |
+| `errorContext` | object | Additional context for error reporting |
+
 ## Architecture
 
 ```
 ├── error-boundaries/
-│   ├── AppointmentErrorBoundary.tsx  # Appointment-specific error handling
-│   ├── DataLoadingErrorBoundary.tsx  # Data fetching error handling
-│   ├── DoctorProfileErrorBoundary.tsx  # Doctor profile error handling
+│   ├── CustomizableErrorBoundary.tsx # New unified error boundary component
+│   ├── AppointmentErrorBoundary.tsx  # Appointment-specific error handling (uses CustomizableErrorBoundary)
+│   ├── DataLoadingErrorBoundary.tsx  # Data fetching error handling (uses CustomizableErrorBoundary)
+│   ├── DoctorProfileErrorBoundary.tsx # Doctor profile error handling (uses CustomizableErrorBoundary)
+│   ├── ApiErrorBoundary.tsx          # API error handling (uses CustomizableErrorBoundary)
+│   ├── FormErrorBoundary.tsx         # Form validation error handling (uses CustomizableErrorBoundary)
+│   ├── TimeSlotSelectionErrorBoundary.tsx # Time slot selection error handling (uses CustomizableErrorBoundary)
+│   ├── AdminDashboardErrorBoundary.tsx # Admin dashboard error handling (uses CustomizableErrorBoundary)
 │   └── index.ts                      # Re-exports all error boundaries
 ├── layout/
 │   └── RootErrorBoundary.tsx         # Application-wide error boundary

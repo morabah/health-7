@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 // import { Tab } from '@headlessui/react'; // Removed unused import
 import clsx from 'clsx';
@@ -24,7 +24,9 @@ import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentMod
 import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
 import { AppointmentStatus } from '@/types/enums';
 import { format, isValid } from 'date-fns';
-import { logValidation } from '@/lib/logger';
+import { logError, logValidation } from '@/lib/logger';
+import { AppointmentError, ApiError } from '@/lib/errors/errorClasses';
+import { extractErrorMessage } from '@/lib/errors/errorHandlingUtils';
 import type { Appointment } from '@/types/schemas';
 import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
 import { useAuth } from '@/context/AuthContext';
@@ -80,19 +82,23 @@ function DoctorAppointmentsContent() {
   const completeMutation = useCompleteAppointment();
   const cancelMutation = useDoctorCancelAppointment();
 
-  // Filter appointments based on selected filters
-  const appointments = (appointmentsData as AppointmentsResponse)?.success 
-    ? (appointmentsData as AppointmentsResponse).appointments || [] 
-    : [];
+  // Extract appointments data with useMemo to avoid unnecessary processing on re-renders
+  const appointments = useMemo(() => {
+    return (appointmentsData as AppointmentsResponse)?.success 
+      ? (appointmentsData as AppointmentsResponse).appointments || [] 
+      : [];
+  }, [appointmentsData]);
   
-  // First filter to only show this doctor's appointments
-  const myAppointments = appointments.filter((appointment: Appointment) => {
-    return appointment.doctorId === user?.uid;
-  });
+  // Memoize doctor's appointments to prevent recomputing on every render
+  const myAppointments = useMemo(() => {
+    return appointments.filter((appointment: Appointment) => {
+      return appointment.doctorId === user?.uid;
+    });
+  }, [appointments, user?.uid]);
   
-  const filteredAppointments = myAppointments.filter((appointment: Appointment) => {
-    // Date filtering
-    const appointmentDate = new Date(appointment.appointmentDate);
+  // Memoize filtered appointments based on date and status filters
+  const filteredAppointments = useMemo(() => {
+    // Calculate date references once for all filtering operations
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -105,43 +111,49 @@ function DoctorAppointmentsContent() {
     const nextMonth = new Date(today);
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     
-    let passesDateFilter = true;
+    const now = new Date(); // Current time with hours/minutes for precise comparisons
     
-    if (dateFilter !== 'all') {
-      if (!appointmentDate || !isValid(appointmentDate)) {
-        passesDateFilter = false; // Exclude invalid dates if a filter is active
-      } else if (dateFilter === 'today') {
-        passesDateFilter = appointmentDate.toDateString() === today.toDateString();
-      } else if (dateFilter === 'tomorrow') {
-        passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
-      } else if (dateFilter === 'week') {
-        passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
-      } else if (dateFilter === 'month') {
-        passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
-      } else if (dateFilter === 'upcoming') {
-         // Match dashboard logic: future date AND not canceled
-         const now = new Date();
-         passesDateFilter = appointmentDate > now && appointment.status !== AppointmentStatus.CANCELED;
-      }
-    }
-    
-    // Status filtering
-    let passesStatusFilter = true;
-    
-    if (dateFilter !== 'upcoming' || statusFilter !== 'all') {
-        if (statusFilter === 'scheduled') {
-          passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
-        } else if (statusFilter === 'completed') {
-          passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
-        } else if (statusFilter === 'cancelled') {
-          passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
-        } else {
-           passesStatusFilter = true; // 'all' status filter passes
+    return myAppointments.filter((appointment: Appointment) => {
+      // Date filtering
+      const appointmentDate = new Date(appointment.appointmentDate);
+      
+      let passesDateFilter = true;
+      
+      if (dateFilter !== 'all') {
+        if (!appointmentDate || !isValid(appointmentDate)) {
+          passesDateFilter = false; // Exclude invalid dates if a filter is active
+        } else if (dateFilter === 'today') {
+          passesDateFilter = appointmentDate.toDateString() === today.toDateString();
+        } else if (dateFilter === 'tomorrow') {
+          passesDateFilter = appointmentDate.toDateString() === tomorrow.toDateString();
+        } else if (dateFilter === 'week') {
+          passesDateFilter = appointmentDate >= today && appointmentDate <= nextWeek;
+        } else if (dateFilter === 'month') {
+          passesDateFilter = appointmentDate >= today && appointmentDate <= nextMonth;
+        } else if (dateFilter === 'upcoming') {
+           // Match dashboard logic: future date AND not canceled
+           passesDateFilter = appointmentDate > now && appointment.status !== AppointmentStatus.CANCELED;
         }
-    }
-    
-    return passesDateFilter && passesStatusFilter;
-  });
+      }
+      
+      // Status filtering
+      let passesStatusFilter = true;
+      
+      if (dateFilter !== 'upcoming' || statusFilter !== 'all') {
+          if (statusFilter === 'scheduled') {
+            passesStatusFilter = [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED].includes(appointment.status);
+          } else if (statusFilter === 'completed') {
+            passesStatusFilter = appointment.status === AppointmentStatus.COMPLETED;
+          } else if (statusFilter === 'cancelled') {
+            passesStatusFilter = appointment.status === AppointmentStatus.CANCELED;
+          } else {
+             passesStatusFilter = true; // 'all' status filter passes
+          }
+      }
+      
+      return passesDateFilter && passesStatusFilter;
+    });
+  }, [myAppointments, dateFilter, statusFilter]); // Only recompute when these dependencies change
 
   // Handle appointment completion
   const handleCompleteAppointment = async (id: string, notes: string) => {
@@ -152,7 +164,9 @@ function DoctorAppointmentsContent() {
       }) as AppointmentActionResponse;
       
       if (!result.success) {
-        throw new Error(result.error);
+        throw new AppointmentError(result.error || 'Failed to complete appointment', { 
+          appointmentId: selectedAppointment?.id 
+        });
       }
       
       setShowCompleteModal(false);
@@ -161,7 +175,19 @@ function DoctorAppointmentsContent() {
       // Explicitly refetch to ensure we have the latest data
       refetch();
     } catch (error) {
-      throw error; // Let the modal handle the error
+      // Enhanced error handling
+      if (error instanceof AppointmentError) {
+        logError('Appointment completion error', { error, appointmentId: selectedAppointment?.id });
+        throw error; // Preserve the specific error type for the modal
+      } else if (error instanceof ApiError) {
+        logError('API error during appointment completion', { error, appointmentId: selectedAppointment?.id });
+        throw new AppointmentError(`Service error: ${error.message}`, { appointmentId: selectedAppointment?.id });
+      } else {
+        // For unexpected errors, enhance with context
+        const errorMessage = extractErrorMessage(error, 'Failed to complete appointment');
+        logError('Unexpected error during appointment completion', { error, appointmentId: selectedAppointment?.id });
+        throw new AppointmentError(errorMessage, { appointmentId: selectedAppointment?.id });
+      }
     }
   };
   
@@ -188,8 +214,22 @@ function DoctorAppointmentsContent() {
         // Explicitly refetch to ensure we have the latest data
         refetch();
         
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to cancel appointment');
+      } catch (error) {
+        // Standardized error handling
+        let errorMessage: string;
+        
+        if (error instanceof AppointmentError) {
+          errorMessage = error.message;
+          logError('Appointment cancellation error', { error, appointmentId: id });
+        } else if (error instanceof ApiError) {
+          errorMessage = `Service error: ${error.message}`;
+          logError('API error during appointment cancellation', { error, appointmentId: id });
+        } else {
+          errorMessage = extractErrorMessage(error, 'Failed to cancel appointment');
+          logError('Unexpected error during appointment cancellation', { error, appointmentId: id });
+        }
+        
+        alert(errorMessage);
       }
     }
   };
@@ -203,8 +243,12 @@ function DoctorAppointmentsContent() {
   useEffect(() => {
     try {
       logValidation('4.10', 'success', 'Doctor appointments page connected to real data via local API');
-    } catch (e) {
-      // Error handling for validation logging
+    } catch (error) {
+      // Standardized error logging for validation
+      logError('Failed to log validation', { 
+        error, 
+        component: 'DoctorAppointmentsContent' 
+      });
     }
   }, []);
 
@@ -291,7 +335,7 @@ function DoctorAppointmentsContent() {
             <details>
               <summary className="cursor-pointer text-blue-600">Show upcoming details</summary>
               <div className="bg-gray-100 p-2 mt-2 rounded text-xs overflow-auto max-h-40">
-                <p>Number of upcoming appointments (now &gt; date & !canceled): {myAppointments.filter(a => {
+                <p>Number of upcoming appointments (now &gt; date & !canceled): {myAppointments.filter((a: Appointment) => {
                   const apptDate = new Date(a.appointmentDate);
                   const now = new Date();
                   return apptDate > now && a.status !== AppointmentStatus.CANCELED;

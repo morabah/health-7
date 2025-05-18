@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import DoctorCard from './DoctorCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -57,22 +57,24 @@ const DoctorList: React.FC<DoctorListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('rating');
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Memoize the search handler to prevent recreation on every render
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (onSearch) {
       onSearch(searchQuery);
     }
-  };
+  }, [onSearch, searchQuery]);
 
-  const handleSort = (option: SortOption) => {
+  // Memoize the sort handler to prevent recreation on every render
+  const handleSort = useCallback((option: SortOption) => {
     setSortBy(option);
     if (onSort) {
       onSort(option);
     }
-  };
+  }, [onSort]);
 
-  // Render loading skeletons
-  const renderSkeletons = () => {
+  // Memoize skeleton rendering to prevent recreation on every render
+  const renderSkeletons = useCallback(() => {
     return Array(4).fill(0).map((_, index) => (
       <Card key={`skeleton-${index}`} className="overflow-hidden animate-pulse">
         <div className="p-5">
@@ -91,10 +93,10 @@ const DoctorList: React.FC<DoctorListProps> = ({
         </div>
       </Card>
     ));
-  };
+  }, []);
 
-  // Render error state
-  const renderError = () => (
+  // Memoize error rendering to prevent recreation on every render
+  const renderError = useMemo(() => (
     <Card className="p-8 text-center">
       <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-4">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -113,10 +115,10 @@ const DoctorList: React.FC<DoctorListProps> = ({
         </Button>
       )}
     </Card>
-  );
+  ), [error, onRetry]);
 
-  // Render empty state
-  const renderEmpty = () => (
+  // Memoize empty state rendering to prevent recreation on every render
+  const renderEmpty = useMemo(() => (
     <Card className="p-8 text-center">
       <div className="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mb-4">
         <User className="h-8 w-8" />
@@ -124,7 +126,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
       <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Doctors Found</h3>
       <p className="text-slate-500 dark:text-slate-400">{emptyMessage}</p>
     </Card>
-  );
+  ), [emptyMessage]);
 
   return (
     <div className={className}>
@@ -191,7 +193,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
                       ? "bg-slate-100 dark:bg-slate-700 text-primary" 
                       : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                   )}
-                  onClick={() => setViewMode('grid')}
+                  onClick={useCallback(() => setViewMode('grid'), [])}
                   aria-label="Grid view"
                 >
                   <Grid className="h-5 w-5" />
@@ -203,7 +205,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
                       ? "bg-slate-100 dark:bg-slate-700 text-primary" 
                       : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                   )}
-                  onClick={() => setViewMode('list')}
+                  onClick={useCallback(() => setViewMode('list'), [])}
                   aria-label="List view"
                 >
                   <List className="h-5 w-5" />
@@ -216,7 +218,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
 
       {/* Doctor List */}
       {error ? (
-        renderError()
+        renderError
       ) : isLoading ? (
         <div className={clsx(
           "grid gap-6",
@@ -225,7 +227,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
           {renderSkeletons()}
         </div>
       ) : doctors.length === 0 ? (
-        renderEmpty()
+        renderEmpty
       ) : (
         <div className={clsx(
           "grid gap-6",

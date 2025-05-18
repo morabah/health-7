@@ -9,6 +9,7 @@ import type { z } from 'zod';
 import type { UpdateProfileSchema, Appointment } from '@/types/schemas';
 import { logError, logInfo } from '@/lib/logger';
 import { isOnline, executeWhenOnline, persistError, normalizeError } from '@/hooks/useErrorSystem';
+import { CACHE_DURATIONS } from '@/lib/cacheDurations';
 
 /**
  * Hook to fetch patient profile data
@@ -96,7 +97,7 @@ export const useBatchPatientData = (
       patientIds.length > 0 &&
       !!user?.uid &&
       (user.role === UserType.DOCTOR || user.role === UserType.ADMIN),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: CACHE_DURATIONS.PATIENT_PROFILE, // 5 minutes for patient profiles
     // Keep data for 10 minutes
     gcTime: 10 * 60 * 1000,
     // Process and cache individual patient data
@@ -147,79 +148,50 @@ export const useUpdatePatientProfile = () => {
 
 /**
  * Hook to fetch patient appointments
+ * @deprecated Use useMyAppointments from sharedRoleLoaders.ts instead
  */
 export function usePatientAppointments() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-
-  return useQuery({
-    queryKey: ['appointments', user?.uid],
-    queryFn: async () => {
-      if (!user?.uid) {
-        throw new AuthError('You must be logged in to view appointments');
-      }
-
-      return callApi('getMyAppointments', { uid: user.uid, role: user.role });
-    },
-    enabled: !!user?.uid,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+  
+  // Import the shared hook here to avoid circular dependencies
+  const { useMyAppointments } = require('./sharedRoleLoaders');
+  
+  // Only enable if the user is a patient
+  const isPatient = user?.role === UserType.PATIENT;
+  
+  // Use the shared hook with patient-specific options
+  return useMyAppointments({
+    enabled: isPatient && !!user?.uid
   });
 }
 
 /**
  * Hook to get appointment details by ID for the current patient
+ * @deprecated Use useAppointmentDetails from sharedRoleLoaders.ts instead
  */
 export function useAppointmentDetails(appointmentId: string) {
-  const user = useAuth().user;
-
-  return useQuery({
-    queryKey: ['appointment', appointmentId],
-    queryFn: async () => {
-      if (!user) {
-        throw new AuthError('User not authenticated');
-      }
-
-      // Create the context object
-      const context = {
-        uid: user.uid,
-        role: UserType.PATIENT,
-      };
-
-      // Pass context as first argument and data as second argument
-      return await callApi('getAppointmentDetails', context, { appointmentId });
-    },
-    enabled: !!appointmentId && !!user,
-  });
+  const { user } = useAuth();
+  
+  // Import the shared hook here to avoid circular dependencies
+  const { useAppointmentDetails: useSharedAppointmentDetails } = require('./sharedRoleLoaders');
+  
+  // Only enable if the user is a patient
+  const isPatient = user?.role === UserType.PATIENT;
+  
+  // Use the shared hook
+  return useSharedAppointmentDetails(appointmentId);
 }
 
 /**
  * Hook to cancel an appointment
+ * @deprecated Use useCancelAppointment from sharedRoleLoaders.ts instead
  */
 export function useCancelAppointment() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ appointmentId, reason }: { appointmentId: string; reason: string }) => {
-      if (!user?.uid) {
-        throw new AuthError('You must be logged in to cancel an appointment');
-      }
-
-      const response = await callApi<{ success: boolean; message?: string }>(
-        'cancelAppointment',
-        { uid: user.uid, role: user.role },
-        { appointmentId, reason }
-      );
-
-      return response;
-    },
-    onSuccess: () => {
-      // Invalidate appointments query to refetch the list
-      queryClient.invalidateQueries({ queryKey: ['appointments', user?.uid] });
-    },
-    onError: error => {
-      logError('Failed to cancel appointment', { error });
-      throw error; // Re-throw for UI handling
-    },
-  });
+  
+  // Import the shared hook here to avoid circular dependencies
+  const { useCancelAppointment: useSharedCancelAppointment } = require('./sharedRoleLoaders');
+  
+  // Use the shared hook
+  return useSharedCancelAppointment();
 }

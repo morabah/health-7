@@ -1,4 +1,4 @@
-import type { LogEventPayload, ValidationEventPayload } from './eventBus';
+import type { LogEventPayload, ValidationEventPayload, PerformanceEventPayload } from './eventBus';
 import { appEventBus, LogLevel } from './eventBus';
 
 // Check if we're in browser

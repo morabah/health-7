@@ -393,17 +393,31 @@ function AdminDashboardContent() {
     error: batchError,
   } = useSafeBatchData(batchResult, adminDashboardKeys);
 
-  // Extracted data pieces
-  const adminStats = extractedData?.adminStats?.adminStats;
-  const allUsers = extractedData?.allUsers?.success ? extractedData.allUsers.users : [];
-  const pendingDoctors = extractedData?.pendingDoctors?.success
-    ? extractedData.pendingDoctors.doctors.filter(
-        d => d.verificationStatus === VerificationStatus.PENDING
-      )
-    : [];
-  const allAppointments = extractedData?.allAppointments?.success
-    ? extractedData.allAppointments.appointments
-    : [];
+  // Extracted data pieces - memoize to prevent recomputing on every render
+  const adminStats = useMemo(() => {
+    return extractedData?.adminStats?.adminStats || {};
+  }, [extractedData?.adminStats]);
+  
+  // Memoize allUsers calculation to prevent recomputing on every render
+  const allUsers = useMemo(() => {
+    return extractedData?.allUsers?.success ? extractedData.allUsers.users : [];
+  }, [extractedData?.allUsers]);
+  
+  // Memoize pendingDoctors calculation to prevent recomputing on every render
+  const pendingDoctors = useMemo(() => {
+    return extractedData?.pendingDoctors?.success
+      ? extractedData.pendingDoctors.doctors.filter(
+          (d: { verificationStatus: VerificationStatus }) => d.verificationStatus === VerificationStatus.PENDING
+        )
+      : [];
+  }, [extractedData?.pendingDoctors]);
+  
+  // Memoize allAppointments calculation to prevent recomputing on every render
+  const allAppointments = useMemo(() => {
+    return extractedData?.allAppointments?.success
+      ? extractedData.allAppointments.appointments
+      : [];
+  }, [extractedData?.allAppointments]);
 
   // Dashboard statistics derived from API data
   const totalUsers = adminStats?.totalUsers || 0;
@@ -426,6 +440,53 @@ function AdminDashboardContent() {
       .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
       .slice(0, 5);
   }, [allAppointments]);
+
+  // Sort sections by their order - memoize to prevent recomputing on every render
+  const sortedSections = useMemo(() => {
+    return [...dashboardPreferences.sections].sort((a, b) => a.order - b.order);
+  }, [dashboardPreferences.sections]);
+
+  // Get visible main grid sections - memoize to prevent recomputing on every render
+  const visibleMainSections = useMemo(() => {
+    return dashboardPreferences.sections
+      .filter(
+        s =>
+          [
+            'verification',
+            'recent-users',
+            'recent-appointments',
+            'system-status',
+            'quick-actions',
+          ].includes(s.id) && s.visible
+      )
+      .sort((a, b) => a.order - b.order);
+  }, [dashboardPreferences.sections]);
+
+  // Define any other useMemo hooks that might be conditionally called
+  // This ensures all hooks are called in the same order on every render
+  const sectionsToRender = useMemo(() => {
+    return sortedSections
+      .filter(s => s.visible && ['stats'].includes(s.id))
+      .map(section => section.id);
+  }, [sortedSections]);
+
+  // Pre-calculate visibility of each section to avoid conditional rendering
+  // This ensures hooks are called in the same order every time
+  const sectionVisibility = useMemo(() => {
+    const sectionIds = [
+      'verification',
+      'recent-users',
+      'recent-appointments',
+      'system-status',
+      'quick-actions',
+    ];
+    return sectionIds.reduce((acc, id) => {
+      acc[id] = !!dashboardPreferences.sections.find(
+        s => s.id === id && s.visible
+      );
+      return acc;
+    }, {} as Record<string, boolean>);
+  }, [dashboardPreferences.sections]);
 
   // Toggle section visibility
   const toggleSectionVisibility = (sectionId: string) => {
@@ -530,9 +591,6 @@ function AdminDashboardContent() {
     );
   }
 
-  // Sort sections by their order
-  const sortedSections = [...dashboardPreferences.sections].sort((a, b) => a.order - b.order);
-
   // Render dashboard sections based on preferences
   const renderSection = (sectionId: string) => {
     const section = dashboardPreferences.sections.find(s => s.id === sectionId);
@@ -613,20 +671,6 @@ function AdminDashboardContent() {
     }
   };
 
-  // Get visible main grid sections
-  const visibleMainSections = dashboardPreferences.sections
-    .filter(
-      s =>
-        [
-          'verification',
-          'recent-users',
-          'recent-appointments',
-          'system-status',
-          'quick-actions',
-        ].includes(s.id) && s.visible
-    )
-    .sort((a, b) => a.order - b.order);
-
   return (
     <div
       className={`space-y-6 p-4 md:p-6 ${dashboardPreferences.layout === 'compact' ? 'max-w-5xl mx-auto' : ''}`}
@@ -677,9 +721,7 @@ function AdminDashboardContent() {
       </div>
 
       {/* Render top sections based on preferences */}
-      {sortedSections
-        .filter(s => s.visible && ['stats'].includes(s.id))
-        .map(section => renderSection(section.id))}
+      {sectionsToRender.map(sectionId => renderSection(sectionId))}
 
       {/* Main Grid Layout */}
       <div
@@ -694,7 +736,7 @@ function AdminDashboardContent() {
         {/* Left Column */}
         <div className="space-y-6">
           {/* Doctor Verification Requests */}
-          {visibleMainSections.find(s => s.id === 'verification') && (
+          {sectionVisibility['verification'] && (
             <Card
               key="verification"
               draggable={isEditMode}
@@ -745,7 +787,7 @@ function AdminDashboardContent() {
                   </div>
                 ) : pendingDoctors.length > 0 ? (
                   <div className="space-y-2">
-                    {pendingDoctors.slice(0, 5).map(doctor => (
+                    {pendingDoctors.slice(0, 5).map((doctor: Doctor & User) => (
                       <Link href={`/admin/doctor-verification/${doctor.id}`} key={doctor.id}>
                         <div className="flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
                           <div
@@ -779,7 +821,7 @@ function AdminDashboardContent() {
           )}
 
           {/* Recent Users */}
-          {visibleMainSections.find(s => s.id === 'recent-users') && (
+          {sectionVisibility['recent-users'] && (
             <Card
               key="recent-users"
               draggable={isEditMode}
@@ -833,36 +875,41 @@ function AdminDashboardContent() {
                   </div>
                 ) : recentUsers.length > 0 ? (
                   <div className="space-y-1">
-                    {recentUsers.map(user => (
-                      <Link href={`/admin/users/${user.id}`} key={user.id}>
-                        <div className="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
-                          <div className="flex items-center">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                user.userType === UserType.DOCTOR
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                  : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                              }`}
-                            >
-                              {user.userType === UserType.DOCTOR ? (
-                                <Stethoscope className="h-4 w-4" />
-                              ) : (
-                                <UserRound className="h-4 w-4" />
-                              )}
+                    {recentUsers.map(user => {
+                      // Pre-compute values outside JSX to avoid conditional hooks
+                      const isDoctor = user.userType === UserType.DOCTOR;
+                      const backgroundClass = isDoctor 
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400';
+                      const badgeVariant = isDoctor ? 'info' : 'success';
+                      
+                      return (
+                        <Link href={`/admin/users/${user.id}`} key={user.id}>
+                          <div className="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                            <div className="flex items-center">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center ${backgroundClass}`}
+                              >
+                                {isDoctor ? (
+                                  <Stethoscope className="h-4 w-4" />
+                                ) : (
+                                  <UserRound className="h-4 w-4" />
+                                )}
+                              </div>
+                              <div className="ml-3">
+                                <p className="font-medium">
+                                  {user.firstName} {user.lastName}
+                                </p>
+                                <p className="text-xs text-slate-500">{user.email}</p>
+                              </div>
                             </div>
-                            <div className="ml-3">
-                              <p className="font-medium">
-                                {user.firstName} {user.lastName}
-                              </p>
-                              <p className="text-xs text-slate-500">{user.email}</p>
-                            </div>
+                            <Badge variant={badgeVariant}>
+                              {user.userType}
+                            </Badge>
                           </div>
-                          <Badge variant={user.userType === UserType.DOCTOR ? 'info' : 'success'}>
-                            {user.userType}
-                          </Badge>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -875,7 +922,7 @@ function AdminDashboardContent() {
           )}
 
           {/* System Status */}
-          {visibleMainSections.find(s => s.id === 'system-status') && (
+          {sectionVisibility['system-status'] && (
             <Card
               key="system-status"
               draggable={isEditMode}
@@ -912,7 +959,7 @@ function AdminDashboardContent() {
                       <p className="text-sm font-medium">Database Status</p>
                       <Badge variant="success">Online</Badge>
                     </div>
-                    <ProgressBar value={95} max={100} className="h-2" variant="success" />
+                    <ProgressBar value={95} max={100} className="h-2 bg-green-100 dark:bg-green-900/30" />
                     <p className="text-xs text-right mt-1 text-slate-500">95% optimal</p>
                   </div>
                   <div>
@@ -920,7 +967,7 @@ function AdminDashboardContent() {
                       <p className="text-sm font-medium">API Performance</p>
                       <Badge variant="success">Excellent</Badge>
                     </div>
-                    <ProgressBar value={90} max={100} className="h-2" variant="success" />
+                    <ProgressBar value={90} max={100} className="h-2 bg-green-100 dark:bg-green-900/30" />
                     <p className="text-xs text-right mt-1 text-slate-500">90% optimal</p>
                   </div>
                   <div>
@@ -928,7 +975,7 @@ function AdminDashboardContent() {
                       <p className="text-sm font-medium">Storage Utilization</p>
                       <Badge variant="info">Good</Badge>
                     </div>
-                    <ProgressBar value={60} max={100} className="h-2" variant="info" />
+                    <ProgressBar value={60} max={100} className="h-2 bg-blue-100 dark:bg-blue-900/30" />
                     <p className="text-xs text-right mt-1 text-slate-500">60% used</p>
                   </div>
                 </div>
@@ -940,7 +987,7 @@ function AdminDashboardContent() {
         {/* Right Column */}
         <div className="space-y-6">
           {/* Recent Appointments */}
-          {visibleMainSections.find(s => s.id === 'recent-appointments') && (
+          {sectionVisibility['recent-appointments'] && (
             <Card
               key="recent-appointments"
               draggable={isEditMode}
@@ -1001,50 +1048,44 @@ function AdminDashboardContent() {
                   </div>
                 ) : recentAppointments.length > 0 ? (
                   <div className="space-y-3">
-                    {recentAppointments.map(appointment => (
-                      <Link href={`/admin/appointments/${appointment.id}`} key={appointment.id}>
-                        <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                          <div className="flex justify-between mb-1">
-                            <p className="font-medium">{appointment.patientName}</p>
-                            <p className="text-sm">
-                              {
-                                // Format date
-                                new Date(appointment.appointmentDate).toLocaleDateString()
-                              }
+                    {recentAppointments.map(appointment => {
+                      // Pre-compute values outside JSX to avoid conditional hooks
+                      const formattedDate = new Date(appointment.appointmentDate).toLocaleDateString();
+                      
+                      const appointmentTime = appointment.appointmentDate.includes('T')
+                        ? new Date(appointment.appointmentDate).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Time not available';
+                      
+                      let badgeVariant: 'success' | 'info' | 'danger' | 'default' = 'default';
+                      if (appointment.status === AppointmentStatus.COMPLETED) {
+                        badgeVariant = 'success';
+                      } else if (appointment.status === AppointmentStatus.CONFIRMED) {
+                        badgeVariant = 'info';
+                      } else if (appointment.status === AppointmentStatus.CANCELED) {
+                        badgeVariant = 'danger';
+                      }
+                      
+                      return (
+                        <Link href={`/admin/appointments/${appointment.id}`} key={appointment.id}>
+                          <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <div className="flex justify-between mb-1">
+                              <p className="font-medium">{appointment.patientName}</p>
+                              <p className="text-sm">{formattedDate}</p>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-1">
+                              With Dr. {appointment.doctorName}
                             </p>
+                            <div className="flex justify-between">
+                              <p className="text-xs text-slate-500">{appointmentTime}</p>
+                              <Badge variant={badgeVariant}>{appointment.status}</Badge>
+                            </div>
                           </div>
-                          <p className="text-sm text-slate-500 mb-1">
-                            With Dr. {appointment.doctorName}
-                          </p>
-                          <div className="flex justify-between">
-                            <p className="text-xs text-slate-500">
-                              {
-                                // Try to extract time from appointmentDate
-                                appointment.appointmentDate.includes('T')
-                                  ? new Date(appointment.appointmentDate).toLocaleTimeString([], {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })
-                                  : 'Time not available'
-                              }
-                            </p>
-                            <Badge
-                              variant={
-                                appointment.status === AppointmentStatus.COMPLETED
-                                  ? 'success'
-                                  : appointment.status === AppointmentStatus.CONFIRMED
-                                    ? 'info'
-                                    : appointment.status === AppointmentStatus.CANCELED
-                                      ? 'danger'
-                                      : 'default'
-                              }
-                            >
-                              {appointment.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -1057,7 +1098,7 @@ function AdminDashboardContent() {
           )}
 
           {/* Quick Actions */}
-          {visibleMainSections.find(s => s.id === 'quick-actions') && (
+          {sectionVisibility['quick-actions'] && (
             <Card
               key="quick-actions"
               draggable={isEditMode}

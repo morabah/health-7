@@ -20,7 +20,7 @@ import { DataError } from './errors';
  */
 async function fetchCollectionData<T>(collection: string): Promise<T[]> {
   try {
-    const response = await fetch(`/api/localDb?collection=${collection}`);
+    const response = await fetch(`/api/localDb?collection=${encodeURIComponent(collection)}`);
     
     if (!response.ok) {
       const error = await response.json();
@@ -43,7 +43,7 @@ async function fetchCollectionData<T>(collection: string): Promise<T[]> {
  */
 async function saveCollectionData<T>(collection: string, data: T[]): Promise<boolean> {
   try {
-    const response = await fetch(`/api/localDb?collection=${collection}`, {
+    const response = await fetch(`/api/localDb?collection=${encodeURIComponent(collection)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

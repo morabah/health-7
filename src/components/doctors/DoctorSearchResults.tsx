@@ -1,4 +1,5 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
 import Card from '@/components/ui/Card';
@@ -11,6 +12,14 @@ import { useApiQuery, prefetchApiQuery } from '@/lib/enhancedApiClient';
 import { cacheKeys } from '@/lib/queryClient';
 import { useBatchDoctorData } from '@/data/doctorLoaders';
 import { trackPerformance } from '@/lib/performance';
+import { logInfo, logError } from '@/lib/logger';
+import { getCachedDoctorSearchResults, cacheDoctorSearchResults, prefetchDoctorProfiles } from '@/lib/doctorCacheUtils';
+
+// Dynamically import the VirtualizedList component to reduce initial load time
+const VirtualizedList = dynamic(() => import('@/components/ui/VirtualizedList'), {
+  ssr: false,
+  loading: () => <div className="py-4"><Spinner /></div>
+});
 
 // Define interface for doctor data
 interface Doctor {
@@ -206,6 +215,11 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   const perfTracker = useMemo(() => trackPerformance('DoctorSearchResults'), []);
   const hasLoggedPerformance = useRef(false);
 
+  // Check for cached search results first for immediate display
+  const cachedResults = useMemo(() => {
+    return getCachedDoctorSearchResults(searchParams);
+  }, [searchParams]);
+
   // Use enhanced API client with React Query integration
   const {
     data: searchData,
@@ -216,9 +230,14 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
     cacheKeys.doctors(searchParams),
     [searchParams],
     {
-      staleTime: 2 * 60 * 1000, // 2 minutes - longer stale time for search results
+      staleTime: 5 * 60 * 1000, // 5 minutes - longer stale time for search results
       retry: 1, // Only retry once for faster feedback
       retryDelay: 1000, // 1 second between retries
+      // Use cached data if available for immediate rendering
+      initialData: cachedResults ? { 
+        success: true, 
+        doctors: cachedResults.doctors 
+      } : undefined
     }
   );
 
@@ -231,15 +250,22 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   // Batch load additional doctor details
   const { data: batchData, isLoading: isBatchLoading } = useBatchDoctorData(doctorIds, {
     enabled: doctorIds.length > 0,
+    // Note: staleTime would be useful here but is not supported in the current interface
   });
 
   // Create enhanced doctor data by merging search results with batch data
   const doctors = useMemo(() => {
     if (!searchData?.success || !searchData.doctors) return [];
 
+    // Early exit if no search data to avoid unnecessary processing
+    if (searchData.doctors.length === 0) return [];
+
+    // Extract batch doctor data once outside the map function
+    const batchDoctors = batchData?.success ? batchData.doctors : {};
+
     return searchData.doctors.map(doctor => {
       // Find additional data from batch results if available
-      const batchDoctor = batchData?.success && batchData.doctors[doctor.id];
+      const batchDoctor = batchDoctors[doctor.id];
 
       // Merge the data, preferring search result data when there's a conflict
       return {
@@ -249,28 +275,85 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
     });
   }, [searchData, batchData]);
 
-  // Determine overall loading state
-  const isLoading = isSearchLoading || (doctorIds.length > 0 && isBatchLoading && !batchData);
+  // Determine overall loading state - memoize to prevent recalculation on every render
+  const isLoading = useMemo(() => {
+    return isSearchLoading || (doctorIds.length > 0 && isBatchLoading && !batchData);
+  }, [isSearchLoading, doctorIds.length, isBatchLoading, batchData]);
+
   const error = searchError;
 
-  React.useEffect(() => {
-    if (doctors.length > 0 && !hasLoggedPerformance.current) {
-      perfTracker.stop();
-      hasLoggedPerformance.current = true;
-    }
-  }, [doctors.length, perfTracker, searchParams, batchData]);
-
-  return (
-    <div className={className}>
-      {/* Results Count and Message */}
-      {!isLoading && !error && doctors && (
+  // Memoized Results Count Message
+  const resultsCountMessage = useMemo(() => {
+    if (!isLoading && !error && doctors) {
+      return (
         <div className="mb-4">
           <h2 className="text-lg font-medium">
             {doctors.length} {doctors.length === 1 ? 'Doctor' : 'Doctors'} Available
           </h2>
           <p className="text-slate-500 text-sm">Showing doctors that match your criteria</p>
         </div>
-      )}
+      );
+    }
+    return null;
+  }, [isLoading, error, doctors?.length]);
+
+  // Track if we should use virtualization (for larger datasets)
+  const shouldUseVirtualization = useMemo(() => {
+    return doctors.length > 10; // Use virtualization for more than 10 doctors
+  }, [doctors.length]);
+  
+  // Log performance metrics for large datasets
+  useEffect(() => {
+    if (doctors.length > 20) {
+      logInfo('DoctorSearchResults performance', {
+        totalDoctors: doctors.length,
+        isVirtualized: shouldUseVirtualization,
+        renderTime: perfTracker.getElapsedTime()
+      });
+    }
+  }, [doctors.length, shouldUseVirtualization, perfTracker]);
+  
+  // Memoized Doctor Cards (used when not virtualizing)
+  const doctorCards = useMemo(() => {
+    if (shouldUseVirtualization) return null;
+    return doctors.map(doctor => (
+      <DoctorCard key={doctor.id} doctor={doctor} />
+    ));
+  }, [doctors, shouldUseVirtualization]);
+
+  // Memoized No Doctors Message
+  const noDoctorsMessage = useMemo(() => (
+    <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
+      <Stethoscope className="h-12 w-12 mx-auto mb-4 text-slate-400" />
+      <h3 className="text-lg font-medium mb-2">No Doctors Found</h3>
+      <p className="text-slate-500 mb-4">
+        Try adjusting your search filters to find more results.
+      </p>
+      <Button variant="outline">Clear Filters</Button>
+    </div>
+  ), []);
+
+  // Cache search results for future use
+  useEffect(() => {
+    if (searchData?.success && searchData?.doctors?.length > 0) {
+      cacheDoctorSearchResults(searchParams, searchData.doctors, searchData.doctors.length);
+      // Prefetch doctor profiles for better UX
+      prefetchDoctorProfiles(searchData.doctors);
+    }
+  }, [searchData, searchParams]);
+
+  // Optimize performance tracking to avoid unnecessary effect runs
+  React.useEffect(() => {
+    if (doctors.length > 0 && !hasLoggedPerformance.current) {
+      perfTracker.stop();
+      hasLoggedPerformance.current = true;
+    }
+  }, [doctors.length, perfTracker]);
+
+  return (
+    <div className={className}>
+      {/* Results Count and Message */}
+      {resultsCountMessage}
 
       {/* Loading State */}
       {isLoading && (
@@ -289,23 +372,39 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
 
       {/* Doctor Cards */}
       {!isLoading && !error && doctors && doctors.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {doctors.map(doctor => (
-            <DoctorCard key={doctor.id} doctor={doctor} />
-          ))}
-        </div>
-      ) : (
-        !isLoading &&
-        !error && (
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
-            <Stethoscope className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-            <h3 className="text-lg font-medium mb-2">No Doctors Found</h3>
-            <p className="text-slate-500 mb-4">
-              Try adjusting your search filters to find more results.
-            </p>
-            <Button variant="outline">Clear Filters</Button>
+        shouldUseVirtualization ? (
+          // Virtualized list for better performance with many doctors
+          <div style={{ height: doctors.length > 10 ? '800px' : 'auto' }}>
+            <VirtualizedList
+              items={doctors}
+              itemSize={220} // Height of each doctor card in pixels
+              height={doctors.length > 10 ? 800 : doctors.length * 220}
+              renderItem={(item, index, style) => {
+                const doctor = item as Doctor;
+                return (
+                  <div style={style} className="px-2 py-2">
+                    <DoctorCard key={doctor.id} doctor={doctor} />
+                  </div>
+                );
+              }}
+              overscanCount={3}
+              onItemsRendered={({ visibleStartIndex, visibleStopIndex }) => {
+                logInfo('DoctorSearchVirtualized performance', {
+                  visibleItems: visibleStopIndex - visibleStartIndex + 1,
+                  totalItems: doctors.length
+                });
+              }}
+            />
+          </div>
+        ) : (
+          // Regular grid for smaller lists
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {doctorCards}
           </div>
         )
+      ) : (
+        !isLoading &&
+        !error && noDoctorsMessage
       )}
     </div>
   );

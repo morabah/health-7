@@ -18,6 +18,9 @@ export interface PerformanceTracker {
   
   /** Marks a point in time during execution with a label */
   mark: (markerName: string) => void;
+  
+  /** Gets the elapsed time in milliseconds without stopping the timer */
+  getElapsedTime: () => number;
 }
 
 /**
@@ -51,11 +54,7 @@ export function trackPerformance(label: string): PerformanceTracker {
         .map(([name, time]) => `${name}: ${Math.round(time - startTime)}ms`)
         .join(', ');
         
-      const logMessage = markerInfo 
-        ? `Performance [${label}]: ${roundedMs}ms (${markerInfo})`
-        : `Performance [${label}]: ${roundedMs}ms`;
-        
-      logInfo(logMessage);
+      logInfo(`⏱️ ${label} completed in ${roundedMs}ms${markerInfo ? ` (${markerInfo})` : ''}`);
       isStopped = true;
 
       return roundedMs;
@@ -69,10 +68,12 @@ export function trackPerformance(label: string): PerformanceTracker {
     mark: (markerName: string) => {
       if (isStopped) return;
       markers[markerName] = performance.now();
-      
-      // Optionally log each marker as it happens (useful for long-running operations)
-      // logInfo(`Performance [${label}] Mark: ${markerName} at ${Math.round(markers[markerName] - startTime)}ms`);
-    }
+    },
+    
+    getElapsedTime: () => {
+      if (isStopped) return 0;
+      return Math.round(performance.now() - startTime);
+    },
   };
 }
 

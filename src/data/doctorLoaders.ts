@@ -8,6 +8,7 @@ import type { z } from 'zod';
 import type { UpdateProfileSchema, SetDoctorAvailabilitySchema, Appointment } from '@/types/schemas';
 import { AuthError } from '@/lib/errors/errorClasses';
 import { isOnline, executeWhenOnline, persistError, normalizeError } from '@/hooks/useErrorSystem';
+import { CACHE_DURATIONS } from '@/lib/cacheDurations';
 
 /**
  * Hook to fetch doctor profile data
@@ -74,30 +75,20 @@ export const useUpdateDoctorProfile = () => {
 
 /**
  * Hook to fetch doctor appointments
+ * @deprecated Use useMyAppointments from sharedRoleLoaders.ts instead
  */
 export const useDoctorAppointments = () => {
   const { user } = useAuth();
   
-  return useQuery({
-    queryKey: ['doctorAppointments', user?.uid],
-    queryFn: async () => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      
-      // Handle offline scenario gracefully
-      try {
-        return await callApi('getMyAppointments', { 
-          uid: user.uid, 
-          role: UserType.DOCTOR 
-        });
-      } catch (error) {
-        // Persist critical errors for analysis
-        persistError(normalizeError(error));
-        throw error;
-      }
-    },
-    enabled: !!user?.uid,
-    // Stale time to reduce unnecessary fetches
-    staleTime: 5 * 60 * 1000, // 5 minutes
+  // Import the shared hook here to avoid circular dependencies
+  const { useMyAppointments } = require('./sharedRoleLoaders');
+  
+  // Only enable if the user is a doctor
+  const isDoctor = user?.role === UserType.DOCTOR;
+  
+  // Use the shared hook with doctor-specific options
+  return useMyAppointments({
+    enabled: isDoctor && !!user?.uid
   });
 };
 
@@ -139,41 +130,16 @@ export const useCompleteAppointment = () => {
 
 /**
  * Hook for doctor to cancel an appointment
+ * @deprecated Use useCancelAppointment from sharedRoleLoaders.ts instead
  */
 export const useDoctorCancelAppointment = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   
-  return useMutation({
-    mutationFn: async (params: { appointmentId: string; reason: string }) => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      
-      // Execute only when online
-      return executeWhenOnline(async () => {
-        try {
-          // Create proper context object
-          const context = { 
-            uid: user.uid, 
-            role: UserType.DOCTOR 
-          };
-          
-          // Pass context as first argument and appointment params as second
-          return await callApi('cancelAppointment', context, { 
-            appointmentId: params.appointmentId,
-            reason: params.reason
-          });
-        } catch (error) {
-          // Persist critical operation errors
-          persistError(normalizeError(error));
-          throw error;
-        }
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctorAppointments'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    }
-  });
+  // Import the shared hook here to avoid circular dependencies
+  const { useCancelAppointment: useSharedCancelAppointment } = require('./sharedRoleLoaders');
+  
+  // Use the shared hook
+  return useSharedCancelAppointment();
 };
 
 /**
@@ -237,32 +203,20 @@ export const useSetAvailability = () => {
 
 /**
  * Hook to fetch a single appointment details
+ * @deprecated Use useAppointmentDetails from sharedRoleLoaders.ts instead
  */
-export const useAppointmentDetails = (appointmentId: string) => {
+export function useAppointmentDetails(appointmentId: string) {
   const { user } = useAuth();
   
-  return useQuery({
-    queryKey: ['appointmentDetails', appointmentId, user?.uid],
-    queryFn: async () => {
-      if (!user?.uid) throw new AuthError('User not authenticated');
-      
-      try {
-        // Create context object
-        const context = {
-          uid: user.uid,
-          role: UserType.DOCTOR
-        };
-        
-        // Use getAppointmentDetails API method
-        return await callApi('getAppointmentDetails', context, { appointmentId });
-      } catch (error) {
-        persistError(normalizeError(error));
-        throw error;
-      }
-    },
-    enabled: !!user?.uid && !!appointmentId
-  });
-};
+  // Import the shared hook here to avoid circular dependencies
+  const { useAppointmentDetails: useSharedAppointmentDetails } = require('./sharedRoleLoaders');
+  
+  // Only enable if the user is a doctor
+  const isDoctor = user?.role === UserType.DOCTOR;
+  
+  // Use the shared hook
+  return useSharedAppointmentDetails(appointmentId);
+}
 
 /**
  * Function to get appointment details by ID for a doctor
@@ -313,7 +267,7 @@ export const useBatchDoctorData = (doctorIds: string[] = [], options: { enabled?
       );
     },
     enabled: options.enabled !== false && doctorIds.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: CACHE_DURATIONS.DOCTOR_PROFILE, // 5 minutes for doctor profiles
     // Keep data for 10 minutes
     gcTime: 10 * 60 * 1000,
     // Deduplicate identical requests

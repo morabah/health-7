@@ -1,5 +1,7 @@
 'use client';
-import React, { useEffect, useState, Fragment } from 'react';
+import React, { useEffect, useState, Fragment, useRef, useMemo, useCallback } from 'react';
+import { AppointmentError, ApiError } from '@/lib/errors/errorClasses';
+import { logError, logInfo } from '@/lib/logger';
 import { Tab } from '@headlessui/react';
 import clsx from 'clsx';
 import Card from '@/components/ui/Card';
@@ -17,7 +19,14 @@ import type { Appointment } from '@/types/schemas';
 import Link from 'next/link';
 import CancelAppointmentModal from '@/components/patient/CancelAppointmentModal';
 import AppointmentErrorBoundary from '@/components/error-boundaries/AppointmentErrorBoundary';
-import { useRenderPerformance } from '@/lib/performance';
+import { useRenderPerformance, trackPerformance } from '@/lib/performance';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the VirtualizedList component to reduce initial load time
+const VirtualizedList = dynamic(() => import('@/components/ui/VirtualizedList'), {
+  ssr: false,
+  loading: () => <div className="py-4"><Spinner /></div>
+});
 
 // Define interfaces for API responses
 interface AppointmentsResponse {
@@ -138,6 +147,22 @@ function PatientAppointmentsContent() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showBookingSuccess, setShowBookingSuccess] = useState(false);
+  
+  // Add state for virtualization
+  const [virtualizedState, setVirtualizedState] = useState({
+    isVisible: false,
+    hasRendered: false
+  });
+  
+  // Track if we're on a mobile device for responsive adjustments
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Reference for the virtualized container
+  const virtualizedRef = useRef<HTMLDivElement>(null);
+  
+  // Performance tracking
+  const perfRef = useRef(trackPerformance('PatientAppointmentsPage'));
+  
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -146,78 +171,167 @@ function PatientAppointmentsContent() {
   const cancelMutation = useCancelAppointment();
 
   // Check for justBooked parameter
+  // Detect mobile devices and handle resize events
   useEffect(() => {
-    const justBooked = searchParams?.get('justBooked');
-    if (justBooked === '1') {
-      setShowBookingSuccess(true);
-      // refetch(); // Explicitly call refetch here - REMOVED as manual cache update should suffice
-      // Remove the parameter from URL after a short delay
-      setTimeout(() => {
-        router.replace('/patient/appointments');
-      }, 3000);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkMobile);
+    
+    // Set virtualized list as visible after initial render
+    const timer = setTimeout(() => {
+      setVirtualizedState(prev => ({
+        ...prev,
+        isVisible: true
+      }));
+    }, 100);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  // These will be defined after filteredAppointments is declared
+
+  useEffect(() => {
+    try {
+      const justBooked = searchParams?.get('justBooked');
+      if (justBooked === '1') {
+        setShowBookingSuccess(true);
+        // Remove the parameter from URL after a short delay
+        setTimeout(() => {
+          router.replace('/patient/appointments');
+        }, 3000);
+      }
+    } catch (error) {
+      // Standardized error handling for URL parameter processing
+      logError('Error processing URL parameters', { 
+        error, 
+        searchParams: searchParams?.toString() 
+      });
     }
-  }, [searchParams, router]); // Removed refetch from dependency array
+  }, [searchParams, router]);
 
   // Filter appointments based on tab
-  const appointments = (appointmentsData as AppointmentsResponse)?.success
-    ? (appointmentsData as AppointmentsResponse).appointments || []
-    : [];
+  const appointments = React.useMemo(() => {
+    if (!appointmentsData) return [];
+    
+    // Safely cast and extract appointments using standardized pattern
+    const response = appointmentsData as AppointmentsResponse;
+    if (response?.success) {
+      return response.appointments || [];
+    } else if (response?.error) {
+      // Log but don't throw - we'll handle this with empty state UI
+      logError('Error loading appointments', { error: response.error });
+      return [];
+    }
+    return [];
+  }, [appointmentsData]);
 
-  const filteredAppointments = {
-    Upcoming: appointments.filter((a: Appointment) => {
-      const isStatusOk =
-        a.status === AppointmentStatus.PENDING ||
-        a.status === AppointmentStatus.CONFIRMED ||
-        a.status === AppointmentStatus.RESCHEDULED;
+  // Memoize filtered appointments to prevent recomputing on every render
+  const filteredAppointments = React.useMemo(() => {
+    // Get current time once for all filter operations
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return {
+      Upcoming: appointments.filter((a: Appointment) => {
+        const isStatusOk =
+          a.status === AppointmentStatus.PENDING ||
+          a.status === AppointmentStatus.CONFIRMED ||
+          a.status === AppointmentStatus.RESCHEDULED;
 
-      if (!isStatusOk) {
-        return false; // Don't log details if status doesn't match
-      }
+        if (!isStatusOk) {
+          return false; // Don't log details if status doesn't match
+        }
 
-      const now = new Date();
-      const appointmentDateObj = new Date(a.appointmentDate);
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfAppointmentDay = new Date(
-        appointmentDateObj.getFullYear(),
-        appointmentDateObj.getMonth(),
-        appointmentDateObj.getDate()
-      );
+        const appointmentDateObj = new Date(a.appointmentDate);
+        const startOfAppointmentDay = new Date(
+          appointmentDateObj.getFullYear(),
+          appointmentDateObj.getMonth(),
+          appointmentDateObj.getDate()
+        );
 
-      let isUpcoming = false;
-      if (startOfAppointmentDay > startOfToday) {
-        isUpcoming = true; // Future date
-      } else if (startOfAppointmentDay.getTime() === startOfToday.getTime()) {
-        // Same day, compare times
-        isUpcoming = appointmentDateObj >= now;
-      } else {
-        isUpcoming = false; // Past date
-      }
+        let isUpcoming = false;
+        if (startOfAppointmentDay > startOfToday) {
+          isUpcoming = true; // Future date
+        } else if (startOfAppointmentDay.getTime() === startOfToday.getTime()) {
+          // Same day, compare times
+          isUpcoming = appointmentDateObj >= now;
+        } else {
+          isUpcoming = false; // Past date
+        }
 
-      return isUpcoming;
-    }),
-    Past: appointments.filter((a: Appointment) => {
-      // For 'Past', if the appointment date (day) is before today, it's past.
-      // If it's today, but the time has passed, it's also past.
-      // Completed appointments are always past.
-      if (a.status === AppointmentStatus.COMPLETED) return true;
-      if (a.status === AppointmentStatus.CANCELED) return false; // Handled by Cancelled tab
+        return isUpcoming;
+      }),
+      Past: appointments.filter((a: Appointment) => {
+        // For 'Past', if the appointment date (day) is before today, it's past.
+        // If it's today, but the time has passed, it's also past.
+        // Completed appointments are always past.
+        if (a.status === AppointmentStatus.COMPLETED) return true;
+        if (a.status === AppointmentStatus.CANCELED) return false; // Handled by Cancelled tab
 
-      const now = new Date();
-      const appointmentDateObj = new Date(a.appointmentDate);
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfAppointmentDay = new Date(
-        appointmentDateObj.getFullYear(),
-        appointmentDateObj.getMonth(),
-        appointmentDateObj.getDate()
-      );
+        const appointmentDateObj = new Date(a.appointmentDate);
+        const startOfAppointmentDay = new Date(
+          appointmentDateObj.getFullYear(),
+          appointmentDateObj.getMonth(),
+          appointmentDateObj.getDate()
+        );
 
-      if (startOfAppointmentDay < startOfToday) return true; // Definitely past day
-      if (startOfAppointmentDay > startOfToday) return false; // Future day, not past
-      // Same day, check time
-      return appointmentDateObj < now;
-    }),
-    Cancelled: appointments.filter((a: Appointment) => a.status === AppointmentStatus.CANCELED),
-  };
+        if (startOfAppointmentDay < startOfToday) return true; // Definitely past day
+        if (startOfAppointmentDay > startOfToday) return false; // Future day, not past
+        // Same day, check time
+        return appointmentDateObj < now;
+      }),
+      Cancelled: appointments.filter((a: Appointment) => a.status === AppointmentStatus.CANCELED),
+    };
+  }, [appointments]); // Only recompute when appointments change
+  
+  // Memoize the virtualized list configuration to prevent unnecessary re-renders
+  const virtualizedConfig = useMemo(() => ({
+    itemSize: isMobile ? 180 : 140, // Height of each appointment card
+    height: Math.min(isMobile ? 500 : 600, filteredAppointments[tabs[index]].length * (isMobile ? 180 : 140), 600), // Limit max height
+    overscanCount: isMobile ? 2 : 3, // Fewer overscan items on mobile to save memory
+  }), [isMobile, filteredAppointments, index]);
+  
+  // Track when items are rendered in the virtualized list
+  const handleItemsRendered = useCallback((info: {
+    overscanStartIndex: number;
+    overscanStopIndex: number;
+    visibleStartIndex: number;
+    visibleStopIndex: number;
+  }) => {
+    if (filteredAppointments[tabs[index]].length > 20) {
+      logInfo('VirtualizedList items rendered', {
+        visibleRange: `${info.visibleStartIndex}-${info.visibleStopIndex}`,
+        overscanRange: `${info.overscanStartIndex}-${info.overscanStopIndex}`,
+        visibleCount: info.visibleStopIndex - info.visibleStartIndex + 1,
+        totalItems: filteredAppointments[tabs[index]].length
+      });
+    }
+  }, [filteredAppointments, index]);
+  
+  // Log performance metrics for large datasets
+  useEffect(() => {
+    if (filteredAppointments[tabs[index]].length > 20) {
+      logInfo('PatientAppointmentsPage performance', {
+        totalAppointments: appointments.length,
+        filteredAppointments: filteredAppointments[tabs[index]].length,
+        activeTab: tabs[index],
+        isVirtualized: filteredAppointments[tabs[index]].length > 10
+      });
+    }
+    
+    return () => {
+      perfRef.current.stop();
+    };
+  }, [appointments.length, filteredAppointments, index]);
 
   // Handle opening cancel modal
   const handleOpenCancelModal = (appointment: Appointment) => {
@@ -234,14 +348,25 @@ function PatientAppointmentsContent() {
       })) as CancelAppointmentResponse;
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to cancel appointment');
+        throw new AppointmentError(result.error || 'Failed to cancel appointment', { appointmentId });
       }
 
       setShowCancelModal(false);
       refetch(); // Explicitly refetch after cancellation
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to cancel appointment';
-      throw new Error(errorMessage); // Let the modal handle the error
+    } catch (error) {
+      // Enhanced error handling following booking form pattern
+      if (error instanceof AppointmentError) {
+        logError('Appointment cancellation error', { error, appointmentId, reason });
+        throw error; // Preserve the specific error type
+      } else if (error instanceof ApiError) {
+        logError('API error during appointment cancellation', { error, appointmentId });
+        throw new AppointmentError(`Service error: ${error.message}`, { appointmentId });
+      } else {
+        // For unexpected errors, enhance with context
+        const errorMessage = error instanceof Error ? error.message : 'Failed to cancel appointment';
+        logError('Unexpected error during appointment cancellation', { error, appointmentId });
+        throw new AppointmentError(errorMessage, { appointmentId });
+      }
     }
   };
 
@@ -249,12 +374,16 @@ function PatientAppointmentsContent() {
     // Add validation that the appointments page is working correctly
     try {
       logValidation(
-        '4.10',
+        'patient-appointments-page-render',
         'success',
-        'Patient appointments page with real data and actions implemented.'
+        'Patient appointments page rendered successfully'
       );
-    } catch (e) {
-      // Silent error handling for validation
+    } catch (error) {
+      // Standardized error logging
+      logError('Failed to log validation', { 
+        error, 
+        component: 'PatientAppointmentsContent' 
+      });
     }
   }, []);
 
@@ -314,13 +443,64 @@ function PatientAppointmentsContent() {
             tabs.map(tab => (
               <Tab.Panel key={tab} className="rounded-xl bg-white dark:bg-slate-800 p-3">
                 {filteredAppointments[tab].length > 0 ? (
-                  filteredAppointments[tab].map((appointment: Appointment) => (
-                    <AppointmentRow
-                      key={appointment.id}
-                      appointment={appointment}
-                      onCancel={handleOpenCancelModal}
-                    />
-                  ))
+                  filteredAppointments[tab].length > 10 ? (
+                    // Use virtualized list for better performance with many appointments
+                    <div 
+                      ref={virtualizedRef}
+                      aria-label={`${tab} appointments list containing ${filteredAppointments[tab].length} appointments`}
+                    >
+                      {/* Show a loading state until the virtualized list is visible */}
+                      {!virtualizedState.isVisible && (
+                        <div className="py-4 text-center">
+                          <Spinner />
+                          <p className="text-sm text-slate-500 mt-2">Preparing appointments...</p>
+                        </div>
+                      )}
+                      
+                      {/* Only render the virtualized list when it should be visible */}
+                      {virtualizedState.isVisible && (
+                        <div 
+                          className={`transition-opacity duration-300 ${virtualizedState.hasRendered ? 'opacity-100' : 'opacity-0'}`}
+                          onLoad={() => {
+                            // Mark as rendered after first load
+                            setVirtualizedState(prev => ({ ...prev, hasRendered: true }));
+                          }}
+                        >
+                          <VirtualizedList
+                            items={filteredAppointments[tab]}
+                            itemSize={virtualizedConfig.itemSize}
+                            height={virtualizedConfig.height}
+                            overscanCount={virtualizedConfig.overscanCount}
+                            onItemsRendered={handleItemsRendered}
+                            renderItem={(appointment, index, style) => (
+                              <div 
+                                style={style} 
+                                key={(appointment as Appointment).id}
+                                role="listitem"
+                                aria-label={`Appointment with ${(appointment as Appointment).doctorName}`}
+                              >
+                                <AppointmentRow 
+                                  appointment={appointment as Appointment} 
+                                  onCancel={handleOpenCancelModal} 
+                                />
+                              </div>
+                            )}
+                            itemKey={(index) => (filteredAppointments[tab][index] as Appointment).id}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Use standard rendering for small lists
+                    filteredAppointments[tab].map((appointment: Appointment) => (
+                      <AppointmentRow
+                        key={appointment.id}
+                        appointment={appointment}
+                        onCancel={handleOpenCancelModal}
+                      />
+                    ))
+                  )
                 ) : (
                   <p className="py-10 text-center text-slate-500">
                     No {tab.toLowerCase()} appointments.

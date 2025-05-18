@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
+/**
+ * @deprecated Use CustomizableErrorBoundary instead for more flexibility
+ */
+
+import React, { useState, useEffect } from 'react';
 import { CreditCard, RefreshCw, ArrowLeft, HelpCircle, AlertTriangle } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
-import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
-import Alert from '@/components/ui/Alert';
+import CustomizableErrorBoundary, { ErrorAction } from './CustomizableErrorBoundary';
+import { appEventBus, LogLevel } from '@/lib/eventBus';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 interface PaymentError extends Error {
   code?: string;
@@ -21,124 +23,6 @@ interface PaymentError extends Error {
 }
 
 /**
- * Booking Payment Error Fallback UI
- * A specialized UI for payment-related errors during booking
- */
-const BookingPaymentErrorFallback: React.FC<{ 
-  error: PaymentError | null;
-  resetError: () => void;
-}> = ({ error, resetError }) => {
-  const router = useRouter();
-  
-  // Report error to monitoring service
-  useEffect(() => {
-    if (error) {
-      // Determine error category based on error code
-      const errorCategory: ErrorCategory = 
-        error.code?.includes('PAYMENT') ? 'api' : 'appointment';
-        
-      ErrorMonitor.getInstance().reportError(error, {
-        component: 'BookingPayment',
-        severity: 'error',
-        category: errorCategory,
-        action: 'process_payment',
-        details: error.details || {}
-      });
-    }
-  }, [error]);
-
-  // Get specific guidance based on error code
-  const getPaymentGuidance = () => {
-    if (!error?.code) return 'Please try again with a different payment method or contact customer support.';
-    
-    switch(error.code) {
-      case 'PAYMENT_DECLINED':
-        return 'Your payment was declined. Please check your card details or try a different payment method.';
-      case 'PAYMENT_INSUFFICIENT_FUNDS':
-        return 'Your card has insufficient funds. Please try a different payment method.';
-      case 'PAYMENT_CARD_EXPIRED':
-        return 'Your card has expired. Please update your card information or try a different payment method.';
-      case 'PAYMENT_PROCESSING_ERROR':
-        return 'There was an error processing your payment. Please try again in a few minutes.';
-      case 'PAYMENT_GATEWAY_ERROR':
-        return 'Our payment system is currently experiencing issues. Please try again later.';
-      case 'PAYMENT_VALIDATION_ERROR':
-        return 'Some of your payment information appears to be invalid. Please check and try again.';
-      case 'APPOINTMENT_ALREADY_PAID':
-        return 'This appointment appears to be already paid for. Please check your appointments.';
-      default:
-        return 'Please try again with a different payment method or contact customer support.';
-    }
-  };
-
-  return (
-    <div className="p-6 rounded-lg border border-red-100 dark:border-red-900/30 bg-white dark:bg-slate-800 shadow-sm">
-      <div className="flex items-start">
-        <div className="mr-4 mt-1 flex-shrink-0">
-          <CreditCard className="h-8 w-8 text-red-500" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-medium mb-2">
-            Payment Processing Error
-          </h3>
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
-            We encountered an issue while processing your payment.
-          </p>
-          
-          <Alert variant="warning" className="mb-4">
-            <div className="flex items-start">
-              <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{getPaymentGuidance()}</p>
-            </div>
-          </Alert>
-          
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md mb-4">
-              <p className="text-sm text-red-800 dark:text-red-300">
-                Error: {error.message}
-              </p>
-              {error.details?.transactionId && (
-                <p className="text-xs text-red-700 dark:text-red-400 mt-1">
-                  Transaction ID: {error.details.transactionId}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3">
-            <Button 
-              onClick={resetError}
-              variant="primary"
-              size="sm"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Go Back
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              as="a"
-              href="/help/payment-issues"
-            >
-              <HelpCircle className="mr-2 h-4 w-4" />
-              Payment Help
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/**
  * BookingPaymentErrorBoundary - Error boundary for payment processing during booking
  * 
  * This component provides specialized error handling for payment processing
@@ -149,6 +33,8 @@ const BookingPaymentErrorFallback: React.FC<{
  * <BookingPaymentErrorBoundary>
  *   <PaymentProcessor appointmentData={data} />
  * </BookingPaymentErrorBoundary>
+ * 
+ * @deprecated Use CustomizableErrorBoundary directly for more flexibility
  */
 export default function BookingPaymentErrorBoundary({ 
   children,
@@ -157,14 +43,171 @@ export default function BookingPaymentErrorBoundary({
   children: React.ReactNode;
   componentName?: string;
 }) {
-  return (
-    <ErrorBoundary
-      componentName={componentName}
-      fallback={
-        <BookingPaymentErrorFallback error={null} resetError={() => {}} />
+  // Create a component that will handle the dynamic error message and actions
+  const DynamicPaymentErrorHandler: React.FC<{
+    error: Error | null;
+    resetErrorBoundary: () => void;
+  }> = ({ error, resetErrorBoundary }) => {
+    const router = useRouter();
+    const [title, setTitle] = useState('Payment Processing Error');
+    const [message, setMessage] = useState('We encountered an issue while processing your payment.');
+    const [guidance, setGuidance] = useState('Please try again with a different payment method or contact support.');
+    const [actions, setActions] = useState<ErrorAction[]>([]);
+    const [additionalContext, setAdditionalContext] = useState<Record<string, unknown>>({});
+    
+    useEffect(() => {
+      if (!error) return;
+      
+      // Cast to PaymentError to access code and details properties
+      const paymentError = error as PaymentError;
+      const errorCode = paymentError.code;
+      const errorDetails = paymentError.details || {};
+      
+      // Determine error category based on error code
+      const errorCategory: ErrorCategory = 
+        errorCode?.includes('PAYMENT') ? 'api' : 'appointment';
+      
+      // Emit error event for centralized logging
+      appEventBus.emit('log_event', {
+        level: LogLevel.ERROR,
+        message: `Payment processing error: ${error.message}`,
+        data: {
+          component: componentName || 'BookingPayment',
+          errorCode,
+          errorDetails,
+          stack: error.stack
+        },
+        timestamp: Date.now()
+      });
+      
+      // Set additional context for error reporting
+      setAdditionalContext({
+        errorCode,
+        transactionId: errorDetails.transactionId,
+        appointmentId: errorDetails.appointmentId,
+        paymentMethod: errorDetails.paymentMethod,
+        amount: errorDetails.amount,
+        workflow: 'payment'
+      });
+      
+      // Get specific guidance based on error code
+      let errorInfo = {
+        title: 'Payment Processing Error',
+        message: 'We encountered an issue while processing your payment.',
+        guidance: 'Please try again with a different payment method or contact support.'
+      };
+      
+      switch(errorCode) {
+        case 'PAYMENT_DECLINED':
+          errorInfo = {
+            title: 'Payment Declined',
+            message: 'Your payment was declined.',
+            guidance: 'Please check your card details or try a different payment method.'
+          };
+          break;
+        case 'PAYMENT_INSUFFICIENT_FUNDS':
+          errorInfo = {
+            title: 'Insufficient Funds',
+            message: 'Your card has insufficient funds.',
+            guidance: 'Please try a different payment method.'
+          };
+          break;
+        case 'PAYMENT_CARD_EXPIRED':
+          errorInfo = {
+            title: 'Card Expired',
+            message: 'Your card has expired.',
+            guidance: 'Please update your card information or try a different payment method.'
+          };
+          break;
+        case 'PAYMENT_PROCESSING_ERROR':
+          errorInfo = {
+            title: 'Processing Error',
+            message: 'There was an error processing your payment.',
+            guidance: 'Please try again in a few minutes.'
+          };
+          break;
+        case 'PAYMENT_GATEWAY_ERROR':
+          errorInfo = {
+            title: 'Payment System Error',
+            message: 'Our payment system is currently experiencing issues.',
+            guidance: 'Please try again later or contact support.'
+          };
+          break;
+        case 'PAYMENT_VALIDATION_ERROR':
+          errorInfo = {
+            title: 'Invalid Payment Information',
+            message: 'Some of your payment information appears to be invalid.',
+            guidance: 'Please check and try again.'
+          };
+          break;
+        case 'PAYMENT_ALREADY_PROCESSED':
+          errorInfo = {
+            title: 'Payment Already Processed',
+            message: 'This appointment has already been paid for.',
+            guidance: 'Please check your email for confirmation.'
+          };
+          break;
+        default:
+          errorInfo = {
+            title: 'Payment Issue',
+            message: error.message || 'There was an issue with your payment.',
+            guidance: 'Please try again or contact support for assistance.'
+          };
       }
-    >
-      {children}
-    </ErrorBoundary>
-  );
+      
+      setTitle(errorInfo.title);
+      setMessage(`${errorInfo.message} ${errorInfo.guidance}`);
+      setGuidance(errorInfo.guidance);
+      
+      // Set actions based on error
+      const errorActions: ErrorAction[] = [
+        {
+          label: 'Try Again',
+          icon: RefreshCw,
+          onClick: resetErrorBoundary,
+          variant: 'primary'
+        },
+        {
+          label: 'Go Back',
+          icon: ArrowLeft,
+          onClick: () => router.back(),
+          variant: 'outline'
+        },
+        {
+          label: 'Payment Help',
+          icon: HelpCircle,
+          href: '/help/payment-issues',
+          variant: 'ghost'
+        }
+      ];
+      
+      setActions(errorActions);
+    }, [error, resetErrorBoundary, router, componentName]);
+    
+    // Create a custom message that includes transaction details if available
+    const getCustomMessage = (): string => {
+      if (!error) return message;
+      
+      const paymentError = error as PaymentError;
+      if (!paymentError.details?.transactionId) return message;
+      
+      return `${message}\n\nTransaction ID: ${paymentError.details.transactionId}`;
+    };
+    
+    return (
+      <CustomizableErrorBoundary
+        title={title}
+        message={getCustomMessage()}
+        icon={CreditCard}
+        category="api"
+        componentName={componentName}
+        actions={actions}
+        additionalContext={additionalContext}
+      >
+        {children}
+      </CustomizableErrorBoundary>
+    );
+  };
+  
+  return <DynamicPaymentErrorHandler error={null} resetErrorBoundary={() => {}} />;
 } 

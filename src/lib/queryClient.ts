@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { createElement, useEffect } from 'react';
 import { browserCache, CacheCategory } from './browserCacheManager';
 import { logInfo } from './logger';
+import { CACHE_DURATIONS } from './cacheDurations';
 
 // Use a reference to access while avoiding circular imports
 let enhancedCacheRef: unknown = null;
@@ -15,8 +16,8 @@ let enhancedCacheRef: unknown = null;
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 3 * 60 * 1000, // 3 minutes (reduced from 5 minutes)
-      gcTime: 5 * 60 * 1000, // 5 minutes (reduced from 10 minutes)
+      staleTime: CACHE_DURATIONS.DEFAULT, // Default stale time from cacheDurations
+      gcTime: CACHE_DURATIONS.DEFAULT_GC, // Default garbage collection time from cacheDurations
       refetchOnWindowFocus: false,
       retry: 1,
       refetchOnMount: false, // changed from 'always' to false
@@ -87,7 +88,7 @@ export const cacheManager = {
       else if (keyStr.includes('appointment')) category = CacheCategory.APPOINTMENTS;
       else if (keyStr.includes('notification')) category = CacheCategory.NOTIFICATIONS;
 
-      enhancedCacheRef.set(category, cacheKey, data, { ttl: 3 * 60 * 1000 });
+      enhancedCacheRef.set(category, cacheKey, data, { ttl: CACHE_DURATIONS.DEFAULT });
     }
   },
 

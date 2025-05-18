@@ -356,6 +356,11 @@
           "isAvailable": true
         },
         {
+          "startTime": "09:00",
+          "endTime": "10:00",
+          "isAvailable": true
+        },
+        {
           "startTime": "14:00",
           "endTime": "20:00",
           "isAvailable": true
@@ -424,7 +429,7 @@
       "2025-07-03T20:35:44.187Z"
     ],
     "createdAt": "2025-03-30T20:35:44.187Z",
-    "updatedAt": "2025-05-08T16:02:19.717Z",
+    "updatedAt": "2025-05-10T10:03:02.209Z",
     "id": "u-005"
   },
   {

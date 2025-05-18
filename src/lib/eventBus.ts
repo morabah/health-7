@@ -32,11 +32,21 @@ export interface ValidationEventPayload {
 }
 
 /**
+ * Performance event payload structure
+ */
+export interface PerformanceEventPayload {
+  operation: string;
+  metrics: Record<string, unknown>;
+  timestamp: string;
+}
+
+/**
  * Application event types mapping
  */
 export type AppEvents = {
   log_event: LogEventPayload;
   validation_event: ValidationEventPayload;
+  performance_event: PerformanceEventPayload;
   // Additional events can be defined here as needed
 };
 

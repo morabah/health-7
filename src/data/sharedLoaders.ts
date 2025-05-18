@@ -10,6 +10,7 @@ import { ValidationError } from '@/lib/errors/errorClasses';
 import { logError } from '@/lib/logger';
 import { AppointmentType } from '@/types/enums';
 import type { Appointment } from '@/types/schemas'; // Import Appointment type
+import { CACHE_DURATIONS } from '@/lib/cacheDurations';
 
 /**
  * Helper function to get user role as UserType
@@ -44,6 +45,7 @@ export const useMyDashboard = () => {
       });
     },
     enabled: !!user?.uid,
+    staleTime: CACHE_DURATIONS.DASHBOARD, // 5 minutes for dashboard data
   });
 };
 
@@ -63,6 +65,7 @@ export const useNotifications = () => {
       });
     },
     enabled: !!user?.uid,
+    staleTime: CACHE_DURATIONS.NOTIFICATIONS, // 1 minute for notifications (more volatile)
   });
 };
 
@@ -153,7 +156,7 @@ export function useDoctorAvailability(doctorId: string) {
       );
     },
     enabled: !!doctorId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: CACHE_DURATIONS.DOCTOR_AVAILABILITY, // 2 minutes for doctor availability
   });
 }
 
@@ -172,7 +175,7 @@ export function useAvailableSlots(doctorId: string, date: string) {
       });
     },
     enabled: !!doctorId && !!date,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: CACHE_DURATIONS.AVAILABLE_SLOTS, // 1 minute for available slots
   });
 }
 

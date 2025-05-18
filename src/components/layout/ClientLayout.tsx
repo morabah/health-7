@@ -5,8 +5,9 @@ import { QueryProvider } from '@/lib/queryClient';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import Layout from '@/components/layout/Layout';
-import AppErrorBoundary from '@/components/error/AppErrorBoundary';
+import { ErrorBoundaryProvider } from '@/components/error-boundaries/ErrorBoundaryProvider';
 import { setupErrorHandling } from '@/lib/errorSystem';
+import type { ErrorInfo } from 'react';
 
 /**
  * Client Layout Component
@@ -20,7 +21,13 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AppErrorBoundary componentName="MainApplication">
+    <ErrorBoundaryProvider 
+      defaultResetOnRouteChange={true}
+      onGlobalError={(error: Error, errorInfo: ErrorInfo) => {
+        // This is a global error handler that will be called for all errors
+        console.error('Global error caught:', error);
+      }}
+    >
       <ThemeProvider>
         <QueryProvider>
           <AuthProvider>
@@ -28,6 +35,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </AuthProvider>
         </QueryProvider>
       </ThemeProvider>
-    </AppErrorBoundary>
+    </ErrorBoundaryProvider>
   );
 }

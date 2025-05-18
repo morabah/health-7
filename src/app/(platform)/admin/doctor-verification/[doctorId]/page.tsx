@@ -236,18 +236,25 @@ const DoctorVerificationPage = () => {
       return userNotes; // For rejections, use the admin's provided notes directly
     }
 
-    // For approvals, add checklist items as structured notes
-    const checklistNotes = [
-      checklistItems.identityVerified ? '✓ Identity verified' : '',
-      checklistItems.licenseValid ? '✓ License valid and current' : '',
-      checklistItems.credentialsVerified ? '✓ Medical credentials verified' : '',
-      checklistItems.contactInfoConfirmed ? '✓ Contact information confirmed' : '',
-      checklistItems.specialtyVerified ? '✓ Specialty credentials verified' : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    // Generate notes for verification - memoize to prevent recomputing on every render
+    const checklistNotes = React.useMemo(() => {
+      return [
+        checklistItems.identityVerified ? '✓ Identity verified' : '',
+        checklistItems.licenseValid ? '✓ License valid and current' : '',
+        checklistItems.credentialsVerified ? '✓ Medical credentials verified' : '',
+        checklistItems.contactInfoConfirmed ? '✓ Contact information confirmed' : '',
+        checklistItems.specialtyVerified ? '✓ Specialty credentials verified' : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }, [checklistItems]);
 
-    return `Verification Checklist:\n${checklistNotes}\n\nAdmin Notes:\n${userNotes || 'Approved through the standard verification process.'}`;
+    // Generate full verification notes
+    const generateVerificationNotes = React.useCallback(() => {
+      return `Verification Checklist:\n${checklistNotes}\n\nAdmin Notes:\n${userNotes || 'Approved through the standard verification process.'}`;
+    }, [checklistNotes, userNotes]);
+
+    return generateVerificationNotes();
   };
 
   // Handle checklist item changes

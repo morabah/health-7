@@ -44,6 +44,8 @@ export enum AppointmentStatus {
   RESCHEDULED = 'rescheduled',
 }
 
+// Removed duplicate AccountStatus enum - using the one defined below
+
 /** Types of documents uploaded by Doctors for verification purposes. */
 export enum DocumentType {
   LICENSE = 'LICENSE',           // Professional license
@@ -82,6 +84,8 @@ export enum NotificationType {
 /** Account statuses for users */
 export enum AccountStatus {
   ACTIVE = 'active',
+  INACTIVE = 'inactive',
   SUSPENDED = 'suspended',
   DEACTIVATED = 'deactivated',
-} 
+  PENDING_VERIFICATION = 'pending_verification',
+}

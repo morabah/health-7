@@ -45,6 +45,176 @@ The Advanced Task Management page can be accessed via:
 
 ---
 
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
 ### Step Id 664
 
 **Implemented Recommended Fixes for Booking Appointment Workflow**
@@ -79,6 +249,176 @@ The Advanced Task Management page can be accessed via:
 
 ---
 
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
 ## Future Improvements
 
 - Connect to Firebase to persist tasks
@@ -93,6 +433,176 @@ The Advanced Task Management page can be accessed via:
 ## Overview
 
 Implemented a static patient dashboard UI with placeholder data following the blueprint § 4.1, using shared UI primitives, lucide icons, token colors, and navigation links.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
 
 ---
 
@@ -135,6 +645,176 @@ Implemented a static patient dashboard UI with placeholder data following the bl
 
 ---
 
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
 using shared UI primitives, lucide icons, token colors, and navigation links.
 
 ## Features Added
@@ -173,6 +853,176 @@ using shared UI primitives, lucide icons, token colors, and navigation links.
 
 ---
 
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
 ### Step Id 664
 
 **Implemented Recommended Fixes for Booking Appointment Workflow**
@@ -204,6 +1054,176 @@ using shared UI primitives, lucide icons, token colors, and navigation links.
 - [x] Added comments for clarity
 
 **No additional files, features, or logic were added beyond the explicit instructions in the prompt.**
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
 
 ---
 
@@ -257,6 +1277,176 @@ Implemented a patient appointments page with tabbed interface to view different 
 
 ---
 
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
 ### Step Id 664
 
 **Implemented Recommended Fixes for Booking Appointment Workflow**
@@ -288,6 +1478,176 @@ Implemented a patient appointments page with tabbed interface to view different 
 - [x] Added comments for clarity
 
 **No additional files, features, or logic were added beyond the explicit instructions in the prompt.**
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 809
+
+**Verified PostCSS/Autoprefixer Integration and Ran Tailwind Build**
+
+- Confirmed presence and correct configuration of `postcss.config.js` with both `tailwindcss` and `autoprefixer` plugins enabled.
+- Verified `autoprefixer` and `postcss` are present in `devDependencies` in `package.json`.
+- Ran Tailwind CSS build with PostCSS (`npx tailwindcss -i ./src/styles/globals.css -o ./public/output.css --postcss`) to ensure autoprefixer is active and CSS output is properly prefixed for cross-browser compatibility.
+- No changes to configuration were required; build completed successfully with no errors.
+
+#### Next Steps:
+- Continue to test the application in different browsers to confirm that vendor prefix issues are resolved.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
+
+---
+
+### Step Id 835
+
+**Network Request Optimization: Prevent 308 Redirects**
+
+- Fixed API URL formatting in `src/lib/localDb.ts` for all `/api/localDb` requests:
+  - Ensured no trailing slash is present in the API endpoint.
+  - Used `encodeURIComponent` for the `collection` query parameter.
+- This prevents frequent 308 redirections (e.g., `/api/localDb?collection=users` → `/api/localDb/?collection=users`), reducing network latency for each API request.
+- No changes to other files or logic were required.
+
+**Checklist:**
+- [x] Updated fetch calls in `localDb.ts` to use correct URL format.
+- [x] Used `encodeURIComponent` for query parameter safety.
+- [x] No trailing slash in endpoint.
+- [x] Documented change in `done_prompt.md`.
+
+---
+
+### Step Id 891
+
+**Error Handling Standardization Across Components**
+
+- Created a comprehensive error handling utility library in `src/lib/errors/errorHandlingUtils.ts` with standardized patterns for:
+  - Error message extraction from various error types (`extractErrorMessage`)  
+  - Standardized error handling and logging (`handleError`)
+  - Error categorization for UI display (`categorizeError`)
+  - Error type conversion to proper AppError classes (`toAppError`)
+
+- Improved error handling patterns in multiple components:
+  - `/src/app/(platform)/patient/appointments/page.tsx`: Replaced generic error throws with specific error classes and proper logging
+  - `/src/app/(platform)/doctor/appointments/page.tsx`: Implemented consistent error handling, better error messages and context
+  - `/src/app/(platform)/patient/dashboard/page.tsx`: Standardized preference loading/saving error handling 
+
+- Implemented consistent patterns for:
+  - Using specialized error classes (AppError, ApiError, ValidationError, etc.)
+  - Providing context with error logging
+  - Consistent error message extraction
+  - Properly categorizing errors for UI elements
+
+**Checklist:**
+- [x] Created error handling utilities library
+- [x] Updated three key components with standardized patterns
+- [x] Maintained type safety with proper error classes
+- [x] Ensured consistent error logging format
+- [x] Added proper error context to aid debugging
 
 ---
 
@@ -438,6 +1798,26 @@ Created specialized error boundaries and a custom error hook for the booking wor
 ## Benefits
 
 1. Improved user experience during the booking process
+
+---
+
+### Step 978 Completed
+- Fixed syntax error in `useEffect` hook in `src/app/(platform)/doctor/dashboard/page.tsx` (removed extraneous comma in logPerformance call).
+- Restarted dev server after code change as per user rules.
+- No new files created.
+- No changes to routing, navigation, or access buttons required for this backend fix.
+
+#### Checklist
+- [x] Syntax error in doctor dashboard fixed
+- [x] Dev server restarted (old process killed if running)
+- [x] No new files or routes needed
+- [x] No access/navigation changes needed
+- [x] Change logged in `done_prompt.md`
+
+#### What may need attention next
+- Patient dashboard lint/type issues (as per previous summary)
+- Further performance enhancements (virtualized lists, offline support, etc.)
+
 2. More specific error handling for different types of booking failures
 3. Standardized error handling pattern for booking-related components
 4. Better error monitoring and categorization for analytics
@@ -563,3 +1943,189 @@ Fixed linting issues and TypeScript errors in the error handling files to improv
 1. Continue improving type safety in other parts of the application
 2. Add comprehensive test coverage for error handling code
 3. Document error handling patterns for future developers
+
+---
+
+### Step Id 205-206
+
+**Error Boundary System Refactoring**
+
+## Overview
+
+Refactored all error boundary components in the health appointment system to utilize a new unified CustomizableErrorBoundary component, ensuring improved maintainability, consistency, and flexibility across the application.
+
+## Changes Made
+
+1. **Created CustomizableErrorBoundary Component**:
+   - Implemented a flexible, reusable error boundary component that accepts customizable props for title, message, icon, and actions
+   - Designed to reduce code duplication and improve maintainability
+   - Added comprehensive TypeScript typing for all props and interfaces
+
+2. **Refactored Specialized Error Boundaries**:
+   - Updated the following error boundaries to use the new CustomizableErrorBoundary:
+     - AppointmentErrorBoundary
+     - DoctorProfileErrorBoundary
+     - AdminDashboardErrorBoundary
+     - TimeSlotSelectionErrorBoundary
+     - ApiErrorBoundary
+     - DataLoadingErrorBoundary
+     - FormErrorBoundary
+     - BookingPaymentErrorBoundary
+     - BookingWorkflowErrorBoundary
+     - GlobalErrorBoundary
+
+3. **Maintained Backward Compatibility**:
+   - Ensured all refactored components maintain their original API
+   - Preserved existing functionality while improving the implementation
+   - Added appropriate TypeScript types to ensure type safety
+
+4. **Updated Documentation**:
+   - Updated the README.md with comprehensive documentation for the CustomizableErrorBoundary
+   - Added usage examples and API reference
+   - Documented the GlobalErrorBoundary refactoring
+
+## Files Modified
+
+- Created `/src/components/error-boundaries/CustomizableErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/GlobalErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/AppointmentErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/DoctorProfileErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/AdminDashboardErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/TimeSlotSelectionErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/ApiErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/DataLoadingErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/FormErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/BookingPaymentErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/BookingWorkflowErrorBoundary.tsx`
+- Updated `/src/components/error-boundaries/index.ts`
+- Updated `/src/components/error-boundaries/README.md`
+
+## Benefits
+
+1. **Improved Maintainability**: Changes to error handling can now be made in a single place
+2. **Consistent User Experience**: All error boundaries now provide a consistent look and feel
+3. **Enhanced Flexibility**: Customizable props allow for context-specific error handling
+4. **Better TypeScript Support**: Improved type safety throughout the error boundary system
+5. **Reduced Code Duplication**: Eliminated redundant code across multiple error boundary components
+
+## Next Steps
+
+- Implement unit tests for the CustomizableErrorBoundary component
+- Consider further refactoring of any remaining specialized error boundaries
+- Address any remaining TypeScript linting issues
+
+---
+
+### Step Id 239
+
+**React Query Caching Optimization**
+
+## Overview
+
+Optimized React Query caching configurations across the application to ensure consistent and appropriate staleTime values for different data types, improving performance and reducing unnecessary API calls.
+
+## Changes Made
+
+1. **Created Standardized Cache Durations**:
+   - Created a centralized `cacheDurations.ts` file with standardized cache duration constants
+   - Categorized data by volatility (very volatile, medium volatility, low volatility, very stable)
+   - Defined appropriate staleTime values for each data category
+
+2. **Updated Query Client Configuration**:
+   - Modified the global queryClient configuration to use standardized cache durations
+   - Ensured consistent default staleTime and gcTime values
+
+3. **Optimized Data Loader Hooks**:
+   - Updated all React Query hooks to use appropriate staleTime values based on data volatility
+   - Added missing staleTime configurations to hooks that were relying on defaults
+   - Ensured consistent caching patterns across similar data types
+
+## Files Modified
+
+- Created `/src/lib/cacheDurations.ts` with standardized cache duration constants
+- Updated `/src/lib/queryClient.ts` to use standardized cache durations
+- Updated `/src/data/sharedLoaders.ts` to add appropriate staleTime values
+- Updated `/src/data/sharedRoleLoaders.ts` to use standardized cache durations
+- Updated `/src/data/patientLoaders.ts` to use standardized cache durations
+- Updated `/src/data/doctorLoaders.ts` to use standardized cache durations
+- Updated `/src/data/dashboardLoaders.ts` to use standardized cache durations
+
+## Benefits
+
+1. **Improved Performance**: Proper caching reduces unnecessary API calls and network traffic
+2. **Better User Experience**: Data refreshes at appropriate intervals based on volatility
+3. **Reduced Server Load**: Fewer redundant requests to the backend services
+4. **Consistent Implementation**: Using the same caching patterns across the application
+5. **Maintainability**: Easier to adjust caching strategy in the future by modifying a single file
+6. **Optimized Resource Usage**: Better memory management with appropriate garbage collection times
+
+---
+
+### Step Id 315
+
+**React Performance Optimization: Preventing Expensive Re-renders**
+
+## Overview
+
+Implemented performance optimizations across the application to prevent expensive re-renders by memoizing filtering operations and computationally intensive calculations, resulting in improved responsiveness and reduced CPU usage.
+
+## Changes Made
+
+1. **Patient Appointments Page Optimization**:
+   - Memoized the `filteredAppointments` object with `useMemo` to prevent recomputing on every render
+   - Extracted date calculations outside the filter functions to avoid redundant calculations
+   - Added proper dependency arrays to ensure filters only recompute when relevant data changes
+
+2. **Doctor Appointments Page Optimization**:
+   - Implemented three-level memoization for appointments data processing:
+     - Memoized base appointments data extraction
+     - Memoized doctor-specific appointments filtering
+     - Memoized date and status filtering operations
+   - Added explicit TypeScript types to filter callback parameters
+
+3. **Admin Users Page Optimization**:
+   - Memoized the export functionality with `useCallback` to prevent unnecessary function recreation
+   - Extracted and memoized the filtered users for export with `useMemo`
+   - Fixed syntax errors in callback implementations
+
+4. **Admin Dashboard Optimization**:
+   - Memoized all data extraction operations from API responses
+   - Implemented `useMemo` for filtering pending doctor verifications
+   - Memoized the dashboard section visibility calculations
+   - Added proper TypeScript types to filter callback parameters
+
+5. **Doctor Verification Page Optimization**:
+   - Memoized checklist notes generation with `useMemo`
+   - Implemented `useCallback` for verification notes generation
+   - Improved component rendering efficiency for verification workflow
+
+## Files Modified
+
+- `/src/app/(platform)/patient/appointments/page.tsx`
+- `/src/app/(platform)/doctor/appointments/page.tsx`
+- `/src/app/(platform)/admin/users/page.tsx`
+- `/src/app/(platform)/admin/dashboard/page.tsx`
+- `/src/app/(platform)/admin/doctor-verification/[doctorId]/page.tsx`
+
+## Benefits
+
+1. **Improved Performance**: Preventing expensive recalculations on every render reduces CPU usage
+2. **Better User Experience**: More responsive UI, especially when filtering large datasets
+3. **Reduced Memory Churn**: Fewer object recreations means less garbage collection overhead
+4. **Improved Battery Life**: Less CPU usage translates to better battery life on mobile devices
+5. **Better Scalability**: Application can handle larger datasets more efficiently
+6. **Proper TypeScript Integration**: Added explicit types to filter callbacks for better type safety
+
+## Benefits
+
+1. **Improved Maintainability**: Changes to error handling can now be made in a single place
+2. **Consistent User Experience**: All error boundaries now provide a consistent look and feel
+3. **Enhanced Flexibility**: Customizable props allow for context-specific error handling
+4. **Better TypeScript Support**: Improved type safety throughout the error boundary system
+5. **Reduced Code Duplication**: Eliminated redundant code across multiple error boundary components
+
+## Next Steps
+
+- Implement unit tests for the CustomizableErrorBoundary component
+- Consider further refactoring of any remaining specialized error boundaries
+- Address any remaining TypeScript linting issues

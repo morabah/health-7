@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
+/**
+ * @deprecated Use CustomizableErrorBoundary instead for more flexibility
+ */
+
+import React, { useState, useEffect } from 'react';
+import CustomizableErrorBoundary from './CustomizableErrorBoundary';
 import { Clock, RefreshCw, Calendar, HelpCircle } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import { ErrorMonitor } from '@/lib/errors/errorMonitoring';
-import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 import { useRouter } from 'next/navigation';
+import type { ErrorAction } from './CustomizableErrorBoundary';
+import type { ErrorCategory } from '@/components/ui/ErrorDisplay';
 
 interface TimeSlotError extends Error {
   code?: string;
@@ -16,104 +19,6 @@ interface TimeSlotError extends Error {
     [key: string]: unknown;
   };
 }
-
-/**
- * Time Slot Selection Error Fallback UI
- * A specialized UI for time slot selection-related errors
- */
-const TimeSlotSelectionErrorFallback: React.FC<{ 
-  error: TimeSlotError | null;
-  resetError: () => void;
-}> = ({ error, resetError }) => {
-  const router = useRouter();
-  
-  // Report error to monitoring service
-  useEffect(() => {
-    if (error) {
-      ErrorMonitor.getInstance().reportError(error, {
-        component: 'TimeSlotSelection',
-        severity: 'warning',
-        category: 'appointment' as ErrorCategory,
-        action: 'time_slot_selection',
-        details: error.details || {}
-      });
-    }
-  }, [error]);
-
-  // Determine specific error message based on the error code
-  const getErrorMessage = () => {
-    if (!error) return 'We couldn\'t load available time slots.';
-    
-    switch(error.code) {
-      case 'NO_SLOTS_AVAILABLE':
-        return 'No time slots are available for the selected date.';
-      case 'DATE_IN_PAST':
-        return 'The selected date is in the past. Please choose a future date.';
-      case 'DOCTOR_UNAVAILABLE':
-        return 'The doctor is not available on the selected date.';
-      case 'LOADING_FAILED':
-        return 'We couldn\'t load the time slots due to a technical issue.';
-      case 'INVALID_DATE_RANGE':
-        return 'The selected date is outside the allowed booking range.';
-      default:
-        return error.message || 'We couldn\'t load available time slots.';
-    }
-  };
-
-  return (
-    <div className="p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 bg-white dark:bg-slate-800 shadow-sm">
-      <div className="flex items-start">
-        <div className="mr-4 mt-1 flex-shrink-0">
-          <Clock className="h-6 w-6 text-blue-500" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-base font-medium mb-2">
-            Time Slot Selection Issue
-          </h3>
-          <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">
-            {getErrorMessage()}
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={resetError}
-              variant="primary"
-              size="sm"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // If we have error details with a doctorId, use it
-                const doctorId = error?.details?.doctorId;
-                if (doctorId) {
-                  router.push(`/book-appointment/${doctorId}`);
-                } else {
-                  resetError();
-                }
-              }}
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              Choose Another Date
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              as="a"
-              href="/help/booking-time-slots"
-            >
-              <HelpCircle className="mr-2 h-4 w-4" />
-              Help
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * TimeSlotSelectionErrorBoundary - Error boundary specifically for time slot selection
@@ -126,6 +31,8 @@ const TimeSlotSelectionErrorFallback: React.FC<{
  * <TimeSlotSelectionErrorBoundary>
  *   <TimeSlotSelector date={selectedDate} doctorId={doctorId} />
  * </TimeSlotSelectionErrorBoundary>
+ * 
+ * @deprecated Use CustomizableErrorBoundary directly for more flexibility
  */
 export default function TimeSlotSelectionErrorBoundary({ 
   children,
@@ -134,14 +41,95 @@ export default function TimeSlotSelectionErrorBoundary({
   children: React.ReactNode;
   componentName?: string;
 }) {
-  return (
-    <ErrorBoundary
-      componentName={componentName}
-      fallback={
-        <TimeSlotSelectionErrorFallback error={null} resetError={() => {}} />
+  // Create a component that will handle the dynamic error message
+  const DynamicTimeSlotErrorHandler: React.FC<{
+    error: Error | null;
+    resetErrorBoundary: () => void;
+  }> = ({ error, resetErrorBoundary }) => {
+    const router = useRouter();
+    const [message, setMessage] = useState('We couldn\'t load available time slots.');
+    
+    // Determine specific error message based on the error code
+    useEffect(() => {
+      if (!error) return;
+      
+      // Cast to TimeSlotError to access code and details properties
+      const timeSlotError = error as TimeSlotError;
+      
+      switch(timeSlotError.code) {
+        case 'NO_SLOTS_AVAILABLE':
+          setMessage('No time slots are available for the selected date.');
+          break;
+        case 'DATE_IN_PAST':
+          setMessage('The selected date is in the past. Please choose a future date.');
+          break;
+        case 'DOCTOR_UNAVAILABLE':
+          setMessage('The doctor is not available on the selected date.');
+          break;
+        case 'LOADING_FAILED':
+          setMessage('We couldn\'t load the time slots due to a technical issue.');
+          break;
+        case 'INVALID_DATE_RANGE':
+          setMessage('The selected date is outside the allowed booking range.');
+          break;
+        default:
+          setMessage(timeSlotError.message || 'We couldn\'t load available time slots.');
       }
-    >
-      {children}
-    </ErrorBoundary>
-  );
+    }, [error]);
+    
+    // Create dynamic actions based on error details
+    const actions: ErrorAction[] = [
+      {
+        label: 'Try Again',
+        icon: RefreshCw,
+        onClick: resetErrorBoundary,
+        variant: 'primary'
+      }
+    ];
+    
+    // Add action to choose another date if we have a doctorId
+    if (error && (error as TimeSlotError).details?.doctorId) {
+      const doctorId = (error as TimeSlotError).details?.doctorId;
+      actions.push({
+        label: 'Choose Another Date',
+        icon: Calendar,
+        onClick: () => router.push(`/book-appointment/${doctorId}`),
+        variant: 'outline'
+      });
+    } else {
+      actions.push({
+        label: 'Choose Another Date',
+        icon: Calendar,
+        onClick: resetErrorBoundary,
+        variant: 'outline'
+      });
+    }
+    
+    // Add help action
+    actions.push({
+      label: 'Help',
+      icon: HelpCircle,
+      href: '/help/booking-time-slots',
+      variant: 'ghost'
+    });
+    
+    return (
+      <CustomizableErrorBoundary
+        title="Time Slot Selection Issue"
+        message={message}
+        icon={Clock}
+        category="appointment"
+        componentName={componentName}
+        actions={actions}
+        additionalContext={{
+          errorCode: (error as TimeSlotError)?.code,
+          errorDetails: (error as TimeSlotError)?.details
+        }}
+      >
+        {children}
+      </CustomizableErrorBoundary>
+    );
+  };
+  
+  return <DynamicTimeSlotErrorHandler error={null} resetErrorBoundary={() => {}} />;
 } 
