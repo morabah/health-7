@@ -8,27 +8,23 @@ import type { z } from 'zod';
 import { UserType, VerificationStatus } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { 
-  getDoctors, 
-  saveDoctors,
-  getUsers
-} from '@/lib/localDb';
+import { getDoctors, saveDoctors, getUsers } from '@/lib/localDb';
 import { generateId, nowIso } from '@/lib/localApiCore';
 import type { ResultOk, ResultErr } from '@/lib/localApiCore';
 import type { DoctorProfileSchema } from '@/types/schemas';
-import { 
-  FindDoctorsSchema, 
+import {
+  FindDoctorsSchema,
   SetDoctorAvailabilitySchema,
   GetDoctorPublicProfileSchema,
   GetDoctorAvailabilitySchema,
-  GetMockDoctorProfileSchema
+  GetMockDoctorProfileSchema,
 } from '@/types/schemas';
 
 /**
  * Search for doctors based on criteria
  */
 export async function findDoctors(
-  ctx: { uid: string; role: UserType },
+  ctx: { uid: string; role: UserType } | undefined,
   payload: {
     specialty?: string;
     location?: string;
@@ -38,7 +34,9 @@ export async function findDoctors(
   }
 ): Promise<
   | ResultOk<{
-      doctors: Array<z.infer<typeof DoctorProfileSchema> & { id: string; firstName: string; lastName: string }>;
+      doctors: Array<
+        z.infer<typeof DoctorProfileSchema> & { id: string; firstName: string; lastName: string }
+      >;
       total: number;
     }>
   | ResultErr
@@ -46,25 +44,31 @@ export async function findDoctors(
   const perf = trackPerformance('findDoctors');
 
   try {
-    const { uid, role } = ctx;
+    const { uid, role } = ctx || { uid: 'anonymous', role: UserType.PATIENT };
 
     logInfo('findDoctors called', { uid, role, ...payload });
 
     // Validate with schema
     const validationResult = FindDoctorsSchema.safeParse({
       ...payload,
-      pageNumber: payload.page,
-      pageSize: payload.limit
+      pageNumber: payload?.page || 1,
+      pageSize: payload?.limit || 10,
     });
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
     // Extract the validated data and map schema fields to expected function parameters
-    const { specialty, location, searchTerm: name, pageNumber = 1, pageSize = 10 } = validationResult.data;
+    const {
+      specialty,
+      location,
+      searchTerm: name,
+      pageNumber = 1,
+      pageSize = 10,
+    } = validationResult.data;
     const page = pageNumber;
     const limit = pageSize;
 
@@ -77,8 +81,8 @@ export async function findDoctors(
 
     // Apply filters
     if (specialty) {
-      filteredDoctors = filteredDoctors.filter(
-        d => d.specialty?.toLowerCase().includes(specialty.toLowerCase())
+      filteredDoctors = filteredDoctors.filter(d =>
+        d.specialty?.toLowerCase().includes(specialty.toLowerCase())
       );
     }
 
@@ -94,7 +98,7 @@ export async function findDoctors(
       filteredDoctors = filteredDoctors.filter(d => {
         const user = users.find(u => u.id === d.userId);
         if (!user) return false;
-        
+
         const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
         return fullName.includes(nameLower);
       });
@@ -132,27 +136,36 @@ export async function findDoctors(
  * Get a doctor's public profile
  */
 export async function getDoctorPublicProfile(
-  ctx: { uid: string; role: UserType },
+  ctx: { uid: string; role: UserType } | undefined,
   payload: { doctorId: string }
 ): Promise<
   | ResultOk<{
-      doctor: z.infer<typeof DoctorProfileSchema> & { id: string; firstName: string; lastName: string };
+      doctor: z.infer<typeof DoctorProfileSchema> & {
+        id: string;
+        firstName: string;
+        lastName: string;
+      };
     }>
   | ResultErr
 > {
   const perf = trackPerformance('getDoctorPublicProfile');
 
   try {
-    const { uid, role } = ctx;
-    
-    logInfo('getDoctorPublicProfile called', { uid, role, doctorId: payload.doctorId });
+    const { uid, role } = ctx || { uid: 'anonymous', role: UserType.PATIENT };
+
+    // Safely log doctorId with null checks
+    logInfo('getDoctorPublicProfile called', {
+      uid,
+      role,
+      doctorId: payload?.doctorId || 'undefined',
+    });
 
     // Validate with schema
     const validationResult = GetDoctorPublicProfileSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -237,7 +250,7 @@ export async function setDoctorAvailability(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -253,7 +266,7 @@ export async function setDoctorAvailability(
 
     // Update availability
     const doctor = { ...doctors[doctorIndex] };
-    
+
     if (weeklySchedule) {
       doctor.weeklySchedule = weeklySchedule;
     }
@@ -301,7 +314,7 @@ export async function getDoctorAvailability(
         };
         blockedDates: string[];
         timezone: string;
-      }
+      };
     }>
   | ResultErr
 > {
@@ -309,7 +322,7 @@ export async function getDoctorAvailability(
 
   try {
     const { uid, role } = ctx;
-    
+
     logInfo('getDoctorAvailability called', { uid, role, doctorId: payload.doctorId });
 
     // Validate with schema
@@ -317,7 +330,7 @@ export async function getDoctorAvailability(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
 
@@ -369,19 +382,19 @@ export async function getMockDoctorProfile(
   payload: { userId: string }
 ): Promise<ResultOk<z.infer<typeof DoctorProfileSchema> & { id: string }> | ResultErr> {
   const perf = trackPerformance('getMockDoctorProfile');
-  
+
   try {
     logInfo('getMockDoctorProfile called', { uid: ctx?.uid, role: ctx?.role, ...payload });
-    
+
     // Validate with schema
     const validationResult = GetMockDoctorProfileSchema.safeParse(payload);
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`
+        error: `Invalid request: ${validationResult.error.format()}`,
       };
     }
-    
+
     const { userId } = validationResult.data;
     const uniqueId = `doctor-${userId.includes('test') ? userId.split('-')[2] : generateId()}`;
     const timestamp = nowIso();
@@ -410,13 +423,28 @@ export async function getMockDoctorProfile(
       rating: 4.8,
       reviewCount: 24,
       weeklySchedule: {
-        monday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-        tuesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-        wednesday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-        thursday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
-        friday: [{ startTime: '09:00', endTime: '12:00', isAvailable: true }, { startTime: '13:00', endTime: '17:00', isAvailable: true }],
+        monday: [
+          { startTime: '09:00', endTime: '12:00', isAvailable: true },
+          { startTime: '13:00', endTime: '17:00', isAvailable: true },
+        ],
+        tuesday: [
+          { startTime: '09:00', endTime: '12:00', isAvailable: true },
+          { startTime: '13:00', endTime: '17:00', isAvailable: true },
+        ],
+        wednesday: [
+          { startTime: '09:00', endTime: '12:00', isAvailable: true },
+          { startTime: '13:00', endTime: '17:00', isAvailable: true },
+        ],
+        thursday: [
+          { startTime: '09:00', endTime: '12:00', isAvailable: true },
+          { startTime: '13:00', endTime: '17:00', isAvailable: true },
+        ],
+        friday: [
+          { startTime: '09:00', endTime: '12:00', isAvailable: true },
+          { startTime: '13:00', endTime: '17:00', isAvailable: true },
+        ],
         saturday: [],
-        sunday: []
+        sunday: [],
       },
       educationHistory: [
         {
@@ -426,8 +454,8 @@ export async function getMockDoctorProfile(
           startYear: 2006,
           endYear: 2010,
           isOngoing: false,
-          description: 'Graduated with honors'
-        }
+          description: 'Graduated with honors',
+        },
       ],
       experience: [
         {
@@ -436,7 +464,7 @@ export async function getMockDoctorProfile(
           startYear: 2010,
           endYear: 2014,
           isOngoing: false,
-          description: 'Completed residency in internal medicine'
+          description: 'Completed residency in internal medicine',
         },
         {
           position: 'General Practitioner',
@@ -444,15 +472,15 @@ export async function getMockDoctorProfile(
           startYear: 2014,
           endYear: null,
           isOngoing: true,
-          description: 'Primary care physician'
-        }
+          description: 'Primary care physician',
+        },
       ],
       timezone: 'America/New_York',
       blockedDates: [],
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-    
+
     perf.stop();
     return { success: true, ...mockProfile };
   } catch (error) {
@@ -460,4 +488,4 @@ export async function getMockDoctorProfile(
     perf.stop();
     return { success: false, error: 'Failed to generate mock doctor profile' };
   }
-} 
+}

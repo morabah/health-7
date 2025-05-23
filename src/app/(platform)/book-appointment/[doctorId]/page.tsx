@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Alert from '@/components/ui/Alert';
 import { CalendarDays, Clock, Check, MapPin, Video, AlertOctagon, CheckCircle } from 'lucide-react';
-import { logError } from '@/lib/logger';
+import { logError, logInfo } from '@/lib/logger';
 import { useAuth } from '@/context/AuthContext';
 import { useDoctorProfile, useDoctorAvailability, useBookAppointment } from '@/data/sharedLoaders';
 import { format } from 'date-fns';
@@ -86,6 +86,7 @@ interface BookAppointmentParams {
   endTime: string;
   appointmentType: AppointmentType;
   reason?: string;
+  patientId: string; // Make patientId required for the mock API
 }
 
 // Define BookingResult type to fix the error
@@ -93,6 +94,37 @@ interface BookingResult {
   success: boolean;
   error?: string;
   appointmentId?: string;
+}
+
+interface BookAppointmentResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  appointment?: {
+    id?: string;
+    patientId?: string;
+    patientName?: string;
+    doctorId?: string;
+    doctorName?: string;
+    doctorSpecialty?: string;
+    appointmentDate?: string;
+    startTime?: string;
+    endTime?: string;
+    status?: string;
+    reason?: string | null;
+    notes?: string | null;
+    appointmentType?: string;
+    videoCallUrl?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    [key: string]: any;
+  };
+  data?: {
+    appointment?: {
+      id: string;
+      [key: string]: any;
+    };
+  };
 }
 
 // Create a custom fallback UI specific to the booking page
@@ -478,49 +510,183 @@ function BookAppointmentPageContent() {
         appointmentDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
         const appointmentDate = appointmentDateTime.toISOString();
 
+        // Ensure time formats strictly conform to HH:MM pattern required by the schema
+        const formatTimeString = (timeString: string | undefined): string => {
+          if (!timeString) {
+            throw new ValidationError('Time slot is required');
+          }
+
+          // If already in HH:MM format, return as is
+          if (/^\d{2}:\d{2}$/.test(timeString)) {
+            return timeString;
+          }
+
+          try {
+            // Parse the time parts
+            const parts = timeString.split(':');
+            if (parts.length !== 2) {
+              throw new ValidationError(`Invalid time format: ${timeString}. Must be HH:MM`);
+            }
+
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+
+            // Validate hour and minute values
+            if (isNaN(hours) || hours < 0 || hours > 23) {
+              throw new ValidationError(`Invalid hours value: ${parts[0]}. Must be 00-23`);
+            }
+
+            if (isNaN(minutes) || minutes < 0 || minutes > 59) {
+              throw new ValidationError(`Invalid minutes value: ${parts[1]}. Must be 00-59`);
+            }
+
+            // Format with padding
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          } catch (error) {
+            if (error instanceof ValidationError) {
+              throw error;
+            }
+            throw new ValidationError(`Invalid time format: ${timeString}. Must be HH:MM`);
+          }
+        };
+
+        const formattedStartTime = formatTimeString(selectedTimeSlot!);
+        const formattedEndTime = formatTimeString(selectedEndTime!);
+
+        // Log the formatted times for debugging
+        console.log('Formatted times:', {
+          original: { start: selectedTimeSlot, end: selectedEndTime },
+          formatted: { start: formattedStartTime, end: formattedEndTime },
+        });
+
         // Prepare booking payload
         const bookingPayload: BookAppointmentParams = {
           doctorId,
           appointmentDate,
-          startTime: selectedTimeSlot,
-          endTime: selectedEndTime,
+          startTime: formattedStartTime,
+          endTime: formattedEndTime,
           appointmentType,
           reason: reason.trim() || undefined,
+          patientId: user.uid, // Add patientId for the mock API
         };
+
+        // Perform pre-validation checks before using Zod
+        if (!bookingPayload.doctorId) {
+          setFormError('Doctor ID is required');
+          setFieldErrors({ doctorId: 'Doctor ID is required' });
+          return;
+        }
+
+        if (!bookingPayload.startTime || !bookingPayload.endTime) {
+          setFormError('Start and end times are required');
+          setFieldErrors({ time: 'Please select a valid time slot' });
+          return;
+        }
+
+        // Explicitly check the time format against the regex pattern
+        const timeFormatRegex = /^\d{2}:\d{2}$/;
+        if (!timeFormatRegex.test(bookingPayload.startTime)) {
+          setFormError(`Invalid start time format: ${bookingPayload.startTime}. Must be HH:MM`);
+          setFieldErrors({ time: 'Invalid start time format (HH:MM)' });
+          logError('Time format validation failed', { startTime: bookingPayload.startTime });
+          return;
+        }
+
+        if (!timeFormatRegex.test(bookingPayload.endTime)) {
+          setFormError(`Invalid end time format: ${bookingPayload.endTime}. Must be HH:MM`);
+          setFieldErrors({ time: 'Invalid end time format (HH:MM)' });
+          logError('Time format validation failed', { endTime: bookingPayload.endTime });
+          return;
+        }
 
         // Validate appointment data on client using Zod schema before API call
         const validation = BookAppointmentSchema.safeParse(bookingPayload);
         if (!validation.success) {
           setFormError('Please check your appointment details and try again.');
-          setFieldErrors(validation.error.flatten().fieldErrors as Record<string, string>);
+          const flatErrors = validation.error.flatten().fieldErrors;
+          setFieldErrors(flatErrors as Record<string, string>);
+          logError('Zod validation failed', { errors: flatErrors, payload: bookingPayload });
           return;
         }
-        // Use callApiWithOptions for booking
+
+        // Log successful validation
+        logInfo('Appointment validation successful', { payload: bookingPayload });
+        // Add more detailed logging
+        logInfo('About to call bookAppointment API', { bookingPayload });
+        // Add patientId to the booking payload
         bookAppointmentMutation.mutate(
           {
             ...bookingPayload,
-          },
+            patientId: user.uid, // Add the authenticated user's ID as patientId
+          } as any, // Type assertion to bypass TypeScript error for now
           {
             onSuccess: (data: BookAppointmentResponse) => {
               if (!isMountedRef.current) return;
-              // Standardized response handling
-              if (data.success && data.data?.appointment) {
+
+              // Log the raw API response for debugging
+              console.log('Raw API Response:', JSON.stringify(data, null, 2));
+              logInfo('Received bookAppointment response', {
+                data,
+                hasSuccess: 'success' in data,
+                hasAppointment: 'appointment' in data,
+                hasError: 'error' in data,
+                keys: Object.keys(data),
+              });
+
+              // Handle the API response
+              if (data.success && data.appointment) {
                 perfTracker.current.mark('booking-api-success');
-                // Success handled by useEffect
+                logInfo('Booking successful', {
+                  appointmentId: data.appointment.id,
+                  appointment: data.appointment,
+                });
+                // Invalidate queries to refresh appointments list
                 queryClient.invalidateQueries({ queryKey: ['appointments', user.uid] });
+                // Show success message
+                setFormError('');
+                setSuccess(true);
               } else if (data.error) {
-                setFormError(data.error);
+                // Handle API-level errors
+                logError('Booking API returned error', {
+                  error: data.error,
+                  message: data.message,
+                });
+                setFormError(data.message || data.error);
               } else {
-                setFormError('Unexpected error occurred while booking.');
+                // Handle unexpected or empty response format
+                const errorMessage =
+                  data && typeof data === 'object' && Object.keys(data).length > 0
+                    ? 'Received an unexpected response format from the server.'
+                    : 'The server returned an empty response. Please try again.';
+
+                logError('Booking API returned unexpected response', {
+                  response: data,
+                  responseType: typeof data,
+                  responseKeys:
+                    data && typeof data === 'object' ? Object.keys(data) : 'not-an-object',
+                });
+
+                setFormError(errorMessage);
               }
             },
-            onError: error => {
+            onError: (error: Error) => {
               if (!isMountedRef.current) return;
-              // Improved error handling for slot availability
+
+              logError('BookAppointment API error', {
+                errorType: error.constructor.name,
+                error:
+                  error instanceof Error
+                    ? {
+                        message: error.message,
+                        stack: error.stack,
+                      }
+                    : error,
+                payload: bookingPayload,
+              });
+
+              // Improved error handling for different error types
               if (error instanceof SlotUnavailableError) {
                 setFormError('This time slot is no longer available. Please select another time.');
-                // Optionally refetch slots
-                // refetchSlots();
               } else if (error instanceof ValidationError) {
                 setFormError('Please check your appointment details and try again.');
               } else if (error instanceof AppointmentError) {
@@ -529,16 +695,16 @@ function BookAppointmentPageContent() {
                 setFormError(`Service error: ${error.message}`);
               } else {
                 setFormError('Failed to book appointment. Please try again later.');
-                logError('Unhandled booking error', { error });
               }
-              perfTracker.current.mark('booking-api-error');
             },
           }
         );
-      } catch (error) {
+      } catch (error: unknown) {
         if (!isMountedRef.current) return;
-
-        if (error instanceof AuthError) {
+        // Improved error handling for different error types
+        if (error instanceof SlotUnavailableError) {
+          setFormError('This time slot is no longer available. Please select another time.');
+        } else if (error instanceof AuthError) {
           setFormError('You must be logged in to book an appointment.');
           setTimeout(() => {
             if (isMountedRef.current) {
@@ -547,15 +713,19 @@ function BookAppointmentPageContent() {
           }, 2000);
         } else if (error instanceof ValidationError) {
           setFormError(error.message);
+        } else if (error instanceof AppointmentError) {
+          setFormError(error.message);
+        } else if (error instanceof ApiError) {
+          setFormError(`Service error: ${error.message}`);
         } else {
-          setFormError('An error occurred while booking your appointment. Please try again.');
-          // Always log error message and stack for better debugging
-          logError('Error submitting appointment form', {
+          setFormError('Failed to book appointment. Please try again later.');
+          logError('Unhandled booking error', {
             error: error instanceof Error ? error.message : JSON.stringify(error),
-            stack: error instanceof Error ? error.stack : undefined,
+            stack: error instanceof Error ? error.stack : 'No stack trace available',
             doctorId,
           });
         }
+        perfTracker.current.mark('booking-api-error');
       } finally {
         perfTracker.current.mark('form-submit-complete');
       }

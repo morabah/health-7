@@ -56,6 +56,8 @@ interface UserStatusUpdateResponse {
   error?: string;
 }
 
+import CreateUserPage from '../create/page';
+
 export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -64,13 +66,13 @@ export default function UserDetailPage() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState<'activate' | 'deactivate' | null>(null);
 
+  // If route param is 'new', render the user creation page instead
+  if (userId === 'new') {
+    return <CreateUserPage />;
+  }
+
   // Fetch user details
-  const { 
-    data, 
-    isLoading, 
-    error, 
-    refetch 
-  } = useUserDetail(userId);
+  const { data, isLoading, error, refetch } = useUserDetail(userId);
 
   // Update user status mutation
   const updateUserStatus = useAdminActivateUser();
@@ -79,12 +81,12 @@ export default function UserDetailPage() {
   useEffect(() => {
     // Refresh data when component mounts
     refetch();
-    
+
     // Setup interval to periodically refetch while on this page
     const intervalId = setInterval(() => {
       refetch();
     }, 5000); // Refresh every 5 seconds
-    
+
     // Cleanup interval on unmount
     return () => clearInterval(intervalId);
   }, [refetch]);
@@ -92,25 +94,25 @@ export default function UserDetailPage() {
   // Handle activation/deactivation
   const handleStatusChange = async (status: AccountStatus) => {
     try {
-      const result = await updateUserStatus.mutateAsync({
+      const result = (await updateUserStatus.mutateAsync({
         userId,
         status,
-        reason: reason || undefined
-      }) as UserStatusUpdateResponse;
-      
+        reason: reason || undefined,
+      })) as UserStatusUpdateResponse;
+
       if (!result.success) {
         throw new ApiError(result.error || 'Failed to update user status', {
           statusCode: 400,
-          context: { userId, status, reason }
+          context: { userId, status, reason },
         });
       }
-      
+
       setShowActionModal(false);
       setReason('');
-      
+
       // Explicitly fetch fresh data
       await refetch();
-      
+
       // Show a success message to the user
       logInfo(`User status successfully updated to ${status}`);
     } catch (error) {
@@ -132,16 +134,18 @@ export default function UserDetailPage() {
   // Show appropriate badge for user status
   const getStatusBadge = (isActive: boolean | undefined) => {
     if (isActive === undefined) return <Badge variant="default">Unknown</Badge>;
-    return isActive ? 
-      <Badge variant="success">Active</Badge> : 
-      <Badge variant="danger">Inactive</Badge>;
+    return isActive ? (
+      <Badge variant="success">Active</Badge>
+    ) : (
+      <Badge variant="danger">Inactive</Badge>
+    );
   };
 
   // Show badge for verification status
   const getVerificationBadge = (status: VerificationStatus | undefined) => {
     if (!status) return null;
-    
-    switch(status) {
+
+    switch (status) {
       case VerificationStatus.VERIFIED:
         return <Badge variant="success">Verified</Badge>;
       case VerificationStatus.PENDING:
@@ -167,14 +171,12 @@ export default function UserDetailPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error" className="mb-4">
-          {error ? String(error) : (data as UserDetailResponse)?.error || 'Failed to load user details'}
+          {error
+            ? String(error)
+            : (data as UserDetailResponse)?.error || 'Failed to load user details'}
         </Alert>
         <div className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => router.back()}
-            className="flex items-center"
-          >
+          <Button variant="outline" onClick={() => router.back()} className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -194,11 +196,7 @@ export default function UserDetailPage() {
     return (
       <div className="space-y-4">
         <Alert variant="error">User not found</Alert>
-        <Button 
-          variant="outline" 
-          onClick={() => router.back()}
-          className="flex items-center"
-        >
+        <Button variant="outline" onClick={() => router.back()} className="flex items-center">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Users
         </Button>
@@ -211,26 +209,18 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center mb-4 sm:mb-0">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.back()}
-            className="mr-4 p-2"
-          >
+          <Button variant="ghost" onClick={() => router.back()} className="mr-4 p-2">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold dark:text-white">
-              User Details
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400">
-              View and manage user information
-            </p>
+            <h1 className="text-2xl font-semibold dark:text-white">User Details</h1>
+            <p className="text-slate-500 dark:text-slate-400">View and manage user information</p>
           </div>
         </div>
         <div className="flex space-x-2">
           {user.isActive ? (
-            <Button 
-              variant="danger" 
+            <Button
+              variant="danger"
               onClick={showDeactivateModal}
               disabled={updateUserStatus.isPending}
             >
@@ -238,8 +228,8 @@ export default function UserDetailPage() {
               Deactivate User
             </Button>
           ) : (
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               onClick={showActivateModal}
               disabled={updateUserStatus.isPending}
             >
@@ -270,13 +260,13 @@ export default function UserDetailPage() {
                 {user.firstName} {user.lastName}
               </h2>
               <div className="flex items-center mt-1">
-                <Badge 
+                <Badge
                   variant={
-                    user.userType === UserType.ADMIN 
-                      ? "warning" 
-                      : user.userType === UserType.DOCTOR 
-                        ? "success" 
-                        : "info"
+                    user.userType === UserType.ADMIN
+                      ? 'warning'
+                      : user.userType === UserType.DOCTOR
+                        ? 'success'
+                        : 'info'
                   }
                   className="mr-2"
                 >
@@ -313,7 +303,11 @@ export default function UserDetailPage() {
                     <p className="font-medium">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                       <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">
-                        ({user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { addSuffix: true }) : ''})
+                        (
+                        {user.createdAt
+                          ? formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })
+                          : ''}
+                        )
                       </span>
                     </p>
                   </div>
@@ -323,7 +317,9 @@ export default function UserDetailPage() {
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Last Login</p>
                     <p className="font-medium">
-                      {user.lastLoginTime ? new Date(user.lastLoginTime).toLocaleDateString() : 'Never'}
+                      {user.lastLoginTime
+                        ? new Date(user.lastLoginTime).toLocaleDateString()
+                        : 'Never'}
                       {user.lastLoginTime && (
                         <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">
                           ({formatDistanceToNow(new Date(user.lastLoginTime), { addSuffix: true })})
@@ -361,7 +357,7 @@ export default function UserDetailPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {user.address && (
                   <div className="flex items-start mb-3">
                     <div>
@@ -381,14 +377,14 @@ export default function UserDetailPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Users
               </Button>
-              
+
               {/* Doctor specific actions */}
               {user.userType === UserType.DOCTOR && doctorProfile && (
                 <>
                   {doctorProfile.verificationStatus === VerificationStatus.PENDING && (
-                    <Button 
-                      variant="primary" 
-                      as={Link} 
+                    <Button
+                      variant="primary"
+                      as={Link}
                       href={`/admin/doctor-verification/${user.id}`}
                     >
                       <ShieldAlert className="h-4 w-4 mr-2" />
@@ -397,11 +393,11 @@ export default function UserDetailPage() {
                   )}
                 </>
               )}
-              
+
               {/* Activate/Deactivate buttons */}
               {user.isActive ? (
-                <Button 
-                  variant="danger" 
+                <Button
+                  variant="danger"
                   onClick={showDeactivateModal}
                   disabled={updateUserStatus.isPending}
                 >
@@ -409,8 +405,8 @@ export default function UserDetailPage() {
                   Deactivate User
                 </Button>
               ) : (
-                <Button 
-                  variant="primary" 
+                <Button
+                  variant="primary"
                   onClick={showActivateModal}
                   disabled={updateUserStatus.isPending}
                 >
@@ -431,35 +427,37 @@ export default function UserDetailPage() {
               {actionType === 'activate' ? 'Activate User' : 'Deactivate User'}
             </h3>
             <p className="mb-4 text-slate-600 dark:text-slate-300">
-              {actionType === 'activate' 
+              {actionType === 'activate'
                 ? 'Are you sure you want to activate this user? They will be able to log in again.'
                 : 'Are you sure you want to deactivate this user? They will no longer be able to log in.'}
             </p>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">Reason (optional)</label>
               <textarea
                 className="w-full p-2 border rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
                 rows={3}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={e => setReason(e.target.value)}
                 placeholder="Enter reason for this action..."
               />
             </div>
-            
+
             <div className="flex justify-end space-x-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowActionModal(false)}
                 disabled={updateUserStatus.isPending}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 variant={actionType === 'activate' ? 'primary' : 'danger'}
-                onClick={() => handleStatusChange(
-                  actionType === 'activate' ? AccountStatus.ACTIVE : AccountStatus.DEACTIVATED
-                )}
+                onClick={() =>
+                  handleStatusChange(
+                    actionType === 'activate' ? AccountStatus.ACTIVE : AccountStatus.DEACTIVATED
+                  )
+                }
                 disabled={updateUserStatus.isPending}
               >
                 {updateUserStatus.isPending ? (
@@ -489,4 +487,4 @@ export default function UserDetailPage() {
       )}
     </div>
   );
-} 
+}

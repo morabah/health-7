@@ -202,9 +202,11 @@ export function useFindDoctors(searchParams: Record<string, any> = {}) {
 interface BookAppointmentParams {
   doctorId: string;
   appointmentDate: string;
-  appointmentTime: string;
+  startTime: string;
+  endTime: string;
   appointmentType: AppointmentType;
-  notes?: string;
+  reason?: string;
+  patientId: string;
 }
 
 interface BookAppointmentApiResponse {
@@ -234,14 +236,23 @@ export function useBookAppointment() {
       }
 
       // Validate required fields
-      const { doctorId, appointmentDate, appointmentTime, appointmentType } = params;
-      if (!doctorId || !appointmentDate || !appointmentTime || !appointmentType) {
+      const { doctorId, appointmentDate, startTime, endTime, appointmentType, patientId } = params;
+      if (
+        !doctorId ||
+        !appointmentDate ||
+        !startTime ||
+        !endTime ||
+        !appointmentType ||
+        !patientId
+      ) {
         throw new ValidationError('Missing required appointment information', {
           validationErrors: {
             doctorId: !doctorId ? ['Doctor is required'] : [],
             appointmentDate: !appointmentDate ? ['Date is required'] : [],
-            appointmentTime: !appointmentTime ? ['Time is required'] : [],
+            startTime: !startTime ? ['Start time is required'] : [],
+            endTime: !endTime ? ['End time is required'] : [],
             appointmentType: !appointmentType ? ['Appointment type is required'] : [],
+            patientId: !patientId ? ['Patient ID is required'] : [],
           },
         });
       }
@@ -294,16 +305,14 @@ export function useDirectMessage() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({
-      recipientId,
-      message,
-    }: {
-      recipientId: string;
-      message: string;
-    }) => {
+    mutationFn: async ({ recipientId, message }: { recipientId: string; message: string }) => {
       if (!user?.uid) throw new AuthError('User not authenticated');
 
-      return callApi('sendDirectMessage', { uid: user.uid, role: user.role }, { recipientId, message });
+      return callApi(
+        'sendDirectMessage',
+        { uid: user.uid, role: user.role },
+        { recipientId, message }
+      );
     },
   });
 }
@@ -319,7 +328,33 @@ export function useMyAppointments(role: UserType) {
     queryKey: ['appointments', user?.uid, role],
     queryFn: async () => {
       if (!user?.uid) throw new AuthError('User not authenticated');
-      return callApi('getMyAppointments', { uid: user.uid, role });
+      // --- CHECKLIST IMPLEMENTATION ---
+      // 1. Confirm frontend is passing {} or a valid filter object
+      const filterPayload = {};
+      // 2. If status is being passed, ensure it matches the schema
+      // (simulate status coming from UI, e.g., filterPayload.status = ...)
+      if ('status' in filterPayload) {
+        const allowedStatuses = [
+          'pending',
+          'confirmed',
+          'cancelled',
+          'completed',
+          'no_show', // enum values
+          'upcoming', // literal allowed
+        ];
+        if (
+          typeof filterPayload.status !== 'string' ||
+          !allowedStatuses.includes(filterPayload.status)
+        ) {
+          // eslint-disable-next-line no-console
+          console.error('Invalid status value for getMyAppointments:', filterPayload.status);
+        }
+      }
+      // Log payload for verification
+      // eslint-disable-next-line no-console
+      console.log('getMyAppointments payload:', { uid: user.uid, role }, filterPayload);
+      // --- END CHECKLIST ---
+      return callApi('getMyAppointments', { uid: user.uid, role }, filterPayload);
     },
     enabled: !!user?.uid,
     staleTime: CACHE_DURATIONS.APPOINTMENTS_UPCOMING, // 5 minutes for appointments

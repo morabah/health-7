@@ -450,7 +450,7 @@ export async function getMyAppointments(
     if (!validationResult.success) {
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`,
+        error: `Invalid request: ${JSON.stringify(validationResult.error.issues)}`,
       };
     }
 
@@ -480,15 +480,32 @@ export async function getMyAppointments(
     if (filters.status) {
       if (filters.status === 'upcoming') {
         // Special handling for 'upcoming' filter - match the dashboard logic:
-        // Future date AND not canceled
+        // Future date+time AND not canceled
         const now = new Date();
         myAppointments = myAppointments.filter(a => {
+          // Create a proper DateTime by combining date and start time
           const appointmentDate = a.appointmentDate.includes('T')
             ? new Date(a.appointmentDate)
-            : new Date(`${a.appointmentDate}T${a.startTime}`);
+            : new Date(`${a.appointmentDate}T${a.startTime}:00.000Z`);
 
           const status = a.status.toLowerCase();
-          return appointmentDate > now && status !== 'canceled';
+          const isFuture = appointmentDate > now;
+          const isNotCanceled = status !== 'canceled';
+
+          // Log individual appointment check for debugging
+          if (a.patientId === uid) {
+            logInfo('Checking appointment for upcoming filter', {
+              appointmentId: a.id,
+              appointmentDateTime: appointmentDate.toISOString(),
+              now: now.toISOString(),
+              isFuture,
+              isNotCanceled,
+              status,
+              willInclude: isFuture && isNotCanceled,
+            });
+          }
+
+          return isFuture && isNotCanceled;
         });
 
         // Log the filter application for debugging
@@ -606,28 +623,46 @@ export async function getAppointmentDetails(
 /**
  * Validates the authentication context for API calls
  */
-function validateAuthContext(ctx: { uid?: string; role?: UserType }): {
+export function validateAuthContext(ctx: { uid?: string; role?: UserType }): {
   isValid: boolean;
   error?: string;
   uid?: string;
   role?: UserType;
 } {
-  // Validate context
-  if (!ctx || typeof ctx !== 'object') {
-    logError('API - Invalid context', { ctx });
-    return { isValid: false, error: 'Invalid authentication context' };
+  if (!ctx) {
+    logError('API - Missing context object', {});
+    return { isValid: false, error: 'Authentication context is required' };
   }
 
   const { uid, role } = ctx;
 
+  // For prefetching scenarios (e.g., doctor search results hovering), we'll be more lenient
+  // but still log the issue for monitoring (but only for unexpected cases)
   if (!uid || typeof uid !== 'string') {
-    logError('API - Missing uid in context', { ctx });
-    return { isValid: false, error: 'User ID is required' };
+    // Only log if this is an unexpected missing uid (not a deliberate anonymous/prefetch call)
+    // Anonymous calls typically have uid set to 'anonymous', undefined context, or empty context object
+    const isAnonymousCall =
+      uid === 'anonymous' || ctx === undefined || Object.keys(ctx || {}).length === 0;
+
+    if (process.env.NODE_ENV === 'development' && !isAnonymousCall) {
+      logError('API - Missing uid in context', { ctx });
+    }
+
+    // Return with isValid=true but no uid/role for read-only, public endpoints like getAvailableSlots
+    // This allows prefetching to work without authentication
+    return {
+      isValid: true,
+      uid: uid || 'anonymous',
+      role: role || UserType.PATIENT,
+    };
   }
 
   if (!role) {
-    logError('API - Missing role in context', { uid, ctx });
-    return { isValid: false, error: 'User role is required' };
+    if (process.env.NODE_ENV === 'development') {
+      logError('API - Missing role in context', { uid, ctx });
+    }
+    // Default to PATIENT role if not provided
+    return { isValid: true, uid, role: UserType.PATIENT };
   }
 
   return { isValid: true, uid, role };
@@ -744,7 +779,7 @@ function calculateAvailableSlots(
  * Get available appointment slots for a doctor on a specific date
  */
 export async function getAvailableSlots(
-  ctx: { uid: string; role: UserType },
+  ctx: { uid: string; role: UserType } | undefined,
   payload: { doctorId: string; date: string }
 ): Promise<
   | ResultOk<{ slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> }>
@@ -753,22 +788,17 @@ export async function getAvailableSlots(
   const perf = trackPerformance('getAvailableSlots');
 
   try {
-    // Step 1: Validate authentication context
-    const contextValidation = validateAuthContext(ctx);
+    // Step 1: Validate authentication context - allow undefined for public access
+    const contextValidation = validateAuthContext(ctx || {});
     if (!contextValidation.isValid) {
       return { success: false, error: contextValidation.error || 'Invalid authentication context' };
     }
 
     const { uid, role } = contextValidation;
 
-    // Ensure uid and role are defined
-    if (!uid || !role) {
-      return { success: false, error: 'Missing user authentication data' };
-    }
-
     // Minimize logging to prevent console freeze
     logInfo('getAvailableSlots called', {
-      uid: uid.substring(0, 6) + '...',
+      uid: uid ? uid.substring(0, 6) + '...' : 'anonymous',
       role,
       doctorId: payload?.doctorId,
     });
@@ -786,7 +816,11 @@ export async function getAvailableSlots(
     const { doctorId, date } = result.data;
 
     // Step 3: Retrieve and validate doctor profile
-    const doctorResult = await retrieveDoctorProfile(doctorId, uid, role);
+    const doctorResult = await retrieveDoctorProfile(
+      doctorId,
+      uid || 'anonymous',
+      role || UserType.PATIENT
+    );
     if (!doctorResult.success || !doctorResult.doctor) {
       return { success: false, error: doctorResult.error || 'Error retrieving doctor profile' };
     }

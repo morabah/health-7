@@ -89,7 +89,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
           // Cache the result
           enhancedCache?.set(CacheCategory.NOTIFICATIONS, cacheKey, response, {
-            ttl: 15000,
+            ttl: 30000,
             priority: 'normal',
           });
         } else {
@@ -143,7 +143,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           };
 
           enhancedCache?.set(CacheCategory.NOTIFICATIONS, cacheKey, updatedCache, {
-            ttl: 15000,
+            ttl: 30000,
             priority: 'normal',
           });
         }
@@ -183,7 +183,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           };
 
           enhancedCache?.set(CacheCategory.NOTIFICATIONS, cacheKey, updatedCache, {
-            ttl: 15000,
+            ttl: 30000,
             priority: 'normal',
           });
         }
@@ -201,7 +201,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       fetchNotifications();
 
       // Set up polling
-      const interval = setInterval(fetchNotifications, 60000); // Every minute
+      const interval = setInterval(fetchNotifications, 120000); // Every 2 minutes
 
       return () => {
         isMountedRef.current = false;

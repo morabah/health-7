@@ -2,7 +2,7 @@
 
 /**
  * Dashboard Data Loaders
- * 
+ *
  * Provides hooks for loading dashboard data efficiently using
  * batched API calls to improve performance with aggressive caching strategies.
  */
@@ -31,19 +31,19 @@ export function useDashboardBatch() {
   const queryClient = useQueryClient();
   const lastFetchTimeRef = useRef<number>(0);
   const isMountedRef = useRef<boolean>(false);
-  
+
   // Prefetch dashboard data when component mounts if we don't have cached data
   useEffect(() => {
     isMountedRef.current = true;
     const cacheKey = `dashboardBatch_${user?.uid}_${user?.role}`;
-    
+
     // Try to use cached data from last session if available
     const cachedData = localStorage.getItem(cacheKey);
     if (cachedData) {
       try {
         const { data, timestamp } = JSON.parse(cachedData);
         const age = Date.now() - timestamp;
-        
+
         // If cache is still fresh, use it
         if (age < CACHE_DURATIONS.DASHBOARD) {
           lastBatchResults[cacheKey] = data;
@@ -59,12 +59,12 @@ export function useDashboardBatch() {
         localStorage.removeItem(cacheKey);
       }
     }
-    
+
     return () => {
       isMountedRef.current = false;
     };
   }, [user?.uid, user?.role, queryClient]);
-  
+
   return useQuery({
     queryKey: ['dashboardBatch', user?.uid, user?.role],
     queryFn: async () => {
@@ -72,34 +72,37 @@ export function useDashboardBatch() {
       if (!user?.uid) {
         throw new Error('User not authenticated');
       }
-      
+
       const cacheKey = `dashboardBatch_${user?.uid}_${user?.role}`;
-      
+
       // Create operations array based on user role
       const operations = buildDashboardOperations(user.role);
-      
+
       // Measure performance of the batch operation
       const result = await measureAsync('dashboardBatchFetch', async () => {
         return executeBatchOperations(operations, { uid: user.uid, role: user.role });
       });
-      
+
       // Store in our memory cache and persistent storage
       if (result && isMountedRef.current) {
         lastBatchResults[cacheKey] = result;
         lastFetchTimeRef.current = Date.now();
-        
+
         // Store in localStorage for persistence between sessions
         try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            data: result,
-            timestamp: Date.now()
-          }));
+          localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              data: result,
+              timestamp: Date.now(),
+            })
+          );
         } catch (e) {
           // If storage fails (e.g., quota exceeded), just log and continue
           logInfo('Failed to cache dashboard data', { error: e });
         }
       }
-      
+
       return result;
     },
     enabled: !!user?.uid,
@@ -114,7 +117,7 @@ export function useDashboardBatch() {
         return lastBatchResults[cacheKey];
       }
       return undefined;
-    }
+    },
   });
 }
 
@@ -125,19 +128,27 @@ function buildDashboardOperations(role: string): Array<ReturnType<typeof createB
   // Common operations for all users
   const operations = [
     createBatchOperation('getMyUserProfile', {}, 'userProfile'),
-    createBatchOperation('getMyNotifications', { limit: 5, unreadOnly: true }, 'notifications')
+    createBatchOperation('getMyNotifications', { limit: 5, unreadOnly: true }, 'notifications'),
   ];
-  
+
   // Add role-specific operations
   if (role === UserType.PATIENT) {
     operations.push(
-      createBatchOperation('getMyAppointments', { status: 'upcoming', limit: 5 }, 'upcomingAppointments'),
+      createBatchOperation(
+        'getMyAppointments',
+        { status: 'upcoming', limit: 5 },
+        'upcomingAppointments'
+      ),
       createBatchOperation('getMyDashboardStats', {}, 'stats')
     );
   } else if (role === UserType.DOCTOR) {
     operations.push(
-      createBatchOperation('getMyAppointments', { status: 'today', limit: 10 }, 'todayAppointments'),
-      createBatchOperation('getMyAppointments', { status: 'upcoming', limit: 10 }, 'upcomingAppointments'),
+      createBatchOperation('getMyAppointments', { limit: 10 }, 'todayAppointments'),
+      createBatchOperation(
+        'getMyAppointments',
+        { status: 'upcoming', limit: 10 },
+        'upcomingAppointments'
+      ),
       createBatchOperation('getDoctorAvailability', {}, 'availability'),
       createBatchOperation('getMyDashboardStats', {}, 'stats')
     );
@@ -147,13 +158,17 @@ function buildDashboardOperations(role: string): Array<ReturnType<typeof createB
       createBatchOperation('adminGetAllUsers', { limit: 100, page: 1 }, 'allUsers'),
       createBatchOperation('adminGetAllDoctors', { limit: 100, page: 1 }, 'allDoctors'),
       createBatchOperation('adminGetAllAppointments', { limit: 100, page: 1 }, 'allAppointments'),
-      createBatchOperation('adminGetAllDoctors', { 
-        limit: 5, 
-        verificationStatus: 'pending' 
-      }, 'pendingDoctors')
+      createBatchOperation(
+        'adminGetAllDoctors',
+        {
+          limit: 5,
+          verificationStatus: 'pending',
+        },
+        'pendingDoctors'
+      )
     );
   }
-  
+
   return operations;
 }
 
@@ -164,17 +179,17 @@ function buildDashboardOperations(role: string): Array<ReturnType<typeof createB
 export function useBatchResultsCache(batchData: any) {
   const queryClient = useQueryClient();
   const processedDataRef = useRef<Set<string>>(new Set());
-  
+
   useEffect(() => {
     if (!batchData || !batchData.data) return;
-    
+
     const results = batchData.data.results || batchData.data; // Adapt to actual structure
     if (!results) return;
-    
+
     // Measure cache update performance
     const start = performance.now();
     const updatedKeys: string[] = [];
-    
+
     // Process user profile
     if (results.userProfile?.success && !processedDataRef.current.has('userProfile')) {
       queryClient.setQueryData(['userProfile'], results.userProfile, {
@@ -183,7 +198,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('userProfile');
       updatedKeys.push('userProfile');
     }
-    
+
     // Process notifications
     if (results.notifications?.success && !processedDataRef.current.has('notifications')) {
       queryClient.setQueryData(['notifications'], results.notifications, {
@@ -192,16 +207,19 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('notifications');
       updatedKeys.push('notifications');
     }
-    
+
     // Process upcoming appointments
-    if (results.upcomingAppointments?.success && !processedDataRef.current.has('upcomingAppointments')) {
+    if (
+      results.upcomingAppointments?.success &&
+      !processedDataRef.current.has('upcomingAppointments')
+    ) {
       queryClient.setQueryData(['appointments', 'upcoming'], results.upcomingAppointments, {
         updatedAt: Date.now(),
       });
       processedDataRef.current.add('upcomingAppointments');
       updatedKeys.push('upcomingAppointments');
     }
-    
+
     // Process today's appointments
     if (results.todayAppointments?.success && !processedDataRef.current.has('todayAppointments')) {
       queryClient.setQueryData(['appointments', 'today'], results.todayAppointments, {
@@ -210,7 +228,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('todayAppointments');
       updatedKeys.push('todayAppointments');
     }
-    
+
     // Process stats
     if (results.stats?.success && !processedDataRef.current.has('stats')) {
       queryClient.setQueryData(['stats'], results.stats, {
@@ -219,7 +237,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('stats');
       updatedKeys.push('stats');
     }
-    
+
     // Process availability
     if (results.availability?.success && !processedDataRef.current.has('availability')) {
       queryClient.setQueryData(['availability'], results.availability, {
@@ -228,18 +246,18 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('availability');
       updatedKeys.push('availability');
     }
-    
+
     // Process pending doctors
     if (results.pendingDoctors?.success && !processedDataRef.current.has('pendingDoctors')) {
       queryClient.setQueryData(
-        ['admin', 'doctors', { verificationStatus: 'pending' }], 
+        ['admin', 'doctors', { verificationStatus: 'pending' }],
         results.pendingDoctors,
         { updatedAt: Date.now() }
       );
       processedDataRef.current.add('pendingDoctors');
       updatedKeys.push('pendingDoctors');
     }
-    
+
     // Process admin stats
     if (results.adminStats?.success && !processedDataRef.current.has('adminStats')) {
       queryClient.setQueryData(['admin', 'dashboardStats'], results.adminStats, {
@@ -248,7 +266,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('adminStats');
       updatedKeys.push('adminStats');
     }
-    
+
     // Process all users
     if (results.allUsers?.success && !processedDataRef.current.has('allUsers')) {
       queryClient.setQueryData(['admin', 'users', 'all'], results.allUsers, {
@@ -257,7 +275,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('allUsers');
       updatedKeys.push('allUsers');
     }
-    
+
     // Process all doctors
     if (results.allDoctors?.success && !processedDataRef.current.has('allDoctors')) {
       queryClient.setQueryData(['admin', 'doctors', 'all'], results.allDoctors, {
@@ -266,7 +284,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('allDoctors');
       updatedKeys.push('allDoctors');
     }
-    
+
     // Process all appointments
     if (results.allAppointments?.success && !processedDataRef.current.has('allAppointments')) {
       queryClient.setQueryData(['admin', 'appointments', 'all'], results.allAppointments, {
@@ -275,7 +293,7 @@ export function useBatchResultsCache(batchData: any) {
       processedDataRef.current.add('allAppointments');
       updatedKeys.push('allAppointments');
     }
-    
+
     // Log performance metrics if any updates were made
     if (updatedKeys.length > 0) {
       const end = performance.now();
@@ -284,9 +302,9 @@ export function useBatchResultsCache(batchData: any) {
       logInfo('Batch data cache update details', {
         duration: `${Math.round(end - start)}ms`,
         updatedKeys,
-        totalKeys: updatedKeys.length
+        totalKeys: updatedKeys.length,
       });
       perf.stop();
     }
   }, [batchData, queryClient]);
-} 
+}

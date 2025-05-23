@@ -13,12 +13,20 @@ import { cacheKeys } from '@/lib/queryClient';
 import { useBatchDoctorData } from '@/data/doctorLoaders';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
-import { getCachedDoctorSearchResults, cacheDoctorSearchResults, prefetchDoctorProfiles } from '@/lib/doctorCacheUtils';
+import {
+  getCachedDoctorSearchResults,
+  cacheDoctorSearchResults,
+  prefetchDoctorProfiles,
+} from '@/lib/doctorCacheUtils';
 
 // Dynamically import the VirtualizedList component to reduce initial load time
 const VirtualizedList = dynamic(() => import('@/components/ui/VirtualizedList'), {
   ssr: false,
-  loading: () => <div className="py-4"><Spinner /></div>
+  loading: () => (
+    <div className="py-4">
+      <Spinner />
+    </div>
+  ),
 });
 
 // Define interface for doctor data
@@ -92,10 +100,16 @@ interface DoctorSearchResultsProps {
 const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
   // Prefetch doctor profile data on hover to improve perceived speed
   const handleMouseEnter = () => {
+    // Guard against undefined doctor.id
+    if (!doctor?.id) {
+      logError('DoctorCard: Cannot prefetch - doctor.id is undefined', { doctor });
+      return;
+    }
+
     prefetchApiQuery<ApiResponse<DoctorProfile>>(
       'getDoctorPublicProfile',
       cacheKeys.doctor(doctor.id),
-      [{ doctorId: doctor.id }]
+      [{ doctorId: doctor.id }] // payload only - context will be handled automatically
     );
 
     // Also prefetch first page of available slots for current date
@@ -103,7 +117,7 @@ const DoctorCard = React.memo(({ doctor }: { doctor: Doctor }) => {
     prefetchApiQuery<ApiResponse<AvailableSlot[]>>(
       'getAvailableSlots',
       cacheKeys.availableSlots(doctor.id, currentDate),
-      [{ doctorId: doctor.id, date: currentDate }]
+      [{ doctorId: doctor.id, date: currentDate }] // payload only - context will be handled automatically
     );
   };
 
@@ -234,10 +248,12 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
       retry: 1, // Only retry once for faster feedback
       retryDelay: 1000, // 1 second between retries
       // Use cached data if available for immediate rendering
-      initialData: cachedResults ? { 
-        success: true, 
-        doctors: cachedResults.doctors 
-      } : undefined
+      initialData: cachedResults
+        ? {
+            success: true,
+            doctors: cachedResults.doctors,
+          }
+        : undefined,
     }
   );
 
@@ -301,46 +317,47 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
   const shouldUseVirtualization = useMemo(() => {
     return doctors.length > 10; // Use virtualization for more than 10 doctors
   }, [doctors.length]);
-  
+
   // Log performance metrics for large datasets
   useEffect(() => {
     if (doctors.length > 20) {
       logInfo('DoctorSearchResults performance', {
         totalDoctors: doctors.length,
         isVirtualized: shouldUseVirtualization,
-        renderTime: perfTracker.getElapsedTime()
+        renderTime: perfTracker.getElapsedTime(),
       });
     }
   }, [doctors.length, shouldUseVirtualization, perfTracker]);
-  
+
   // Memoized Doctor Cards (used when not virtualizing)
   const doctorCards = useMemo(() => {
     if (shouldUseVirtualization) return null;
-    return doctors.map(doctor => (
-      <DoctorCard key={doctor.id} doctor={doctor} />
-    ));
+    return doctors.map(doctor => <DoctorCard key={doctor.id} doctor={doctor} />);
   }, [doctors, shouldUseVirtualization]);
 
   // Memoized No Doctors Message
-  const noDoctorsMessage = useMemo(() => (
-    <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
-      <Stethoscope className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-      <h3 className="text-lg font-medium mb-2">No Doctors Found</h3>
-      <p className="text-slate-500 mb-4">
-        Try adjusting your search filters to find more results.
-      </p>
-      <Button variant="outline">Clear Filters</Button>
-    </div>
-  ), []);
+  const noDoctorsMessage = useMemo(
+    () => (
+      <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center">
+        <Stethoscope className="h-12 w-12 mx-auto mb-4 text-slate-400" />
+        <h3 className="text-lg font-medium mb-2">No Doctors Found</h3>
+        <p className="text-slate-500 mb-4">
+          Try adjusting your search filters to find more results.
+        </p>
+        <Button variant="outline">Clear Filters</Button>
+      </div>
+    ),
+    []
+  );
 
   // Cache search results for future use
   useEffect(() => {
     if (searchData?.success && searchData?.doctors?.length > 0) {
       cacheDoctorSearchResults(searchParams, searchData.doctors, searchData.doctors.length);
       // Prefetch doctor profiles for better UX
-      prefetchDoctorProfiles(searchData.doctors);
+      prefetchDoctorProfiles(doctors);
     }
-  }, [searchData, searchParams]);
+  }, [searchData, searchParams, doctors]);
 
   // Optimize performance tracking to avoid unnecessary effect runs
   React.useEffect(() => {
@@ -391,20 +408,17 @@ const DoctorSearchResults: React.FC<DoctorSearchResultsProps> = ({
               onItemsRendered={({ visibleStartIndex, visibleStopIndex }) => {
                 logInfo('DoctorSearchVirtualized performance', {
                   visibleItems: visibleStopIndex - visibleStartIndex + 1,
-                  totalItems: doctors.length
+                  totalItems: doctors.length,
                 });
               }}
             />
           </div>
         ) : (
           // Regular grid for smaller lists
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {doctorCards}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{doctorCards}</div>
         )
       ) : (
-        !isLoading &&
-        !error && noDoctorsMessage
+        !isLoading && !error && noDoctorsMessage
       )}
     </div>
   );

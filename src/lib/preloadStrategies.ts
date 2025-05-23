@@ -2,7 +2,7 @@
 
 /**
  * Preload Strategies
- * 
+ *
  * This module implements optimized preloading strategies for different pages
  * to reduce redundant API calls and improve perceived performance.
  */
@@ -114,11 +114,11 @@ export class BookAppointmentPreloader implements PagePreloader {
     }
 
     logInfo('BookAppointmentPreloader: Starting preload', { doctorId: this.doctorId });
-    
+
     try {
       // Execute the most strategic preload first
       await this.preloadStrategic();
-      
+
       // Then prefetch future days' slots in the background
       this.prefetchFutureDays().catch(err => {
         logError('Error prefetching future days', { error: err });
@@ -134,18 +134,18 @@ export class BookAppointmentPreloader implements PagePreloader {
       await this.preloadFallback();
     }
   }
-  
+
   /**
    * Strategic batch preload for the most critical data
    * This combines doctor profile and public slots into a single API call
    */
   private async preloadStrategic(): Promise<void> {
     if (this.strategicDataFetched) return;
-    
+
     try {
       // Get current date in YYYY-MM-DD format
       const currentDate = new Date().toISOString().split('T')[0];
-      
+
       // Create a batch payload to get multiple resources in one go
       const batchPayload = {
         doctorId: this.doctorId,
@@ -155,56 +155,56 @@ export class BookAppointmentPreloader implements PagePreloader {
         currentDate,
         numDays: 3, // Prefetch 3 days of slots in a single call
       };
-      
+
       // Use optimized batch endpoint if available
       const response = await callApi<BatchDoctorDataResponse>(
         'batchGetDoctorData',
-        this.userId ? { uid: this.userId, role: this.userRole } : undefined, 
+        this.userId ? { uid: this.userId, role: this.userRole } : undefined,
         batchPayload
       );
-      
+
       if (response.success) {
         // Cache all returned data appropriately with longer TTLs for better performance
         if (response.doctor) {
           // Cache doctor profile with 30 minute TTL
           enhancedCache.set(
-            CacheCategory.DOCTORS, 
-            enhancedCache.createKey('doctor', this.doctorId), 
+            CacheCategory.DOCTORS,
+            enhancedCache.createKey('doctor', this.doctorId),
             response.doctor,
             { ttl: 30 * 60 * 1000, priority: 'high' }
           );
           // Also set in React Query cache
           cacheManager.setDoctorData(this.doctorId, response.doctor);
         }
-        
+
         if (response.availability) {
           // Cache availability with 10 minute TTL
           enhancedCache.set(
-            CacheCategory.APPOINTMENTS, 
-            enhancedCache.createKey('availability', this.doctorId), 
+            CacheCategory.APPOINTMENTS,
+            enhancedCache.createKey('availability', this.doctorId),
             response.availability,
             { ttl: 10 * 60 * 1000, priority: 'high' }
           );
         }
-        
+
         if (response.slots) {
           // Cache each day's slots
           if (typeof response.slots === 'object') {
             Object.entries(response.slots).forEach(
               ([dateStr, dateSlots]: [string, Array<{ startTime: string; endTime: string }>]) => {
-              // Cache with longer TTL for closer dates
-              const today = new Date().toISOString().split('T')[0];
-              const priority = dateStr === today ? 'high' : 'normal';
-              const ttl = dateStr === today ? 5 * 60 * 1000 : 10 * 60 * 1000;
-              
-              enhancedCache.set(
-                CacheCategory.APPOINTMENTS,
-                enhancedCache.createKey('slots', this.doctorId, dateStr),
-                dateSlots,
-                { ttl, priority }
-              );
-              
-              // Also update in React Query cache
+                // Cache with longer TTL for closer dates
+                const today = new Date().toISOString().split('T')[0];
+                const priority = dateStr === today ? 'high' : 'normal';
+                const ttl = dateStr === today ? 5 * 60 * 1000 : 10 * 60 * 1000;
+
+                enhancedCache.set(
+                  CacheCategory.APPOINTMENTS,
+                  enhancedCache.createKey('slots', this.doctorId, dateStr),
+                  dateSlots,
+                  { ttl, priority }
+                );
+
+                // Also update in React Query cache
                 cacheManager.setQueryData(cacheKeys.availableSlots(this.doctorId, dateStr), {
                   success: true,
                   slots: dateSlots,
@@ -213,23 +213,23 @@ export class BookAppointmentPreloader implements PagePreloader {
             );
           }
         }
-        
+
         if (response.appointments) {
           // Cache appointments with 2 minute TTL
           enhancedCache.set(
-            CacheCategory.APPOINTMENTS, 
+            CacheCategory.APPOINTMENTS,
             enhancedCache.createKey('appointments', this.userId || 'anon'),
             response.appointments,
             { ttl: 2 * 60 * 1000 }
           );
-          
+
           // Also update in React Query cache
           cacheManager.setQueryData(cacheKeys.appointments(this.userId || 'anon', this.userRole), {
             success: true,
             appointments: response.appointments,
           });
         }
-        
+
         this.strategicDataFetched = true;
         logInfo('BookAppointmentPreloader: Strategic preload complete', {
           doctorId: this.doctorId,
@@ -243,31 +243,31 @@ export class BookAppointmentPreloader implements PagePreloader {
       // We'll fall back to individual calls
     }
   }
-  
+
   /**
    * Prefetch slots for future days to make date selection more responsive
    */
   private async prefetchFutureDays(): Promise<void> {
     // Don't prefetch if the main strategic load failed
     if (!this.strategicDataFetched) return;
-    
+
     try {
       const prefetchPromises = [];
       const today = new Date();
-      
+
       // Prefetch the next several days (defined by this.prefetchDays)
       for (let i = 1; i <= this.prefetchDays; i++) {
         const futureDate = new Date(today);
         futureDate.setDate(today.getDate() + i);
         const futureDateStr = futureDate.toISOString().split('T')[0];
-        
+
         // Use a lower priority for future dates (further away = lower priority)
         const priority = i <= 3 ? 'normal' : 'low';
-        
+
         // Prefetch this future date's slots
         prefetchPromises.push(this.prefetchSlotsForDate(futureDateStr, priority));
       }
-      
+
       // Execute prefetches with a small delay between them
       for (let i = 0; i < prefetchPromises.length; i++) {
         // Stagger the prefetches to prevent overwhelming the API
@@ -278,7 +278,7 @@ export class BookAppointmentPreloader implements PagePreloader {
       logError('Error prefetching future days', { error, doctorId: this.doctorId });
     }
   }
-  
+
   /**
    * Prefetch slots for a specific date
    */
@@ -293,10 +293,10 @@ export class BookAppointmentPreloader implements PagePreloader {
           CacheCategory.APPOINTMENTS,
           enhancedCache.createKey('slots', this.doctorId, dateStr)
         );
-        
+
         // If already cached, skip prefetching
         if (cachedSlots) return;
-        
+
         // Otherwise fetch slots for this date
         const response = await callApi<{
           success: boolean;
@@ -306,7 +306,7 @@ export class BookAppointmentPreloader implements PagePreloader {
           this.userId ? { uid: this.userId, role: this.userRole } : undefined,
           { doctorId: this.doctorId, date: dateStr }
         );
-        
+
         if (response.success && response.slots) {
           // Cache the slots with TTL based on how far in the future
           // (closer dates have longer TTL)
@@ -316,14 +316,14 @@ export class BookAppointmentPreloader implements PagePreloader {
               : priority === 'normal'
                 ? 3 * 60 * 1000
                 : 2 * 60 * 1000;
-                      
+
           enhancedCache.set(
             CacheCategory.APPOINTMENTS,
             enhancedCache.createKey('slots', this.doctorId, dateStr),
             response.slots,
             { ttl, priority }
           );
-          
+
           // Also update in React Query cache
           cacheManager.setQueryData(cacheKeys.availableSlots(this.doctorId, dateStr), {
             success: true,
@@ -342,8 +342,9 @@ export class BookAppointmentPreloader implements PagePreloader {
    */
   private async preloadDoctorProfile(): Promise<void> {
     if (this.strategicDataFetched) return;
-    
+
     await prefetchApiQuery('getDoctorPublicProfile', cacheKeys.doctor(this.doctorId), [
+      undefined, // context - can be undefined for public endpoint
       { doctorId: this.doctorId },
     ]);
   }
@@ -353,21 +354,22 @@ export class BookAppointmentPreloader implements PagePreloader {
    */
   private async preloadDoctorAvailability(): Promise<void> {
     if (this.strategicDataFetched) return;
-    
+
     const date = new Date().toISOString().split('T')[0];
     await prefetchApiQuery('getAvailableSlots', cacheKeys.availableSlots(this.doctorId, date), [
+      undefined, // context - can be undefined for public endpoint
       { doctorId: this.doctorId, date },
     ]);
-    
+
     // Also prefetch next few days
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    
+
     await prefetchApiQuery(
       'getAvailableSlots',
       cacheKeys.availableSlots(this.doctorId, tomorrowStr),
-      [{ doctorId: this.doctorId, date: tomorrowStr }]
+      [undefined, { doctorId: this.doctorId, date: tomorrowStr }] // context can be undefined for public endpoint
     );
   }
 
@@ -376,7 +378,7 @@ export class BookAppointmentPreloader implements PagePreloader {
    */
   private async preloadAppointments(): Promise<void> {
     if (!this.userId || this.strategicDataFetched) return;
-    
+
     await prefetchApiQuery('getMyAppointments', cacheKeys.appointments(this.userId), [
       { uid: this.userId, role: this.userRole },
     ]);
@@ -442,15 +444,17 @@ export async function enhancedPreload(
   return Promise.resolve(); // Placeholder
 }
 
-export function applyStrategies<_T>() // strategies: T[], // Removed unused parameter
-// executeStrategy: (strategy: T) => Promise<unknown> // Removed unused parameter
+export function applyStrategies<
+  _T,
+>() // executeStrategy: (strategy: T) => Promise<unknown> // Removed unused parameter // strategies: T[], // Removed unused parameter
 : Promise<unknown[]> {
   // ... existing code ...
   return Promise.resolve([]); // Placeholder
 }
 
-export async function executeWithPriority<_T>() // items: T[], // Removed unused parameter
-// processor: (item: T) => Promise<unknown> // Removed unused parameter
+export async function executeWithPriority<
+  _T,
+>() // processor: (item: T) => Promise<unknown> // Removed unused parameter // items: T[], // Removed unused parameter
 : Promise<unknown[]> {
   // ... existing code ...
   return Promise.resolve([]); // Placeholder

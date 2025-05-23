@@ -22,9 +22,9 @@ interface AdminGetAllUsersPayload {
 }
 
 // Use the UserProfile type which includes id, and add accountStatus
-export type AdminUserListItem = z.infer<typeof UserProfileSchema> & { 
-  id: string; 
-  accountStatus: AccountStatus; 
+export type AdminUserListItem = z.infer<typeof UserProfileSchema> & {
+  id: string;
+  accountStatus: AccountStatus;
 };
 
 interface AdminGetAllUsersResponse {
@@ -96,13 +96,18 @@ export const useAllUsers = (payload: AdminGetAllUsersPayload = {}) => {
       };
 
       // Assuming callApi returns users matching UserProfileSchema and an id field
-      const response = await callApi<{ success: boolean; users: (z.infer<typeof UserProfileSchema> & { id: string })[]; totalCount: number; error?: string }>(
+      const response = await callApi<{
+        success: boolean;
+        users: (z.infer<typeof UserProfileSchema> & { id: string })[];
+        totalCount: number;
+        error?: string;
+      }>(
         'adminGetAllUsers',
         {
           uid: user.uid,
           role: UserType.ADMIN,
         },
-        apiPayload 
+        apiPayload
       );
 
       if (!response.success) {
@@ -201,13 +206,27 @@ export const useUserDetail = (userId: string) => {
         throw new UnauthorizedError('Only administrators can access user details');
       }
 
-      return callApi('adminGetUserDetail', {
-        uid: user.uid,
-        role: UserType.ADMIN,
-        userId,
-      });
+      // Ensure we have a valid userId
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      // Call the API with properly formatted payload
+      const response = await callApi<{
+        success: boolean;
+        user: any; // You might want to replace 'any' with a more specific type
+        hasData: boolean;
+        error?: string;
+      }>('adminGetUserDetail', { uid: user.uid, role: UserType.ADMIN }, { userId });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch user details');
+      }
+
+      return response;
     },
     enabled: !!user && user.role === UserType.ADMIN && !!userId,
+    retry: 1, // Retry once on failure
   });
 };
 

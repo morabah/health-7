@@ -55,7 +55,9 @@
     "react-tooltip": "^5.28.1",
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
-    "tailwind-merge": "^3.2.0",
+    "recharts": "^2.15.3",
+    "tailwind-merge": "^3.3.0",
+    "use-debounce": "^10.0.4",
     "zod": "^3.24.3"
   },
   "devDependencies": {

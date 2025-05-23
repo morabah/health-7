@@ -1,8 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef, FormEvent, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDebounce } from 'use-debounce';
+
+// UI Components
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -10,37 +15,70 @@ import Select from '@/components/ui/Select';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   UserPlus,
   Search,
   Eye,
-  Pencil,
-  RotateCw,
-  Key,
-  Trash2,
-  CheckSquare,
   Filter,
-  Download,
-  Mail,
-  ChevronDown,
+  RotateCw,
   MoreVertical,
   Check,
   Ban,
-  MessageSquare,
   AlertTriangle,
+  Download,
+  Mail,
+  Key,
+  UserCog,
+  Calendar,
+  Users,
+  Activity,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+  X,
+  CheckCircle,
+  XCircle,
+  UserCheck,
+  UserX,
+  FileText,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
+  Filter as FilterIcon,
+  RefreshCw,
+  Plus,
+  Trash2,
+  UserMinus,
+  UserPlus as UserPlusIcon,
+  ShieldAlert,
+  ShieldCheck,
+  Mail as MailIcon,
+  Key as KeyIcon,
+  User as UserIcon,
 } from 'lucide-react';
-import { 
-  useAllUsers, 
-  useAdminActivateUser, 
+
+// Data Hooks & Types
+import {
+  useAllUsers,
+  useAdminActivateUser,
   useAdminTriggerPasswordReset,
-  type AdminUserListItem // Import the type
+  type AdminUserListItem,
 } from '@/data/adminLoaders';
-import { useToast, ToastProvider } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
+// Import VirtualizedList from components
+import { VirtualizedList } from '@/components/ui/VirtualizedList';
+
+// Import enums and types
+import { UserType, AccountStatus } from '@/types/enums';
+import { formatDate, formatDateTime } from '@/lib/dateUtils';
+import { logInfo, logError } from '@/lib/logger';
+import { trackPerformance } from '@/lib/performance';
+
 // Custom hook for media queries
 const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = React.useState(false);
+  const [matches, setMatches] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const media = window.matchMedia(query);
     if (media.matches !== matches) {
       setMatches(media.matches);
@@ -52,181 +90,287 @@ const useMediaQuery = (query: string): boolean => {
 
   return matches;
 };
-import { UserType, AccountStatus } from '@/types/enums';
-import { formatDate, formatDateTime } from '@/lib/dateUtils';
-import { logInfo, logValidation, logError } from '@/lib/logger';
-import { trackPerformance } from '@/lib/performance';
 
-// TypeScript interface for the API response
-interface UsersApiResponse {
-  success: boolean;
-  users: User[];
-  totalCount: number;
-  error?: string;
-}
+// User status badge
+const statusOptions = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'deactivated', label: 'Deactivated' },
+  { value: 'pending_verification', label: 'Pending Verification' },
+] as const;
 
-// Define types for the user data
-interface User {
-  id: string;
-  email: string | null;
-  firstName: string;
-  lastName: string;
-  userType: UserType;
-  isActive: boolean;
-  emailVerified: boolean;
-  phoneVerified: boolean;
-  createdAt: string;
-  updatedAt: string;
-  phoneNumber?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  profilePictureUrl?: string | null;
-  accountStatus: AccountStatus;
-  lastLogin?: string | null;
-};
+const UserStatusBadge = ({ status }: { status: AccountStatus }) => (
+  <Badge
+    variant={
+      status === AccountStatus.ACTIVE
+        ? 'success'
+        : status === AccountStatus.PENDING_VERIFICATION
+          ? 'warning'
+          : status === AccountStatus.SUSPENDED
+            ? 'danger'
+            : 'danger'
+    }
+    className="capitalize"
+  >
+    {status.toLowerCase()}
+  </Badge>
+);
 
-interface UserRowProps {
-  user: User;
-  selectedUsers: string[];
-  toggleSelectUser: (userId: string) => void;
-  activeDropdown: string | null;
-  setActiveDropdown: (userId: string | null) => void;
-  handleStatusChange: (userId: string, status: AccountStatus) => void;
-  isActionLoading: boolean;
-}
+// User type badge component
+const UserTypeBadge = ({ userType }: { userType: UserType }) => (
+  <Badge
+    variant={
+      userType === UserType.ADMIN ? 'warning' : userType === UserType.DOCTOR ? 'success' : 'primary'
+    }
+    className="capitalize"
+  >
+    {userType.toLowerCase()}
+  </Badge>
+);
 
-// UserRow component for virtualized list
-const UserRow = React.memo(({
-  user,
-  selectedUsers,
-  toggleSelectUser,
-  activeDropdown,
-  setActiveDropdown,
-  handleStatusChange,
-  isActionLoading
-}: UserRowProps) => {
-  return (
-    <div className="flex items-center w-full px-4 py-3 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-      <div className="w-8 flex-shrink-0">
-        <input
-          type="checkbox"
-          className="rounded text-primary-600 focus:ring-primary-500"
-          checked={selectedUsers.includes(user.id)}
-          onChange={() => toggleSelectUser(user.id)}
-          id={`user-${user.id}`}
+// Filter component
+const UsersFilter = ({
+  searchQuery,
+  setSearchQuery,
+  statusFilter,
+  setStatusFilter,
+  userTypeFilter,
+  setUserTypeFilter,
+  isFilterOpen,
+  toggleFilter,
+}: {
+  searchQuery: string;
+  setSearchQuery: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  userTypeFilter: string;
+  setUserTypeFilter: (value: string) => void;
+  isFilterOpen: boolean;
+  toggleFilter: () => void;
+}) => (
+  <div className="mb-6 bg-white dark:bg-slate-800 rounded-lg shadow p-4">
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="relative flex-1">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-4 w-4 text-slate-400" />
+        </div>
+        <Input
+          type="text"
+          placeholder="Search users..."
+          className="pl-10 w-full"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
         />
       </div>
-      
-      <div className="flex-grow flex items-center">
-        <div className="w-1/4 font-medium text-slate-900 dark:text-white truncate">
-          {user.firstName} {user.lastName}
-        </div>
-        
-        <div className="w-1/4 text-slate-600 dark:text-slate-300 truncate">
-          {user.email}
-        </div>
-        
-        <div className="w-1/6">
-          <Badge
-            variant={
-              user.userType === UserType.ADMIN
-                ? 'warning'
-                : user.userType === UserType.DOCTOR
-                  ? 'success'
-                  : 'primary'
-            }
-            className="capitalize"
-          >
-            {user.userType}
-          </Badge>
-        </div>
-        
-        <div className="w-1/6">
-          <Badge
-            variant={
-              user.accountStatus === AccountStatus.ACTIVE
-                ? 'success'
-                : user.accountStatus === AccountStatus.SUSPENDED
-                  ? 'warning'
-                  : 'danger'
-            }
-            className="capitalize px-3 py-1 text-sm font-medium shadow-sm"
-          >
-            {user.accountStatus}
-          </Badge>
-        </div>
-        
-        <div className="w-1/6 text-sm text-slate-500 dark:text-slate-400">
-          {user.lastLogin ? formatDateTime(user.lastLogin) : 'Never'}
-        </div>
-      </div>
-      
-      <div className="flex-shrink-0 flex items-center space-x-2">
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setActiveDropdown(activeDropdown === user.id ? null : user.id)}
-            aria-label="User actions"
-            className="rounded-full p-2"
-            disabled={isActionLoading}
-          >
-            <MoreVertical className="h-4 w-4" />
+
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleFilter}
+          className="flex items-center gap-2"
+        >
+          <FilterIcon className="h-4 w-4" />
+          <span>Filters</span>
+          {isFilterOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+
+        <Button variant="outline" size="sm" className="flex items-center gap-2">
+          <DownloadIcon className="h-4 w-4" />
+          <span>Export</span>
+        </Button>
+
+        <Link href="/admin/users/create">
+          <Button size="sm" className="flex items-center gap-2">
+            <UserPlusIcon className="h-4 w-4" />
+            <span>Add User</span>
           </Button>
-          
-          {activeDropdown === user.id && (
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg z-10 border border-slate-200 dark:border-slate-700">
-              <div className="py-1">
-                <Link
-                  href={`/admin/users/${user.id}`}
-                  className="flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Details
-                </Link>
-                
-                {user.accountStatus !== AccountStatus.ACTIVE && (
-                  <button
-                    onClick={() => handleStatusChange(user.id, AccountStatus.ACTIVE)}
-                    className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                    disabled={isActionLoading}
-                  >
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    Activate
-                  </button>
-                )}
-                
-                {user.accountStatus !== AccountStatus.SUSPENDED && (
-                  <button
-                    onClick={() => handleStatusChange(user.id, AccountStatus.SUSPENDED)}
-                    className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                    disabled={isActionLoading}
-                  >
-                    <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
-                    Suspend
-                  </button>
-                )}
-                
-                {user.accountStatus !== AccountStatus.DEACTIVATED && (
-                  <button
-                    onClick={() => handleStatusChange(user.id, AccountStatus.DEACTIVATED)}
-                    className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                    disabled={isActionLoading}
-                  >
-                    <Ban className="h-4 w-4 mr-2 text-red-500" />
-                    Deactivate
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        </Link>
       </div>
     </div>
-  );
-});
+
+    {isFilterOpen && (
+      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Status
+          </label>
+          <Select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="min-w-[150px]"
+          >
+            {statusOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            User Type
+          </label>
+          <Select
+            value={userTypeFilter}
+            onChange={e => setUserTypeFilter(e.target.value)}
+            className="min-w-[150px]"
+          >
+            <option value="">All Types</option>
+            {Object.values(UserType).map(type => (
+              <option key={type} value={type}>
+                {type.charAt(0) + type.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+// UserRow component for virtualized list
+const UserRow = React.memo(
+  ({
+    user,
+    selectedUsers,
+    toggleSelectUser,
+    activeDropdown,
+    setActiveDropdown,
+    handleStatusChange,
+    isActionLoading,
+  }: {
+    user: AdminUserListItem;
+    selectedUsers: string[];
+    toggleSelectUser: (userId: string) => void;
+    activeDropdown: string | null;
+    setActiveDropdown: (userId: string | null) => void;
+    handleStatusChange: (userId: string, status: AccountStatus) => void;
+    isActionLoading: boolean;
+  }) => {
+    const lastLogin = user.updatedAt ? formatDateTime(user.updatedAt) : 'Never';
+    return (
+      <div className="flex items-center w-full px-4 py-3 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+        <div className="w-8 flex-shrink-0">
+          <input
+            type="checkbox"
+            className="rounded text-primary-600 focus:ring-primary-500"
+            checked={selectedUsers.includes(user.id)}
+            onChange={() => toggleSelectUser(user.id)}
+            id={`user-${user.id}`}
+          />
+        </div>
+
+        <div className="flex-grow flex items-center">
+          <div className="w-1/4 font-medium text-slate-900 dark:text-white truncate">
+            {user.firstName} {user.lastName}
+          </div>
+
+          <div className="w-1/4 text-slate-600 dark:text-slate-300 truncate">{user.email}</div>
+
+          <div className="w-1/6">
+            <Badge
+              variant={
+                user.userType === UserType.ADMIN
+                  ? 'warning'
+                  : user.userType === UserType.DOCTOR
+                    ? 'success'
+                    : 'primary'
+              }
+              className="capitalize"
+            >
+              {user.userType}
+            </Badge>
+          </div>
+
+          <div className="w-1/6">
+            <Badge
+              variant={
+                user.accountStatus === AccountStatus.ACTIVE
+                  ? 'success'
+                  : user.accountStatus === AccountStatus.PENDING_VERIFICATION
+                    ? 'warning'
+                    : user.accountStatus === AccountStatus.SUSPENDED
+                      ? 'danger'
+                      : 'danger'
+              }
+              className="capitalize px-3 py-1 text-sm font-medium shadow-sm"
+            >
+              {user.accountStatus}
+            </Badge>
+          </div>
+
+          <div className="w-1/6 text-sm text-slate-500 dark:text-slate-400">{lastLogin}</div>
+        </div>
+
+        <div className="flex-shrink-0 flex items-center space-x-2">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveDropdown(activeDropdown === user.id ? null : user.id)}
+              aria-label="User actions"
+              className="rounded-full p-2"
+              disabled={isActionLoading}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+
+            {activeDropdown === user.id && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg z-10 border border-slate-200 dark:border-slate-700">
+                <div className="py-1">
+                  <Link
+                    href={`/admin/users/${user.id}`}
+                    className="flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Link>
+
+                  {user.accountStatus !== AccountStatus.ACTIVE && (
+                    <button
+                      onClick={() => handleStatusChange(user.id, AccountStatus.ACTIVE)}
+                      className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      disabled={isActionLoading}
+                    >
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      Activate
+                    </button>
+                  )}
+
+                  {user.accountStatus !== AccountStatus.SUSPENDED && (
+                    <button
+                      onClick={() => handleStatusChange(user.id, AccountStatus.SUSPENDED)}
+                      className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      disabled={isActionLoading}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
+                      Suspend
+                    </button>
+                  )}
+
+                  {user.accountStatus !== AccountStatus.DEACTIVATED && (
+                    <button
+                      onClick={() => handleStatusChange(user.id, AccountStatus.DEACTIVATED)}
+                      className="w-full flex items-center px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      disabled={isActionLoading}
+                    >
+                      <Ban className="h-4 w-4 mr-2 text-red-500" />
+                      Deactivate
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
 
 UserRow.displayName = 'UserRow';
 
@@ -238,12 +382,7 @@ interface VirtualizedListProps<T> {
   renderRow: (props: { item: T; index: number }) => React.ReactNode;
 }
 
-function VirtualizedList<T>({
-  data,
-  height,
-  itemHeight,
-  renderRow,
-}: VirtualizedListProps<T>) {
+function VirtualizedList<T>({ data, height, itemHeight, renderRow }: VirtualizedListProps<T>) {
   return (
     <div className="overflow-y-auto" style={{ height }}>
       {data.map((item, index) => (
@@ -256,7 +395,15 @@ function VirtualizedList<T>({
 }
 
 // Define action types for confirmation dialogs
-type ConfirmActionType = 'deactivate' | 'activate' | 'suspend' | 'delete' | 'password' | 'message' | 'status' | null;
+type ConfirmActionType =
+  | 'deactivate'
+  | 'activate'
+  | 'suspend'
+  | 'delete'
+  | 'password'
+  | 'message'
+  | 'status'
+  | null;
 
 interface ConfirmActionState {
   type: ConfirmActionType;
@@ -267,10 +414,7 @@ interface ConfirmActionState {
 }
 
 // Corrected useDebounce hook for debouncing function calls
-function useDebounceCallback(
-  callback: (...args: any[]) => void, 
-  delay: number
-) {
+function useDebounceCallback(callback: (...args: any[]) => void, delay: number) {
   const callbackRef = useRef(callback);
 
   useEffect(() => {
@@ -291,9 +435,9 @@ function useDebounceCallback(
 function AdminUsersPageContent() {
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
-  
+
   const [usersToDisplay, setUsersToDisplay] = useState<AdminUserListItem[]>([]);
-  
+
   // State for search and filtering
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -301,13 +445,16 @@ function AdminUsersPageContent() {
   const [userTypeFilter, setUserTypeFilter] = useState<UserType | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  
+
   // State for UI
-  const [sortConfig, setSortConfig] = useState<{ key: keyof AdminUserListItem; direction: 'asc' | 'desc' }>({
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof AdminUserListItem;
+    direction: 'asc' | 'desc';
+  }>({
     key: 'createdAt',
     direction: 'desc',
   });
-  
+
   // State for user selection and actions
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
@@ -315,51 +462,55 @@ function AdminUsersPageContent() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  
+
   // State for action feedback
   const [actionFeedback, setActionFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
     visible: boolean;
   } | null>(null);
-  
+
   // State for confirmation dialogs
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
-  
+
   // State for message form
   const [messageForm, setMessageForm] = useState({
     subject: '',
     message: '',
   });
-  
+
   // State for virtualized list
   const [virtualizedState, setVirtualizedState] = useState({
     isVisible: false,
   });
-  
+
   // Refs
   const virtualizedRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+
   // Check if mobile view
   const [isMobile, setIsMobile] = useState(false);
-  
+
   // Toast hook
   const { toast } = useToast();
-  
+
   // API hooks
-  const { data: usersData, isLoading, error, refetch } = useAllUsers({
+  const {
+    data: usersData,
+    isLoading,
+    error,
+    refetch,
+  } = useAllUsers({
     page: currentPage,
     limit: itemsPerPage,
     filter: searchQuery,
-    status: statusFilter === 'all' ? 'all' : 
-           statusFilter === AccountStatus.ACTIVE ? 'active' : 'inactive',
+    status: statusFilter === 'all' ? 'all' : statusFilter === 'active' ? 'active' : 'inactive',
     userType: userTypeFilter === 'all' ? undefined : userTypeFilter,
   });
-  
+
   const { mutateAsync: activateUser } = useAdminActivateUser();
   const { mutateAsync: resetPassword } = useAdminTriggerPasswordReset();
-  
+
   useEffect(() => {
     if (usersData?.users) {
       setUsersToDisplay(usersData.users);
@@ -370,7 +521,7 @@ function AdminUsersPageContent() {
     setSearchQuery(query);
     setCurrentPage(1);
   }, 300);
-  
+
   const processedUsersForDisplay = useMemo(() => {
     if (!usersData?.users) return [];
     return usersData.users.map(apiUser => ({
@@ -380,38 +531,41 @@ function AdminUsersPageContent() {
       city: (apiUser as any).city || '',
       state: (apiUser as any).state || '',
       zipCode: (apiUser as any).zipCode || '',
-      lastLogin: (apiUser as any).lastLogin || apiUser.updatedAt,
+      lastActive: (apiUser as any).lastActive || apiUser.updatedAt,
     }));
   }, [usersData]);
 
   const filteredUsers = useMemo(() => {
-    let filtered = [...usersToDisplay];
-    return [...filtered].sort((a, b) => {
-      if (!sortConfig?.key) return 0;
-      const key = sortConfig.key as keyof AdminUserListItem;
-      
-      const aValue = a[key];
-      const bValue = b[key];
-      
-      if (aValue === bValue) return 0;
-      if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1;
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-      }
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      
-      return 0;
+    if (!usersToDisplay) return [];
+
+    return usersToDisplay.filter(user => {
+      // Filter by search query
+      const matchesSearch =
+        searchQuery === '' ||
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Filter by status
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && user.accountStatus === 'active') ||
+        (statusFilter === 'inactive' && user.accountStatus === 'inactive') ||
+        (statusFilter === 'suspended' && user.accountStatus === 'suspended') ||
+        (statusFilter === 'deactivated' && user.accountStatus === 'deactivated') ||
+        (statusFilter === 'pending_verification' && user.accountStatus === 'pending_verification');
+
+      // Filter by user type
+      const matchesUserType = userTypeFilter === 'all' || user.userType === userTypeFilter;
+
+      return matchesSearch && matchesStatus && matchesUserType;
     });
-  }, [usersToDisplay, sortConfig]);
+  }, [usersToDisplay, searchQuery, statusFilter, userTypeFilter]);
 
   // Calculate pagination
   const totalUserCount = filteredUsers.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedUsers = useMemo(() => 
-    filteredUsers.slice(startIndex, startIndex + itemsPerPage),
+  const paginatedUsers = useMemo(
+    () => filteredUsers.slice(startIndex, startIndex + itemsPerPage),
     [filteredUsers, startIndex, itemsPerPage]
   );
   const totalPages = Math.ceil(totalUserCount / itemsPerPage);
@@ -431,10 +585,8 @@ function AdminUsersPageContent() {
 
   // Toggle user selection
   const toggleSelectUser = useCallback((userId: string) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId) 
-        : [...prev, userId]
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
     );
   }, []);
 
@@ -454,14 +606,12 @@ function AdminUsersPageContent() {
       setIsActionLoading(true);
       // TODO: Implement actual API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Update local state
-      setUsersToDisplay(prev => 
-        prev.map(user => 
-          user.id === userId ? { ...user, accountStatus: status } : user
-        )
+      setUsersToDisplay(prev =>
+        prev.map(user => (user.id === userId ? { ...user, accountStatus: status } : user))
       );
-      
+
       setActionFeedback({
         type: 'success',
         message: `User ${status === AccountStatus.ACTIVE ? 'activated' : 'deactivated'} successfully`,
@@ -485,7 +635,7 @@ function AdminUsersPageContent() {
       setIsActionLoading(true);
       // TODO: Implement actual API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setActionFeedback({
         type: 'success',
         message: 'Password reset email sent successfully',
@@ -504,49 +654,55 @@ function AdminUsersPageContent() {
   }, []);
 
   // Handle message form change
-  const handleMessageFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setMessageForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }, []);
+  const handleMessageFormChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = e.target;
+      setMessageForm(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    },
+    []
+  );
 
   // Handle send message
-  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!confirmAction) return;
-    
-    try {
-      setIsActionLoading(true);
-      // TODO: Implement actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setActionFeedback({
-        type: 'success',
-        message: 'Message sent successfully',
-        visible: true,
-      });
-      
-      // Reset form and close dialog
-      setMessageForm({ subject: '', message: '' });
-      setConfirmAction(null);
-    } catch (error) {
-      setActionFeedback({
-        type: 'error',
-        message: 'Failed to send message',
-        visible: true,
-      });
-    } finally {
-      setIsActionLoading(false);
-    }
-  }, [confirmAction]);
+  const handleSendMessage = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!confirmAction) return;
+
+      try {
+        setIsActionLoading(true);
+        // TODO: Implement actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        setActionFeedback({
+          type: 'success',
+          message: 'Message sent successfully',
+          visible: true,
+        });
+
+        // Reset form and close dialog
+        setMessageForm({ subject: '', message: '' });
+        setConfirmAction(null);
+      } catch (error) {
+        setActionFeedback({
+          type: 'error',
+          message: 'Failed to send message',
+          visible: true,
+        });
+      } finally {
+        setIsActionLoading(false);
+      }
+    },
+    [confirmAction]
+  );
 
   // Close action feedback after delay
   useEffect(() => {
     if (actionFeedback?.visible) {
       const timer = setTimeout(() => {
-        setActionFeedback(prev => prev ? { ...prev, visible: false } : null);
+        setActionFeedback(prev => (prev ? { ...prev, visible: false } : null));
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -559,7 +715,7 @@ function AdminUsersPageContent() {
         setActiveDropdown(null);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -569,7 +725,7 @@ function AdminUsersPageContent() {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkIfMobile();
     window.addEventListener('resize', checkIfMobile);
     return () => window.removeEventListener('resize', checkIfMobile);
@@ -611,27 +767,32 @@ function AdminUsersPageContent() {
               <Input
                 placeholder="Search users..."
                 value={searchInput}
-                onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearchQuery(e.target.value); }}
+                onChange={e => {
+                  setSearchInput(e.target.value);
+                  debouncedSetSearchQuery(e.target.value);
+                }}
                 icon={<Search className="h-4 w-4 text-slate-400" />}
                 className="w-full"
               />
             </div>
             <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
+              onChange={e => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
               className="w-full md:w-48"
             >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              {statusOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </Select>
             <Select
               value={userTypeFilter}
-              onChange={(e) => setUserTypeFilter(e.target.value as UserType)}
+              onChange={e => setUserTypeFilter(e.target.value as UserType)}
               className="w-full md:w-48"
             >
               <option value="all">All Types</option>
-              {Object.values(UserType).map((type) => (
+              {Object.values(UserType).map(type => (
                 <option key={type} value={type}>
                   {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}
                 </option>
@@ -668,7 +829,7 @@ function AdminUsersPageContent() {
               {/* Table Body */}
               <div className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                 {paginatedUsers.length > 0 ? (
-                  paginatedUsers.map((user) => (
+                  paginatedUsers.map(user => (
                     <UserRow
                       key={user.id}
                       user={user}
@@ -692,7 +853,9 @@ function AdminUsersPageContent() {
           {/* Pagination (Part of Users Table Card) */}
           <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Showing <span className="font-medium">{paginatedUsers.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+              Showing{' '}
+              <span className="font-medium">{paginatedUsers.length > 0 ? startIndex + 1 : 0}</span>{' '}
+              to{' '}
               <span className="font-medium">
                 {Math.min(startIndex + itemsPerPage, totalUserCount)}
               </span>{' '}
@@ -721,10 +884,10 @@ function AdminUsersPageContent() {
 
         {/* Action Feedback Toast */}
         {actionFeedback?.visible && (
-          <div 
+          <div
             className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg z-50 ${
-              actionFeedback.type === 'success' 
-                ? 'bg-green-500 text-white' 
+              actionFeedback.type === 'success'
+                ? 'bg-green-500 text-white'
                 : 'bg-red-500 text-white'
             }`}
           >
@@ -746,7 +909,8 @@ function AdminUsersPageContent() {
             <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
               <h3 className="text-lg font-medium mb-4">Confirm Deactivation</h3>
               <p className="text-slate-600 dark:text-slate-300 mb-6">
-                Are you sure you want to deactivate this user? They will no longer be able to log in.
+                Are you sure you want to deactivate this user? They will no longer be able to log
+                in.
               </p>
               <div className="flex justify-end space-x-3">
                 <Button
@@ -764,7 +928,7 @@ function AdminUsersPageContent() {
                       setConfirmAction(null);
                     }
                   }}
-                  isLoading={isActionLoading} 
+                  isLoading={isActionLoading}
                 >
                   Deactivate
                 </Button>
@@ -791,12 +955,12 @@ function AdminUsersPageContent() {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (confirmAction?.userId) { 
+                    if (confirmAction?.userId) {
                       handlePasswordReset(confirmAction.userId);
                       setConfirmAction(null); // Also close dialog on action
                     }
                   }}
-                  isLoading={isActionLoading} 
+                  isLoading={isActionLoading}
                 >
                   Send Reset Email
                 </Button>
@@ -808,7 +972,10 @@ function AdminUsersPageContent() {
         {/* Message User Modal */}
         {confirmAction?.type === 'message' && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <form onSubmit={handleSendMessage} className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+            <form
+              onSubmit={handleSendMessage}
+              className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full"
+            >
               <h3 className="text-lg font-medium mb-4">Send Message</h3>
               <div className="space-y-4 mb-6">
                 <div>
@@ -846,10 +1013,7 @@ function AdminUsersPageContent() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  isLoading={isActionLoading}
-                >
+                <Button type="submit" isLoading={isActionLoading}>
                   Send Message
                 </Button>
               </div>
@@ -873,7 +1037,7 @@ function AdminUsersPageContent() {
               <span className="text-sm text-slate-600 dark:text-slate-300">
                 Patients:{' '}
                 <span className="font-medium">
-                  {usersToDisplay.filter((u) => u.userType === UserType.PATIENT).length}
+                  {usersToDisplay.filter(u => u.userType === UserType.PATIENT).length}
                 </span>
               </span>
             </div>
@@ -882,7 +1046,7 @@ function AdminUsersPageContent() {
               <span className="text-sm text-slate-600 dark:text-slate-300">
                 Doctors:{' '}
                 <span className="font-medium">
-                  {usersToDisplay.filter((u) => u.userType === UserType.DOCTOR).length}
+                  {usersToDisplay.filter(u => u.userType === UserType.DOCTOR).length}
                 </span>
               </span>
             </div>
@@ -891,7 +1055,7 @@ function AdminUsersPageContent() {
               <span className="text-sm text-slate-600 dark:text-slate-300">
                 Admins:{' '}
                 <span className="font-medium">
-                  {usersToDisplay.filter((u) => u.userType === UserType.ADMIN).length}
+                  {usersToDisplay.filter(u => u.userType === UserType.ADMIN).length}
                 </span>
               </span>
             </div>
@@ -912,8 +1076,10 @@ function AdminUsersPageContent() {
               <div className="text-xs text-green-600 dark:text-green-500 mt-1">
                 {Math.round(
                   (usersToDisplay.filter(u => u.accountStatus === AccountStatus.ACTIVE).length /
-                    usersToDisplay.length) * 100
-                )}% of total
+                    usersToDisplay.length) *
+                    100
+                )}
+                % of total
               </div>
             )}
           </div>
@@ -929,8 +1095,10 @@ function AdminUsersPageContent() {
               <div className="text-xs text-orange-600 dark:text-orange-500 mt-1">
                 {Math.round(
                   (usersToDisplay.filter(u => u.accountStatus === AccountStatus.SUSPENDED).length /
-                    usersToDisplay.length) * 100
-                )}% of total
+                    usersToDisplay.length) *
+                    100
+                )}
+                % of total
               </div>
             )}
           </div>
@@ -945,9 +1113,12 @@ function AdminUsersPageContent() {
             {usersToDisplay.length > 0 && (
               <div className="text-xs text-red-600 dark:text-red-500 mt-1">
                 {Math.round(
-                  (usersToDisplay.filter(u => u.accountStatus === AccountStatus.DEACTIVATED).length /
-                    usersToDisplay.length) * 100
-                )}% of total
+                  (usersToDisplay.filter(u => u.accountStatus === AccountStatus.DEACTIVATED)
+                    .length /
+                    usersToDisplay.length) *
+                    100
+                )}
+                % of total
               </div>
             )}
           </div>
@@ -1008,8 +1179,8 @@ function AdminUsersPageContent() {
 
 export default function AdminUsersPage() {
   return (
-    <ToastProvider>
+    <div className="flex flex-col h-full">
       <AdminUsersPageContent />
-    </ToastProvider>
+    </div>
   );
 }

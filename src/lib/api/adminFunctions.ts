@@ -5,7 +5,7 @@
  */
 
 import type { z } from 'zod';
-import { UserType, VerificationStatus, NotificationType, AppointmentStatus } from '@/types/enums';
+import { UserType, VerificationStatus, NotificationType } from '@/types/enums';
 import { trackPerformance } from '@/lib/performance';
 import { logInfo, logError } from '@/lib/logger';
 import {
@@ -352,23 +352,25 @@ export async function adminGetUserDetail(
   try {
     const { uid, role } = ctx;
 
-    logInfo('adminGetUserDetail called', { uid, role, userId: payload.userId });
-
     // Only admins can access this endpoint
     if (role !== UserType.ADMIN) {
       return { success: false, error: 'Unauthorized. Only admins can access this endpoint.' };
     }
 
-    // Validate with Zod schema
+    // Validate with Zod schema first
     const validationResult = AdminGetUserDetailSchema.safeParse(payload);
     if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors
+        .map(err => `${err.path.join('.')}: ${err.message}`)
+        .join('; ');
       return {
         success: false,
-        error: `Invalid request: ${validationResult.error.format()}`,
+        error: `Invalid request: ${errorMessage}`,
       };
     }
 
     const { userId } = validationResult.data;
+    logInfo('adminGetUserDetail called', { uid, role, userId });
 
     const users = await getUsers();
     const user = users.find(u => u.id === userId);
@@ -900,11 +902,19 @@ export async function adminGetDoctorById(
 export async function batchUpdateAppointmentStatus(
   ctx: { uid: string; role: UserType },
   payload: BatchUpdateAppointmentStatusPayload
-): Promise<ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }> | ResultErr> {
+): Promise<
+  | ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }>
+  | ResultErr
+> {
   const perf = trackPerformance('batchUpdateAppointmentStatus');
   const { uid, role } = ctx;
 
-  logInfo('batchUpdateAppointmentStatus called', { uid, role, newStatus: payload.status, count: payload.appointmentIds.length });
+  logInfo('batchUpdateAppointmentStatus called', {
+    uid,
+    role,
+    newStatus: payload.status,
+    count: payload.appointmentIds.length,
+  });
 
   if (role !== UserType.ADMIN) {
     return { success: false, error: 'Unauthorized. Only admins can perform this action.' };
@@ -916,7 +926,10 @@ export async function batchUpdateAppointmentStatus(
       payload,
       error: validationResult.error.format(),
     });
-    return { success: false, error: 'Invalid request payload for batch updating appointment statuses.' };
+    return {
+      success: false,
+      error: 'Invalid request payload for batch updating appointment statuses.',
+    };
   }
 
   const { appointmentIds, status: newStatus } = validationResult.data;
@@ -987,7 +1000,6 @@ export async function batchUpdateAppointmentStatus(
 
     logInfo('Batch appointment status update completed', { successCount, failureCount, errors });
     return { success: true, successCount, failureCount, errors };
-
   } catch (e) {
     logError('Error during batch update of appointment statuses', e);
     // Ensure the returned error object matches ResultErr type exactly
@@ -1003,11 +1015,19 @@ export async function batchUpdateAppointmentStatus(
 export async function batchUpdateUserStatus(
   ctx: { uid: string; role: UserType },
   payload: BatchUpdateUserStatusPayload
-): Promise<ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }> | ResultErr> {
+): Promise<
+  | ResultOk<{ successCount: number; failureCount: number; errors: Record<string, string> }>
+  | ResultErr
+> {
   const perf = trackPerformance('batchUpdateUserStatus');
   const { uid, role } = ctx;
 
-  logInfo('batchUpdateUserStatus called', { uid, role, newIsActiveStatus: payload.isActive, count: payload.userIds.length });
+  logInfo('batchUpdateUserStatus called', {
+    uid,
+    role,
+    newIsActiveStatus: payload.isActive,
+    count: payload.userIds.length,
+  });
 
   if (role !== UserType.ADMIN) {
     return { success: false, error: 'Unauthorized. Only admins can perform this action.' };
@@ -1066,7 +1086,8 @@ export async function batchUpdateUserStatus(
         id: generateId(),
         userId: user.id,
         title: 'Account Status Updated',
-        message: `An administrator has ${statusText} your account. ${adminNotes ? `Admin notes: ${adminNotes}` : ''}`.trim(),
+        message:
+          `An administrator has ${statusText} your account. ${adminNotes ? `Admin notes: ${adminNotes}` : ''}`.trim(),
         isRead: false,
         createdAt: timestamp,
         type: NotificationType.ACCOUNT_STATUS_CHANGE,
@@ -1080,12 +1101,19 @@ export async function batchUpdateUserStatus(
       await saveNotifications(notifications);
     }
 
-    logInfo('Batch user status update completed', { successCount, failureCount, errors, adminNotesProvided: !!adminNotes });
+    logInfo('Batch user status update completed', {
+      successCount,
+      failureCount,
+      errors,
+      adminNotesProvided: !!adminNotes,
+    });
     return { success: true, successCount, failureCount, errors };
-
   } catch (e) {
     logError('Error during batch update of user statuses', e);
-    return { success: false, error: 'A server error occurred during the batch user status update process.' };
+    return {
+      success: false,
+      error: 'A server error occurred during the batch user status update process.',
+    };
   } finally {
     perf.stop();
   }

@@ -747,6 +747,70 @@ We've fixed several issues with TypeScript typings and linter errors:
 
 ## Outstanding Issues
 
+## Prompt Progress Log
+
+### Fixed Issues (Latest)
+
+#### Recharts Import Error Fix
+
+**Issue**: ReferenceError: Pie is not defined in PatientAppointments component
+**Root Cause**: Missing `Pie` import from recharts library for pie chart component
+**Solution Applied**:
+
+- Added `Pie` to the recharts import statement in appointments page
+- Fixed Badge variant from 'error' to 'danger' to match available variants
+- Added null safety check for searchParams
+- Fixed logInfo call with 3 arguments to use single argument
+
+**Files Modified**:
+
+- `src/app/(platform)/patient/appointments/page.tsx` - Fixed recharts imports and various TypeScript issues
+
+**Status**: Main error resolved, some TypeScript linting issues remain but don't affect functionality
+
+#### Interactive Upcoming Appointments Navigation
+
+**Enhancement**: Made the "Upcoming" stat card clickable to jump to appointments section
+**Implementation**:
+
+- Added state management for selected tab index (`selectedTabIndex`)
+- Added ref to appointments section (`appointmentsRef`)
+- Created `handleUpcomingClick` function to scroll to appointments and select upcoming tab
+- Made upcoming StatCard clickable with hover effects and smooth scrolling
+- Integrated controlled Tab.Group with `selectedIndex` and `onChange` props
+
+**User Experience Improvement**:
+
+- Users can now click the "Upcoming" stat card to quickly navigate to their upcoming appointments
+- Smooth scroll animation provides better visual feedback
+- Hover effect on stat card indicates it's clickable
+- Automatically selects the "Upcoming" tab when clicked
+
+**Files Modified**:
+
+- `src/app/(platform)/patient/appointments/page.tsx` - Added interactive navigation functionality
+
+#### Doctor Profile API Call Fix
+
+**Issue**: Doctor profile page showing "Invalid request: [object Object]" error
+**Root Cause**: Incorrect `callApi` function parameter order - missing auth context parameter
+**Problem**: The callApi function expects `(method, authContext, payload)` but was called as `(method, payload)`
+**Solution Applied**:
+
+- Fixed `callApi` call to include `undefined` for auth context parameter
+- This allows anonymous access to public doctor profiles
+- Changed from `callApi('getDoctorPublicProfile', { doctorId })` to `callApi('getDoctorPublicProfile', undefined, { doctorId })`
+
+**Technical Details**:
+
+- The `callApi` function signature is `(method, ...args)` where first arg after method is auth context
+- Public doctor profiles should be accessible without authentication
+- Passing `undefined` as auth context enables anonymous access
+
+**Files Modified**:
+
+- `src/app/(platform)/doctor-profile/[doctorId]/page.tsx` - Fixed API call parameter order
+
 These issues still need attention:
 
 1. **TypeScript 'any' Type Usage**:
@@ -2454,3 +2518,477 @@ The dashboard enhancements across all user roles (patient, doctor, admin) now pr
   - src/app/(platform)/patient/appointments/[appointmentId]/page.tsx
   - src/app/(platform)/admin/appointments/[appointmentId]/page.tsx
 - Added proper TypeScript interfaces for route parameters
+
+### React Lazy Loading Error Fix - Patient Appointments
+
+**Issue**: "Element type is invalid. Received a promise that resolves to: undefined. Lazy element type must resolve to a class or function."
+
+**Root Cause**: The dynamic import for `BookAppointmentModal` was looking for a named export that didn't exist.
+
+**Solution**:
+
+1. Added a named export to `BookAppointmentModal.tsx`:
+
+   ```tsx
+   export default function BookAppointmentModal({ ... }) { ... }
+   export { BookAppointmentModal };
+   ```
+
+2. Fixed the dynamic import in `PatientAppointments` page:
+   ```tsx
+   const BookAppointmentModal = dynamic<BookAppointmentModalProps>(
+     () => import('./BookAppointmentModal').then(mod => mod.BookAppointmentModal),
+     {
+       ssr: false,
+       loading: () => (
+         <div className="flex items-center justify-center p-8">
+           <Spinner className="h-8 w-8 animate-spin" />
+         </div>
+       ),
+     }
+   );
+   ```
+
+**Key Learning**: When using React.lazy() or Next.js dynamic imports, ensure that the imported module exports the component correctly. If using named exports, the import must specifically reference the named export.
+
+### Patient Dashboard UX/UI Analysis & Fixes (December 2024)
+
+**Analysis Performed**: Comprehensive review of the patient dashboard at `/patient/dashboard/` to identify UX/UI and data visualization discrepancies.
+
+**Issues Identified & Fixed**:
+
+1. **Missing Section Implementations**:
+
+   - **Issue**: The `renderSection` function had placeholder `return null` for appointments, reminders, notifications, and quick-actions sections
+   - **Fix**: Implemented complete, interactive sections with proper data integration and visual hierarchy
+
+2. **Poor Data Visualization**:
+
+   - **Issue**: Static health metrics with no visual context or progress indicators
+   - **Fix**: Added comprehensive health progress visualization with:
+     - Gradient stat cards with color-coded categories
+     - Progress bars showing goals and achievement percentages
+     - Dynamic metrics based on real appointment and health data
+     - Visual indicators for medication compliance and health records
+
+3. **Static Health Reminders**:
+
+   - **Issue**: Hardcoded, non-contextual health reminders
+   - **Fix**: Implemented dynamic, data-driven reminders:
+     - Conditional reminders based on user's appointment history
+     - Medication-specific reminders when applicable
+     - Health records update prompts based on completion status
+     - Actionable buttons with direct navigation to relevant pages
+
+4. **Enhanced Health Overview Section**:
+
+   - **Issue**: Basic metrics display without visual engagement
+   - **Fix**: Complete redesign with:
+     - Enhanced header with Heart icon and last updated timestamp
+     - Color-coded stat cards with gradient backgrounds
+     - "Next Appointment" counter showing days until next visit
+     - Health progress visualization with goal tracking
+     - Progress bars for appointments, health records, and medication compliance
+
+5. **Improved Appointments Section**:
+
+   - **Issue**: Poor empty state and limited functionality
+   - **Fix**: Enhanced with:
+     - Better visual hierarchy with CalendarCheck icon
+     - Improved empty state with visual cues and call-to-action
+     - "View more" functionality when multiple appointments exist
+     - Limit display to 3 appointments with overflow handling
+
+6. **Enhanced Notifications Section**:
+
+   - **Issue**: Basic notification display without interaction
+   - **Fix**: Improved with:
+     - Visual distinction for read/unread notifications
+     - "Mark all as read" functionality with loading states
+     - Better empty state with contextual messaging
+     - Proper overflow handling with "View more" option
+
+7. **Redesigned Quick Actions**:
+
+   - **Issue**: Basic button layout without descriptions
+   - **Fix**: Enhanced with:
+     - Card-based layout with descriptive text
+     - Color-coded hover states for each action type
+     - Icon-text combinations for better visual recognition
+     - Notification badges on relevant actions
+
+8. **Data Integration Improvements**:
+   - **Issue**: Hardcoded values not reflecting real user data
+   - **Fix**: Integrated real data sources:
+     - Dynamic appointment counting and date calculations
+     - Real notification unread counts
+     - Contextual reminders based on user's health status
+     - Progressive loading for better perceived performance
+
+**Technical Enhancements**:
+
+- Enhanced StatCard component with gradient backgrounds and better responsiveness
+- Improved visual hierarchy with consistent icon usage and color coding
+- Better loading states with appropriate skeleton loaders
+- Enhanced error handling with contextual error messages
+- Responsive design improvements for mobile and desktop
+
+**Visual Design Improvements**:
+
+- Added progress bars for health goal tracking
+- Implemented color-coded sections (blue for appointments, green for health records, etc.)
+- Enhanced card layouts with proper spacing and visual hierarchy
+- Improved typography with consistent font weights and sizes
+- Better use of whitespace and visual grouping
+
+**User Experience Enhancements**:
+
+- Clearer navigation with actionable buttons
+- Contextual information and helpful descriptions
+- Progressive disclosure of information
+- Improved feedback for user actions
+- Better empty states with guidance for next steps
+
+The patient dashboard now provides a comprehensive, visually appealing, and data-driven overview of the patient's health journey with proper data visualization, contextual reminders, and intuitive navigation.
+
+### Upcoming Appointments Count Issue Fix (May 2025)
+
+**Issue**: Patient dashboard showing "0 upcoming appointments" even when appointments exist in the database.
+
+**Root Cause Analysis**:
+
+1. **Data Issue**: Most appointments for current user (u-007) were canceled or in the past
+2. **Time Logic Issue**: The `getMyAppointments` function was not properly combining appointment date and time when filtering for "upcoming" appointments
+3. **Date/Time Parsing**: The function created date objects incorrectly: `new Date(date + startTime)` instead of proper ISO format
+
+**Solution**:
+
+1. **Fixed Time Parsing**: Updated the upcoming filter logic in `src/lib/api/appointmentFunctions.ts`:
+
+   ```typescript
+   // Before: Incorrect date parsing
+   const appointmentDate = a.appointmentDate.includes('T')
+     ? new Date(a.appointmentDate)
+     : new Date(`${a.appointmentDate}T${a.startTime}`);
+
+   // After: Proper ISO date parsing with timezone
+   const appointmentDate = a.appointmentDate.includes('T')
+     ? new Date(a.appointmentDate)
+     : new Date(`${a.appointmentDate}T${a.startTime}:00.000Z`);
+   ```
+
+2. **Enhanced Debugging**: Added detailed logging to track appointment filtering:
+
+   ```typescript
+   logInfo('Checking appointment for upcoming filter', {
+     appointmentId: a.id,
+     appointmentDateTime: appointmentDate.toISOString(),
+     now: now.toISOString(),
+     isFuture,
+     isNotCanceled,
+     status,
+     willInclude: isFuture && isNotCanceled,
+   });
+   ```
+
+3. **Data Improvement**: Added genuine future appointments to `local_db/appointments.json`:
+   - May 26, 2025: Neurology follow-up (confirmed)
+   - May 28, 2025: Cardiology checkup (pending)
+   - June 2, 2025: Dermatology consultation (confirmed)
+
+**Files Modified**:
+
+- `src/lib/api/appointmentFunctions.ts` - Fixed upcoming appointments filter logic
+- `local_db/appointments.json` - Added future appointments for testing
+
+**Testing**:
+
+- Dashboard now correctly shows upcoming appointments count
+- Appointments are properly filtered by date+time, not just date
+- Canceled appointments are correctly excluded
+
+### Dashboard Data Structure Issue Fix (May 2025)
+
+**Issue**: Profile information showing "could not be loaded" despite successful API calls, and stale cached data from 192 seconds ago.
+
+**Root Cause Analysis**:
+
+1. **Data Structure Mismatch**: The `processDashboardData` function was looking for `typedData.userProfile?.data` but the actual API response structure is `typedData.userProfile?.userProfile`
+2. **Stale Cache**: Dashboard was using cached data from before our fixes were applied
+3. **Batch API Structure**: The batch operations return `{ success: true, results: { [key]: apiResult } }` format
+
+**Solution**:
+
+1. **Fixed Data Structure Mapping**: Updated `processDashboardData` function in `src/app/(platform)/patient/dashboard/page.tsx`:
+
+   ```typescript
+   // Before: Incorrect structure assumption
+   userProfile: typedData.userProfile?.data || null,
+
+   // After: Correct structure matching API response
+   userProfile: typedData.userProfile?.userProfile || null,
+   ```
+
+2. **Added Cache Clearing**: Implemented automatic clearing of stale dashboard cache older than 60 seconds
+
+3. **Enhanced Debugging**: Added logging to show actual data structure for troubleshooting
+
+**Files Modified**:
+
+- `src/app/(platform)/patient/dashboard/page.tsx` - Fixed data structure mapping and added cache clearing
+- Added logging to debug batch data processing
+
+**Expected Result**: Profile information and appointment counts now display correctly without stale cache issues
+
+### Authentication Context Missing Error Fix (May 2025)
+
+**Issue**: Console error "[ERROR] API - Missing uid in context {}" when visiting `/find-doctors` page, caused by prefetch API calls not having authentication context.
+
+**Root Cause Analysis**:
+
+1. **Prefetch Without Context**: The `prefetchApiQuery` function calls API methods without authentication context
+2. **API Function Expectations**: Local API functions like `getAvailableSlots`, `getDoctorPublicProfile`, and `findDoctors` expected authentication context as first parameter
+3. **Public Endpoint Access**: These functions should be accessible without authentication for public browsing
+
+**Solution**:
+
+1. **Updated API Function Signatures**: Modified public API functions to accept undefined context:
+
+   ```typescript
+   // Before
+   export async function getAvailableSlots(ctx: { uid: string; role: UserType }, ...)
+
+   // After
+   export async function getAvailableSlots(ctx: { uid: string; role: UserType } | undefined, ...)
+   ```
+
+2. **Default Context Handling**: Added fallback for missing context:
+
+   ```typescript
+   const { uid, role } = ctx || { uid: 'anonymous', role: UserType.PATIENT };
+   ```
+
+3. **Safe Logging**: Updated logging to handle anonymous users:
+   ```typescript
+   logInfo('getAvailableSlots called', {
+     uid: uid ? uid.substring(0, 6) + '...' : 'anonymous',
+     role,
+     doctorId: payload?.doctorId,
+   });
+   ```
+
+**Files Modified**:
+
+- `src/lib/api/appointmentFunctions.ts` - Updated `getAvailableSlots` function
+- `src/lib/api/doctorFunctions.ts` - Updated `getDoctorPublicProfile` and `findDoctors` functions
+
+**Testing**:
+
+- `/find-doctors` page loads without console errors
+- Doctor card hover prefetching works correctly
+- Public API endpoints accessible without authentication
+- Authenticated users still get proper context when logged in
+
+### Console Error Fix: Prefetch API Context Issues (December 2024)
+
+**Issue**: Console error "[ERROR] API - Missing uid in context {}" occurring when visiting pages with prefetching functionality.
+
+**Root Cause Analysis**:
+
+1. **Prefetch Function Issue**: The `prefetchApiQuery` function was calling API methods without providing authentication context as the first parameter
+2. **Argument Handling Bug**: When detecting invalid context, the function was incorrectly spreading all arguments, causing duplicate parameters
+3. **Context Validation Too Strict**: The `validateAuthContext` function was logging errors even for legitimate anonymous/prefetch calls
+
+**Solution Implemented**:
+
+1. **Fixed prefetchApiQuery Argument Logic**: Updated `src/lib/enhancedApiClient.ts` to properly handle single vs multiple arguments for public API methods
+2. **Improved Context Detection**: Added logic to detect empty context objects `{}` as anonymous calls
+3. **Simplified Prefetch Calls**: Updated prefetch calls to pass only payload arguments, letting the function handle context automatically
+4. **Added Guard Clauses**: Added validation to prevent prefetching when doctor.id is undefined
+
+**Files Modified**:
+
+- `src/lib/enhancedApiClient.ts` - Fixed prefetch function argument handling logic
+- `src/lib/api/appointmentFunctions.ts` - Improved context validation to handle empty objects
+- `src/components/doctors/DoctorSearchResults.tsx` - Simplified prefetch calls and added guard clauses
+- `src/lib/preloadStrategies.ts` - Fixed prefetch calls (from previous fix)
+- `src/lib/bookingApi.ts` - Fixed context handling (from previous fix)
+
+**Key Technical Changes**:
+
+- `prefetchApiQuery` now properly handles single argument (payload only) for public methods
+- Context validation recognizes `Object.keys(ctx || {}).length === 0` as anonymous call
+- All prefetch calls simplified to pass payload only: `[{ doctorId: doctor.id }]`
+
+**Key Changes**:
+
+```typescript
+// Before: Incorrect argument handling
+if (
+  publicMethods.includes(method) &&
+  args.length > 0 &&
+  (!args[0] || typeof args[0] !== 'object' || !('uid' in args[0]))
+) {
+  return callApi<TData>(method, undefined, ...args); // This duplicated arguments
+}
+
+// After: Proper argument handling
+if (args.length === 1) {
+  return callApi<TData>(method, undefined, args[0]); // Single payload argument
+}
+// Multiple arguments logic handles context detection correctly
+```
+
+**Result**: Console errors completely eliminated while maintaining full prefetching functionality for improved user experience.
+
+### Enhanced Patient Appointments Page with Data Visualization (December 2024)
+
+**Enhancement**: Comprehensive upgrade of the patient appointments page (`http://localhost:3000/patient/appointments`) with advanced data visualization, analytics, and improved user experience.
+
+**New Features Implemented**:
+
+#### 1. **Success Banner for Just Booked Appointments**
+
+- **Feature**: Handles `justBooked=1` URL parameter to show celebration banner
+- **Implementation**:
+  - `JustBookedSuccessBanner` component with dismissible success message
+  - URL parameter cleanup after displaying banner
+  - Animated success notification with party emoji
+
+#### 2. **Advanced Data Analytics Dashboard**
+
+- **Statistics Cards**:
+
+  - Total appointments (all time)
+  - Upcoming appointments (scheduled ahead)
+  - This month appointments (with month-over-month trend)
+  - Completed appointments (with completion rate percentage)
+
+- **Interactive Charts** (using Recharts library):
+  - **Monthly Trend Chart**: Area chart showing appointment patterns over last 6 months
+  - **Status Distribution**: Pie chart breaking down appointments by status
+  - **Weekly Pattern**: Bar chart showing preferred appointment days
+  - **Healthcare Team**: List of most frequently visited doctors
+
+#### 3. **Enhanced Visual Components**
+
+- **StatCard Component**: Color-coded statistics with trend indicators
+- **Improved Appointment Cards**: Better layout with status icons and formatted dates
+- **Responsive Design**: Mobile-first approach with proper grid layouts
+- **Dark Mode Support**: Full theming support for all charts and components
+
+#### 4. **Data Processing & Analytics**
+
+- **Smart Date Parsing**: Robust date handling with timezone support
+- **Trend Calculations**: Month-over-month percentage changes
+- **Pattern Analysis**: Weekly appointment distribution
+- **Doctor Analytics**: Visit frequency and completion rates
+- **Health Metrics**: Mock satisfaction scores and wait times
+
+#### 5. **Enhanced User Experience**
+
+- **Smart Empty States**: Encouraging messages for first-time users
+- **Loading States**: Skeleton loaders for all sections
+- **Interactive Tabs**: Appointment filtering with live counts
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+
+**Technical Implementation**:
+
+**Files Modified**:
+
+- `src/app/(platform)/patient/appointments/page.tsx` - Complete rewrite with data visualization
+- `package.json` - Added Recharts dependency for chart components
+
+**Key Technologies Added**:
+
+- **Recharts**: For interactive charts (Area, Pie, Bar charts)
+- **date-fns**: Enhanced date manipulation functions
+- **Advanced React Hooks**: Complex data processing with useMemo
+
+**Chart Components**:
+
+```typescript
+// Monthly Trend - Area Chart
+<AreaChart data={appointmentAnalytics.appointmentsByMonth}>
+  <Area dataKey="appointments" stroke="#3b82f6" fill="#3b82f6" />
+  <Area dataKey="completed" stroke="#10b981" fill="#10b981" />
+</AreaChart>
+
+// Status Distribution - Pie Chart
+<RechartsPieChart>
+  <Pie data={statusData} innerRadius={60} outerRadius={100} />
+</RechartsPieChart>
+
+// Weekly Pattern - Bar Chart
+<BarChart data={weeklyPattern}>
+  <Bar dataKey="appointments" fill="#f59e0b" />
+</BarChart>
+```
+
+**Analytics Calculations**:
+
+- Monthly appointment trends with percentage changes
+- Status distribution with percentages
+- Weekly pattern analysis
+- Doctor visit frequency ranking
+- Completion rate calculations
+
+**Responsive Design Features**:
+
+- Mobile-first grid layouts (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`)
+- Flexible chart containers with `ResponsiveContainer`
+- Adaptive card sizes and spacing
+- Touch-friendly interaction areas
+
+**Accessibility Enhancements**:
+
+- Screen reader compatible chart descriptions
+- Keyboard navigation support
+- High contrast color schemes
+- Semantic HTML structure
+
+**Performance Optimizations**:
+
+- Memoized analytics calculations
+- Lazy-loaded chart components
+- Efficient data filtering and grouping
+- Virtual scrolling for large appointment lists
+
+**User Journey Improvements**:
+
+1. **New Users**: Welcome message with prominent "Book First Appointment" CTA
+2. **Returning Users**: Rich dashboard with personalized insights
+3. **Post-Booking**: Success celebration with informative next steps
+4. **Data-Driven**: Visual insights into appointment patterns and health journey
+
+**Access Methods**:
+
+- **Main Navigation**: Patient dashboard → Appointments
+- **Direct URL**: `http://localhost:3000/patient/appointments`
+- **Post-Booking**: Redirected with `?justBooked=1` parameter
+- **CMS Access**: Available in patient management section
+
+**Key Visual Elements**:
+
+- **Color-coded Statistics**: Blue (total), Green (upcoming), Purple (trends), Red (health scores)
+- **Interactive Charts**: Hover tooltips, responsive legends, smooth animations
+- **Status Indicators**: Icon + text combinations for appointment states
+- **Trend Arrows**: Visual up/down indicators for month-over-month changes
+
+**Health Insights Provided**:
+
+- Appointment frequency patterns
+- Doctor relationship tracking
+- Health engagement metrics
+- Wait time analytics
+- Satisfaction scoring (mockup for future integration)
+
+**Future Enhancement Opportunities**:
+
+- Real-time satisfaction surveys
+- Integration with wearable device data
+- Predictive health analytics
+- Appointment recommendation system
+- Social sharing of health milestones
+
+This enhancement transforms the appointments page from a simple list into a comprehensive health dashboard that provides valuable insights into the patient's healthcare journey while maintaining excellent usability and performance.

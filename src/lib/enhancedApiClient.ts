@@ -306,7 +306,7 @@ export function useApiMutation<TData, TVariables, TError = Error>(
  * Prefetch data and store in cache
  * @param method API method name
  * @param queryKey Cache key array
- * @param args Arguments to pass to the API method
+ * @param args Arguments to pass to the API method (context should be first argument if required)
  */
 export async function prefetchApiQuery<TData>(
   method: string,
@@ -314,6 +314,36 @@ export async function prefetchApiQuery<TData>(
   args: unknown[] = []
 ): Promise<void> {
   await cacheManager.prefetchQuery<TData>(queryKey, async () => {
+    // For public API methods that can work without authentication,
+    // ensure proper context handling
+    const publicMethods = ['findDoctors', 'getDoctorPublicProfile', 'getAvailableSlots'];
+
+    if (publicMethods.includes(method)) {
+      // For public methods, ensure the first argument is a proper context or undefined
+      if (args.length === 0) {
+        // No arguments provided, call with undefined context
+        return callApi<TData>(method, undefined);
+      } else if (args.length === 1) {
+        // One argument provided, assume it's the payload and add undefined context
+        return callApi<TData>(method, undefined, args[0]);
+      } else {
+        // Multiple arguments, check if first one is a valid context
+        const [potentialContext, ...restArgs] = args;
+        if (
+          !potentialContext ||
+          typeof potentialContext !== 'object' ||
+          !('uid' in potentialContext)
+        ) {
+          // First argument is not a valid context, use undefined context and treat first arg as payload
+          return callApi<TData>(method, undefined, ...restArgs);
+        } else {
+          // First argument looks like a valid context, use as-is
+          return callApi<TData>(method, ...args);
+        }
+      }
+    }
+
+    // For non-public methods, use arguments as-is
     return callApi<TData>(method, ...args);
   });
 }

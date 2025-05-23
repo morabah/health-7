@@ -8,6 +8,7 @@ import Layout from '@/components/layout/Layout';
 import { ErrorBoundaryProvider } from '@/components/error-boundaries/ErrorBoundaryProvider';
 import { setupErrorHandling } from '@/lib/errorSystem';
 import type { ErrorInfo } from 'react';
+import { ToastProvider } from '@/components/ui/use-toast';
 
 /**
  * Client Layout Component
@@ -21,9 +22,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ErrorBoundaryProvider 
+    <ErrorBoundaryProvider
       defaultResetOnRouteChange={true}
-      onGlobalError={(error: Error, errorInfo: ErrorInfo) => {
+      onGlobalError={(error: Error, _errorInfo: ErrorInfo) => {
         // This is a global error handler that will be called for all errors
         console.error('Global error caught:', error);
       }}
@@ -31,7 +32,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <ThemeProvider>
         <QueryProvider>
           <AuthProvider>
-            <Layout>{children}</Layout>
+            <ToastProvider>
+              <Layout>{children}</Layout>
+            </ToastProvider>
           </AuthProvider>
         </QueryProvider>
       </ThemeProvider>

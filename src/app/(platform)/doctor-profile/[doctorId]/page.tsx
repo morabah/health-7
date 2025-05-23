@@ -133,7 +133,7 @@ export default function DoctorProfilePage() {
       setError(null);
 
       try {
-        const response = await callApi<DoctorProfileResponse>('getDoctorPublicProfile', {
+        const response = await callApi<DoctorProfileResponse>('getDoctorPublicProfile', undefined, {
           doctorId,
         });
         setDoctorData(response);

@@ -64,9 +64,9 @@ export function useAvailableSlots(doctorId: string, date: string) {
   const { data, isLoading, error, refetch } = useApiQuery<AvailableSlotsResponse, Error>(
     'getAvailableSlots',
     cacheKeys.availableSlots(doctorId, date),
-    [{ doctorId, date }],
+    [user ? { uid: user.uid, role: user.role } : undefined, { doctorId, date }], // provide context if user is available
     {
-      enabled: !!user?.uid && !!doctorId && !!date,
+      enabled: !!doctorId && !!date, // remove user requirement since this is a public endpoint
       staleTime: 60 * 1000, // 1 minute
       retry: 2,
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
@@ -155,7 +155,7 @@ function prefetchAdjacentDates(doctorId: string, currentDate: string) {
       prefetchApiQuery<AvailableSlotsResponse>(
         'getAvailableSlots',
         cacheKeys.availableSlots(doctorId, nextDayStr),
-        [{ doctorId, date: nextDayStr }]
+        [undefined, { doctorId, date: nextDayStr }] // context can be undefined for public endpoint
       );
     }, 500);
 
@@ -163,7 +163,7 @@ function prefetchAdjacentDates(doctorId: string, currentDate: string) {
       prefetchApiQuery<AvailableSlotsResponse>(
         'getAvailableSlots',
         cacheKeys.availableSlots(doctorId, prevDayStr),
-        [{ doctorId, date: prevDayStr }]
+        [undefined, { doctorId, date: prevDayStr }] // context can be undefined for public endpoint
       );
     }, 1000);
   } catch (err) {
@@ -230,9 +230,9 @@ export function useDoctorDetails(doctorId: string) {
   const { data, isLoading, error } = useApiQuery<{ success: boolean; doctor: Doctor }, Error>(
     'getDoctorPublicProfile',
     cacheKeys.doctor(doctorId),
-    [{ doctorId }],
+    [user ? { uid: user.uid, role: user.role } : undefined, { doctorId }], // provide context if user is available
     {
-      enabled: !!user?.uid && !!doctorId,
+      enabled: !!doctorId, // remove user requirement since this is a public endpoint
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
   );
