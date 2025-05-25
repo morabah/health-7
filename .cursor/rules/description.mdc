@@ -3,4 +3,64 @@ description:
 globs: 
 alwaysApply: true
 ---
-always refer to [APPLICATION_BLUEPRINT.md](mdc:APPLICATION_BLUEPRINT.md) and [PROJECT_REFERENCE.md](mdc:PROJECT_REFERENCE.md) and [sitemap.txt](mdc:sitemap.txt)
+# Health Appointment System: Documentation Reference Rules
+
+## Primary Reference Documents
+
+Always refer to these core documents for project context and guidance:
+
+### **Core Documentation** (Project Root)
+- **[PROJECT_REFERENCE.md](mdc:PROJECT_REFERENCE.md)** - Central navigation hub, quick reference, and current project status
+- **[ARCHITECTURE.md](mdc:ARCHITECTURE.md)** - System architecture, tech stack, and design patterns
+- **[DEVELOPMENT.md](mdc:DEVELOPMENT.md)** - Development workflow, scripts, and best practices
+- **[AUTHENTICATION.md](mdc:AUTHENTICATION.md)** - Firebase Auth setup, user roles, and security
+- **[APPLICATION_BLUEPRINT.md](mdc:APPLICATION_BLUEPRINT.md)** - Application blueprint and requirements
+- **[sitemap.txt](mdc:sitemap.txt)** - Site structure and routing roadmap
+
+### **Specialized Documentation** (/docs/)
+- **[docs/API_REFERENCE.md](mdc:docs/API_REFERENCE.md)** - API endpoints, schemas, and validation
+- **[docs/DEPLOYMENT.md](mdc:docs/DEPLOYMENT.md)** - Firebase deployment and configuration
+- **[docs/ERROR_HANDLING.md](mdc:docs/ERROR_HANDLING.md)** - Error system and troubleshooting
+- **[docs/TESTING.md](mdc:docs/TESTING.md)** - Testing strategies and validation tools
+- **[docs/UI_COMPONENTS.md](mdc:docs/UI_COMPONENTS.md)** - Component library and styling
+
+### **Historical Records** (/docs/history/)
+- **[docs/history/PROMPT_COMPLETION_LOG.md](mdc:docs/history/PROMPT_COMPLETION_LOG.md)** - Detailed prompt completion history
+- **[docs/history/MIGRATION_HISTORY.md](mdc:docs/history/MIGRATION_HISTORY.md)** - Database migrations and Firebase setup
+
+## Reference Priority
+
+1. **Start with PROJECT_REFERENCE.md** - Central hub for navigation and current status
+2. **Check ARCHITECTURE.md** - For system design and technical decisions
+3. **Refer to DEVELOPMENT.md** - For workflow, scripts, and development practices
+4. **Use specialized docs** - For specific technical topics (API, deployment, etc.)
+5. **Check historical records** - For context on past implementations and decisions
+
+## Documentation Usage Guidelines
+
+### **For Development Tasks**
+- Reference DEVELOPMENT.md for scripts and workflow
+- Check AUTHENTICATION.md for auth-related work
+- Use API_REFERENCE.md for endpoint development
+
+### **For Architecture Decisions**
+- Start with ARCHITECTURE.md for system design
+- Reference APPLICATION_BLUEPRINT.md for requirements
+- Check sitemap.txt for routing structure
+
+### **For Troubleshooting**
+- Use PROJECT_REFERENCE.md troubleshooting section
+- Check ERROR_HANDLING.md for error patterns
+- Review PROMPT_COMPLETION_LOG.md for similar issues
+
+### **For Project Context**
+- PROJECT_REFERENCE.md provides current status and quick navigation
+- PROMPT_COMPLETION_LOG.md contains detailed implementation history
+- MIGRATION_HISTORY.md tracks database and system changes
+
+## Cross-Reference Strategy
+
+- **Never duplicate information** - Reference existing documentation instead
+- **Use relative links** - Link between related documents
+- **Update PROJECT_REFERENCE.md** - When adding new major features or documentation
+- **Maintain consistency** - Follow established patterns and terminology
