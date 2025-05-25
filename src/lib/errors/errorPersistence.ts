@@ -246,7 +246,7 @@ export function initErrorPersistence(): void {
   console.error = function (...args) {
     // Always call original function first
     try {
-      originalConsoleError.apply(console, args);
+    originalConsoleError.apply(console, args);
     } catch (e) {
       // If original console.error fails, fall back to basic logging
       // eslint-disable-next-line no-console
@@ -261,9 +261,9 @@ export function initErrorPersistence(): void {
     try {
       isHandlingError = true;
 
-             // Look for Error objects in the arguments
-       for (const arg of args) {
-         if (arg instanceof Error) {
+    // Look for Error objects in the arguments
+    for (const arg of args) {
+      if (arg instanceof Error) {
            // Log to debugger for analysis
            debugError(arg, 'console', { 
              originalArgs: args.length,
@@ -274,8 +274,8 @@ export function initErrorPersistence(): void {
            if (!arg.message.includes('Failed to persist error') && 
                !arg.message.includes('Failed to retrieve persisted errors') &&
                !arg.message.includes('Failed to clear persisted errors')) {
-             persistError(arg);
-           }
+        persistError(arg);
+      }
          }
        }
     } catch (e) {
@@ -298,7 +298,7 @@ export function initErrorPersistence(): void {
     // Mark as initialized
     (window as any).__errorPersistenceInitialized = true;
 
-          window.addEventListener('error', event => {
+    window.addEventListener('error', event => {
         if (event.error instanceof Error && !isHandlingError) {
           try {
             isHandlingError = true;
@@ -310,17 +310,17 @@ export function initErrorPersistence(): void {
               colno: event.colno
             });
             
-            persistError(event.error);
+        persistError(event.error);
           } catch (e) {
             // Silently fail to avoid infinite loops
             originalConsoleError('Failed to persist window error:', e);
           } finally {
             isHandlingError = false;
           }
-        }
-      });
+      }
+    });
 
-          window.addEventListener('unhandledrejection', event => {
+    window.addEventListener('unhandledrejection', event => {
         if (event.reason instanceof Error && !isHandlingError) {
           try {
             isHandlingError = true;
@@ -331,14 +331,14 @@ export function initErrorPersistence(): void {
               promise: 'present'
             });
             
-            persistError(event.reason);
+        persistError(event.reason);
           } catch (e) {
             // Silently fail to avoid infinite loops
             originalConsoleError('Failed to persist unhandled rejection:', e);
           } finally {
             isHandlingError = false;
           }
-        }
-      });
+      }
+    });
   }
 }

@@ -21,10 +21,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import CompleteAppointmentModal from '@/components/shared/modals/CompleteAppointmentModal';
-import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
+import { useDoctorAppointments, useDoctorCancelAppointment } from '@/data/doctorLoaders';
 import { AppointmentStatus } from '@/types/enums';
 import { format, isValid } from 'date-fns';
-import { logError, logValidation } from '@/lib/logger';
+import { logError, logValidation, logInfo } from '@/lib/logger';
 import { AppointmentError, ApiError } from '@/lib/errors/errorClasses';
 import { extractErrorMessage } from '@/lib/errors/errorHandlingUtils';
 import type { Appointment } from '@/types/schemas';
@@ -79,7 +79,6 @@ function DoctorAppointmentsContent() {
     refetch 
   } = useDoctorAppointments();
   
-  const completeMutation = useCompleteAppointment();
   const cancelMutation = useDoctorCancelAppointment();
 
   // Extract appointments data with useMemo to avoid unnecessary processing on re-renders
@@ -155,40 +154,14 @@ function DoctorAppointmentsContent() {
     });
   }, [myAppointments, dateFilter, statusFilter]); // Only recompute when these dependencies change
 
-  // Handle appointment completion
-  const handleCompleteAppointment = async (id: string, notes: string) => {
-    try {
-      const result = await completeMutation.mutateAsync({
-        appointmentId: id,
-        notes
-      }) as AppointmentActionResponse;
-      
-      if (!result.success) {
-        throw new AppointmentError(result.error || 'Failed to complete appointment', { 
-          appointmentId: selectedAppointment?.id 
-        });
-      }
-      
-      setShowCompleteModal(false);
-      logValidation('4.10', 'success', 'Doctor appointment completion fully functional');
-      
-      // Explicitly refetch to ensure we have the latest data
-      refetch();
-    } catch (error) {
-      // Enhanced error handling
-      if (error instanceof AppointmentError) {
-        logError('Appointment completion error', { error, appointmentId: selectedAppointment?.id });
-        throw error; // Preserve the specific error type for the modal
-      } else if (error instanceof ApiError) {
-        logError('API error during appointment completion', { error, appointmentId: selectedAppointment?.id });
-        throw new AppointmentError(`Service error: ${error.message}`, { appointmentId: selectedAppointment?.id });
-      } else {
-        // For unexpected errors, enhance with context
-        const errorMessage = extractErrorMessage(error, 'Failed to complete appointment');
-        logError('Unexpected error during appointment completion', { error, appointmentId: selectedAppointment?.id });
-        throw new AppointmentError(errorMessage, { appointmentId: selectedAppointment?.id });
-      }
-    }
+  // Handle appointment completion success
+  const handleAppointmentUpdated = (updatedAppointmentId: string) => {
+    logInfo('Appointment completed successfully', { appointmentId: updatedAppointmentId });
+    
+    // Trigger data refetch for the appointments list
+    refetch();
+    
+    logValidation('7.2b', 'success', 'Complete Appointment UI connected to live Dev Cloud function via callApi.');
   };
   
   // Handle appointment cancellation
@@ -412,10 +385,9 @@ function DoctorAppointmentsContent() {
       {/* Complete Appointment Modal */}
       <CompleteAppointmentModal
         isOpen={showCompleteModal}
-        onClose={() => setShowCompleteModal(false)}
+        setIsOpen={setShowCompleteModal}
         appointment={selectedAppointment}
-        onConfirm={handleCompleteAppointment}
-        userType="doctor"
+        onSuccess={handleAppointmentUpdated}
       />
     </div>
   );

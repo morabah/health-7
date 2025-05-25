@@ -116,7 +116,7 @@ export default function Navbar() {
     if (!user?.uid || !userProfile?.userType || fetchingNotifications || notificationsFetchFailed) {
       return;
     }
-
+    
     // Debounce check
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 5000) {
@@ -184,18 +184,18 @@ export default function Navbar() {
     
     // Only start polling if notifications haven't failed
     if (!notificationsFetchFailed) {
-      fetchNotifications();
-      
-      const interval = setInterval(() => {
+    fetchNotifications();
+    
+    const interval = setInterval(() => {
         if (isMountedRef.current && !notificationsFetchFailed) {
-          fetchNotifications();
-        }
-      }, 60000); // Poll every minute
-      
-      return () => {
-        isMountedRef.current = false;
-        if (interval) clearInterval(interval);
-      };
+        fetchNotifications();
+      }
+    }, 60000); // Poll every minute
+    
+    return () => {
+      isMountedRef.current = false;
+      if (interval) clearInterval(interval);
+    };
     }
     
     return () => {

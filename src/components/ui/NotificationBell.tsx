@@ -28,7 +28,7 @@ const formatTimeAgo = (timestamp: number): string => {
 };
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +80,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
       const response = await callApi<NotificationResponse>('getMyNotifications', {
         uid: user.uid,
-        role: user.role,
+        role: userProfile?.userType,
       });
 
       if (isMountedRef.current) {
@@ -115,7 +115,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     try {
       await callApi(
         'markNotificationAsRead',
-        { uid: user.uid, role: user.role },
+        { uid: user.uid, role: userProfile?.userType },
         { notificationId }
       );
 
@@ -158,7 +158,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     if (!user) return;
 
     try {
-      await callApi('markAllNotificationsAsRead', { uid: user.uid, role: user.role });
+      await callApi('markAllNotificationsAsRead', { uid: user.uid, role: userProfile?.userType });
 
       // Update local state
       if (isMountedRef.current) {
@@ -318,8 +318,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                           >
                             <Menu.Item>
                               {({ active }) => (
-                                <Link
-                                  href={notification.link || '#'}
+                                <div
                                   className={`block ${active ? 'bg-slate-100 dark:bg-slate-700' : ''}`}
                                   onClick={() => {
                                     if (!notification.isRead) {
@@ -329,9 +328,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                                 >
                                   <div className="flex items-start">
                                     <div className="flex-shrink-0 pt-0.5">
-                                      {notification.type === 'success' ? (
+                                      {notification.type === 'appointment_confirmed' ? (
                                         <Check className="h-5 w-5 text-green-500" />
-                                      ) : notification.type === 'error' ? (
+                                      ) : notification.type === 'appointment_canceled' ? (
                                         <X className="h-5 w-5 text-red-500" />
                                       ) : (
                                         <Clock className="h-5 w-5 text-blue-500" />
@@ -345,7 +344,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                                         {notification.message}
                                       </p>
                                       <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                                        {formatTimeAgo(notification.timestamp)}
+                                        {formatTimeAgo(new Date(notification.createdAt).getTime())}
                                       </p>
                                     </div>
                                     {!notification.isRead && (
@@ -354,11 +353,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                                       </div>
                                     )}
                                   </div>
-                                </Link>
+                                </div>
                               )}
                             </Menu.Item>
                           </li>
-                        )}
+                        ))}
                       </ul>
                     )}
                   </div>

@@ -260,11 +260,11 @@ export async function callFirebaseFunction<T = any>(
       
       // Only log detailed error info on first attempt or final failure
       if (attempt === 1 || attempt > retries) {
-        logError(`[${requestId}] Attempt ${attempt} failed`, {
-          error: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
-          attempt,
-          maxRetries: retries,
+      logError(`[${requestId}] Attempt ${attempt} failed`, {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        attempt,
+        maxRetries: retries,
           isCommonError
         });
       } else if (!isCommonError) {
@@ -291,7 +291,7 @@ export async function callFirebaseFunction<T = any>(
         } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
           throw new Error('Network error - please check your connection and try again');
         } else {
-          throw new Error(`Failed after ${retries + 1} attempts: ${errorMessage}`);
+        throw new Error(`Failed after ${retries + 1} attempts: ${errorMessage}`);
         }
       }
       
@@ -300,7 +300,7 @@ export async function callFirebaseFunction<T = any>(
       
       // Only log retry delay for non-common errors or first few attempts
       if (!isCommonError || attempt <= 2) {
-        logInfo(`[${requestId}] Retrying in ${delay}ms...`);
+      logInfo(`[${requestId}] Retrying in ${delay}ms...`);
       }
       
       // Wait before retrying

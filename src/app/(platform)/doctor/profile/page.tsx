@@ -1,434 +1,551 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Spinner from '@/components/ui/Spinner';
 import Alert from '@/components/ui/Alert';
-import { User, Save, GraduationCap, Stethoscope } from 'lucide-react';
-import { useDoctorProfile, useUpdateDoctorProfile } from '@/data/doctorLoaders';
-import { VerificationStatus } from '@/types/enums';
-import { logValidation } from '@/lib/logger';
+import { User, Save, GraduationCap, Stethoscope, FileText, Upload } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { callApi } from '@/lib/apiClient';
+import { logInfo, logError } from '@/lib/logger';
+import { trackPerformance } from '@/lib/performance';
+import { UserType, VerificationStatus } from '@/types/enums';
+import { 
+  UpdatableDoctorProfileSchema,
+  UpdatableUserCoreFieldsSchema,
+  UpdatableDoctorSpecificFieldsSchema 
+} from '@/types/schemas';
 import DoctorProfileErrorBoundary from '@/components/error-boundaries/DoctorProfileErrorBoundary';
 
 /**
  * Doctor Profile Page
  * Allows doctors to view and edit their profile information
- * 
- * @returns Doctor profile component
+ * Connected to live updateUserProfile Cloud Function
  */
 export default function DoctorProfilePage() {
-  return (
-    <DoctorProfileErrorBoundary>
-      <DoctorProfileContent />
-    </DoctorProfileErrorBoundary>
-  );
-}
+  const router = useRouter();
+  const { user, userProfile, doctorProfile, loading: authLoading, refreshUserProfile } = useAuth();
 
-// Interface for the doctor profile data structure returned by the API
-interface DoctorProfileData {
-  success: boolean;
-  error?: string;
-  userProfile: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string | null;
-    phone: string | null;
-    role: string;
-  };
-  roleProfile: {
-    id: string;
-    userId: string;
-    specialty: string;
-    licenseNumber: string;
-    yearsOfExperience: number;
-    location: string | null;
-    languages: string[];
-    consultationFee: number | null;
-    bio: string | null;
-    servicesOffered: string | null;
-    verificationStatus: string;
-    education?: Array<{ institution: string; degree: string; year: string }>;
-  };
-}
-
-/**
- * Doctor Profile Content Component
- * Separated to allow error boundary to work properly
- */
-function DoctorProfileContent() {
-  const { data: profileData, isLoading, error, refetch } = useDoctorProfile();
-  const updateProfileMutation = useUpdateDoctorProfile();
-  
-  const [profile, setProfile] = useState<{
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    specialty: string;
-    licenseNumber: string;
-    yearsOfExperience: string;
-    location: string;
-    languages: string[] | string;
-    consultationFee: string;
-    bio: string;
-    services: string;
-    verificationStatus: string;
-  }>({
+  // Form state for all editable fields
+  const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
     phone: '',
     specialty: '',
-    licenseNumber: '',
-    yearsOfExperience: '',
+    yearsOfExperience: 0,
     location: '',
     languages: [] as string[],
-    consultationFee: '',
+    consultationFee: null as number | null,
     bio: '',
-    services: '',
-    verificationStatus: VerificationStatus.PENDING,
+    servicesOffered: '',
+    timezone: '',
   });
-  
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  
-  // Handle errors from data fetching by throwing them to the error boundary
+
+  // Initialize form data from AuthContext
   useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-  
-  // Load profile data when available
-  useEffect(() => {
-    if (profileData && typeof profileData === 'object' && 'success' in profileData && profileData.success) {
-      // Type guard to ensure profileData conforms to expected structure
-      const typedProfileData = profileData as DoctorProfileData;
-      const { userProfile, roleProfile } = typedProfileData;
-      
-      setProfile({
-        firstName: userProfile?.firstName || '',
-        lastName: userProfile?.lastName || '',
-        email: userProfile?.email || '',
-        phone: userProfile?.phone || '',
-        specialty: roleProfile?.specialty || '',
-        licenseNumber: roleProfile?.licenseNumber || '',
-        yearsOfExperience: roleProfile?.yearsOfExperience?.toString() || '',
-        location: roleProfile?.location || '',
-        languages: roleProfile?.languages || [],
-        consultationFee: roleProfile?.consultationFee?.toString() || '',
-        bio: roleProfile?.bio || '',
-        services: roleProfile?.servicesOffered || '',
-        verificationStatus: roleProfile?.verificationStatus || VerificationStatus.PENDING,
+    if (userProfile && doctorProfile) {
+      logInfo('Populating doctor profile edit form with data from AuthContext', {
+        userType: userProfile.userType,
+        hasDoctorProfile: !!doctorProfile
       });
 
-      logValidation('4.10', 'success', 'Doctor profile page connected to real data via local API');
+      setFormData({
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
+        phone: userProfile.phone || '',
+        specialty: doctorProfile.specialty || '',
+        yearsOfExperience: doctorProfile.yearsOfExperience || 0,
+        location: doctorProfile.location || '',
+        languages: doctorProfile.languages || [],
+        consultationFee: doctorProfile.consultationFee || null,
+        bio: doctorProfile.bio || '',
+        servicesOffered: doctorProfile.servicesOffered || '',
+        timezone: doctorProfile.timezone || '',
+      });
     }
-  }, [profileData]);
+  }, [userProfile, doctorProfile]);
 
   // Handle input changes
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  const handleChange = useCallback((
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setProfile(prev => ({ ...prev, [name]: value }));
-  };
+    
+    if (name === 'languages') {
+      // Handle languages as comma-separated string
+      const languagesArray = value.split(',').map(lang => lang.trim()).filter(Boolean);
+      setFormData(prev => ({
+        ...prev,
+        [name]: languagesArray,
+      }));
+    } else if (name === 'yearsOfExperience' || name === 'consultationFee') {
+      // Handle numeric fields
+      const numValue = value === '' ? (name === 'consultationFee' ? null : 0) : Number(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: numValue,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value || '',
+      }));
+    }
+  }, []);
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMessage(null);
+  // Handle profile update submission
+  const handleProfileUpdate = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const perf = trackPerformance('handleDoctorProfileUpdateSubmit_Live');
     
     try {
-      // Prepare languages array from comma-separated string if needed
-      let languagesArray: string[] = [];
-      if (Array.isArray(profile.languages)) {
-        languagesArray = profile.languages;
-      } else if (typeof profile.languages === 'string') {
-        languagesArray = profile.languages.split(',').map((lang: string) => lang.trim()).filter(Boolean);
+      logInfo('Starting doctor profile update', { uid: user?.uid });
+
+      // Construct profileUpdates object with only changed fields
+      const profileUpdates: Record<string, any> = {};
+
+      // Check core user fields
+      if (formData.firstName !== (userProfile?.firstName || '')) {
+        profileUpdates.firstName = formData.firstName;
+      }
+      if (formData.lastName !== (userProfile?.lastName || '')) {
+        profileUpdates.lastName = formData.lastName;
+      }
+      if (formData.phone !== (userProfile?.phone || '')) {
+        profileUpdates.phone = formData.phone || null;
+      }
+
+      // Check doctor-specific fields
+      if (formData.specialty !== (doctorProfile?.specialty || '')) {
+        profileUpdates.specialty = formData.specialty;
+      }
+      if (formData.yearsOfExperience !== (doctorProfile?.yearsOfExperience || 0)) {
+        profileUpdates.yearsOfExperience = formData.yearsOfExperience;
+      }
+      if (formData.location !== (doctorProfile?.location || '')) {
+        profileUpdates.location = formData.location || null;
       }
       
-      // Type the update payload
-      const updatePayload = {
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        specialty: profile.specialty,
-        licenseNumber: profile.licenseNumber,
-        yearsOfExperience: parseInt(profile.yearsOfExperience) || 0,
-        location: profile.location,
-        languages: languagesArray,
-        consultationFee: parseInt(profile.consultationFee) || null,
-        bio: profile.bio,
-        servicesOffered: profile.services,
-      };
-      
-      // Define the expected response type
-      interface UpdateProfileResponse {
-        success: boolean;
-        error?: string;
+      // Compare languages arrays
+      const currentLanguages = doctorProfile?.languages || [];
+      const formLanguages = formData.languages || [];
+      if (JSON.stringify(currentLanguages.sort()) !== JSON.stringify(formLanguages.sort())) {
+        profileUpdates.languages = formLanguages.length > 0 ? formLanguages : null;
       }
       
-      const result = await updateProfileMutation.mutateAsync(updatePayload) as UpdateProfileResponse;
-      
-      if (result.success) {
-        setStatusMessage({
-          type: 'success',
-          message: 'Profile updated successfully'
-        });
-        setIsEditing(false);
-        
-        // Explicitly refetch to ensure we have the latest data
-        refetch();
-        
-        logValidation('4.10', 'success', 'Doctor profile update fully functional');
-      } else {
-        setStatusMessage({
-          type: 'error',
-          message: result.error || 'Failed to update profile'
-        });
+      if (formData.consultationFee !== (doctorProfile?.consultationFee || null)) {
+        profileUpdates.consultationFee = formData.consultationFee;
       }
-    } catch (error) {
-      setStatusMessage({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'An error occurred while updating profile'
+      if (formData.bio !== (doctorProfile?.bio || '')) {
+        profileUpdates.bio = formData.bio || null;
+      }
+      if (formData.servicesOffered !== (doctorProfile?.servicesOffered || '')) {
+        profileUpdates.servicesOffered = formData.servicesOffered || null;
+      }
+      if (formData.timezone !== (doctorProfile?.timezone || '')) {
+        profileUpdates.timezone = formData.timezone || null;
+      }
+
+      // Check if there are any changes
+      if (Object.keys(profileUpdates).length === 0) {
+        setSuccessMsg('No changes to save.');
+        setIsSubmitting(false);
+        perf.stop();
+        return;
+      }
+
+      // Optional client-side validation
+      const validationResult = UpdatableDoctorProfileSchema.safeParse(profileUpdates);
+      if (!validationResult.success) {
+        setErrorMsg("Validation failed: " + validationResult.error.issues.map(i => i.message).join(', '));
+        setIsSubmitting(false);
+        perf.stop();
+        return;
+      }
+
+      logInfo('Calling updateUserProfile (Live Cloud) with updates:', { 
+        updateFields: Object.keys(profileUpdates) // Log field names only for PHI safety
       });
+
+      // Call backend via callApi
+      await callApi('updateUserProfile', { updates: profileUpdates });
+      
+      logInfo('Doctor profile update successful (Live Cloud)');
+      setSuccessMsg('Profile updated successfully!');
+      setIsEditing(false);
+      
+      // Trigger AuthContext to re-fetch profile
+      await refreshUserProfile();
+
+    } catch (error: any) {
+      logError('Doctor profile update failed (Live Cloud)', error);
+      setErrorMsg(error.message || 'Failed to update profile.');
+    } finally {
+      setIsSubmitting(false);
+      perf.stop();
     }
-  };
+  }, [userProfile, doctorProfile, formData, refreshUserProfile, user?.uid]);
+
+  // Redirect if not a doctor
+  useEffect(() => {
+    if (!authLoading && userProfile && userProfile.userType !== UserType.DOCTOR) {
+      router.push('/dashboard');
+    }
+  }, [authLoading, userProfile, router]);
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner className="w-8 h-8" />
+      </div>
+    );
+  }
+
+  if (!userProfile || userProfile.userType !== UserType.DOCTOR) {
+    return (
+      <Alert variant="error">
+        Access denied. This page is only available to doctors.
+      </Alert>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {profile.firstName && profile.lastName 
-              ? `Dr. ${profile.firstName} ${profile.lastName}` 
-              : "Doctor Profile"}
-          </h1>
-          {profile.specialty && (
-            <p className="text-slate-500">{profile.specialty}</p>
-          )}
-        </div>
-        <Button
-          variant={isEditing ? "secondary" : "primary"}
-          onClick={() => setIsEditing(!isEditing)}
-          disabled={isLoading || updateProfileMutation.isPending}
-        >
-          {isEditing ? (
-            <>Cancel</>
-          ) : (
-            <>
+    <DoctorProfileErrorBoundary>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">
+              {formData.firstName && formData.lastName 
+                ? `Dr. ${formData.firstName} ${formData.lastName}` 
+                : "Doctor Profile"}
+            </h1>
+            {formData.specialty && (
+              <p className="text-slate-500">{formData.specialty}</p>
+            )}
+          </div>
+          {!isEditing && (
+            <Button onClick={() => setIsEditing(true)} variant="secondary">
               <User className="h-4 w-4 mr-2" />
               Edit Profile
-            </>
+            </Button>
           )}
-        </Button>
-      </div>
-
-      {statusMessage && (
-        <Alert variant={statusMessage.type}>
-          {statusMessage.message}
-        </Alert>
-      )}
-
-      {error && (
-        <Alert variant="error">
-          {error instanceof Error ? error.message : 'Error loading profile'}
-        </Alert>
-      )}
-
-      {isLoading ? (
-        <div className="flex justify-center py-10">
-          <Spinner className="w-8 h-8" />
         </div>
-      ) : (
-        <>
-          {profile.verificationStatus === VerificationStatus.PENDING && (
-            <Alert variant="warning" className="mb-4">
-          <div className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-            <span>
-              Your profile is pending verification. Our team will review your credentials shortly.
-            </span>
-          </div>
-            </Alert>
-      )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-6">
-          {/* Personal Information */}
-          <Card>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center">
-              <User className="h-5 w-5 mr-2 text-primary" />
-              <h2 className="text-lg font-medium">Personal Information</h2>
+        {/* Verification Status Alert */}
+        {doctorProfile?.verificationStatus === VerificationStatus.PENDING && (
+          <Alert variant="warning">
+            <div className="flex items-center">
+              <User className="h-5 w-5 mr-2" />
+              <span>
+                Your profile is pending verification. Our team will review your credentials shortly.
+              </span>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                id="firstName"
-                name="firstName"
-                label="First Name"
-                value={profile.firstName}
-                onChange={handleChange}
-                required
-                disabled={!isEditing}
-              />
-              <Input
-                id="lastName"
-                name="lastName"
-                label="Last Name"
-                value={profile.lastName}
-                onChange={handleChange}
-                required
-                disabled={!isEditing}
-              />
-                <Input
-                  id="email"
-                  name="email"
-                  label="Email"
-                  type="email"
-                  value={profile.email}
-                  onChange={handleChange}
-                  required
-                    disabled={true} // Email cannot be changed
-                />
-                <Input
-                  id="phone"
-                  name="phone"
-                  label="Phone Number"
-                  value={profile.phone}
-                  onChange={handleChange}
-                  required
-                  disabled={!isEditing}
-                />
-            </div>
-          </Card>
+          </Alert>
+        )}
 
-          {/* Professional Information */}
-          <Card>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center">
-              <Stethoscope className="h-5 w-5 mr-2 text-primary" />
-              <h2 className="text-lg font-medium">Professional Information</h2>
-            </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                id="specialty"
-                name="specialty"
-                label="Specialty"
-                value={profile.specialty}
-                onChange={handleChange}
-                disabled={!isEditing}
+        {/* Status Messages */}
+        {errorMsg && <Alert variant="error">{errorMsg}</Alert>}
+        {successMsg && <Alert variant="success">{successMsg}</Alert>}
+
+        <form onSubmit={handleProfileUpdate}>
+          <div className="space-y-6">
+            {/* Personal Information */}
+            <Card>
+              <div className="p-6 bg-primary/5 border-b flex items-center gap-4">
+                <div className="bg-primary/10 rounded-full p-3">
+                  <User size={24} className="text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold">Personal Information</h2>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium mb-1">
+                    First Name *
+                  </label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    disabled={!isEditing}
                     required
-              />
-                <Input
-                  id="licenseNumber"
-                  name="licenseNumber"
-                  label="License Number"
-                  value={profile.licenseNumber}
-                  onChange={handleChange}
-                  required
-                  disabled={!isEditing}
-                />
-                <Input
-                  id="yearsOfExperience"
-                  name="yearsOfExperience"
-                  label="Years of Experience"
-                  type="number"
-                  value={profile.yearsOfExperience}
-                  onChange={handleChange}
-                  required
-                  disabled={!isEditing}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium mb-1">
+                    Last Name *
+                  </label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium mb-1">
+                    Email Address
+                  </label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={userProfile.email || ''}
+                    disabled={true} // Email cannot be changed
+                    className="bg-gray-50 dark:bg-gray-800"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                </div>
+                
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium mb-1">
+                    Phone Number
+                  </label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    placeholder="+1234567890"
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Professional Information */}
+            <Card>
+              <div className="p-6 bg-primary/5 border-b flex items-center gap-4">
+                <div className="bg-primary/10 rounded-full p-3">
+                  <Stethoscope size={24} className="text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold">Professional Information</h2>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="specialty" className="block text-sm font-medium mb-1">
+                    Specialty *
+                  </label>
+                  <Input
+                    id="specialty"
+                    name="specialty"
+                    value={formData.specialty}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    required
+                    placeholder="e.g., Cardiology, Pediatrics"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="yearsOfExperience" className="block text-sm font-medium mb-1">
+                    Years of Experience
+                  </label>
+                  <Input
+                    id="yearsOfExperience"
+                    name="yearsOfExperience"
+                    type="number"
+                    value={formData.yearsOfExperience.toString()}
+                    onChange={handleChange}
+                    disabled={!isEditing}
                     min="0"
-                />
-                <Input
-                  id="location"
-                  name="location"
-                  label="Practice Location"
-                  value={profile.location}
-                  onChange={handleChange}
-                  required
-                  disabled={!isEditing}
-                />
-              <Input
-                id="languages"
-                name="languages"
-                label="Languages Spoken"
-                    value={Array.isArray(profile.languages) ? profile.languages.join(', ') : profile.languages}
-                onChange={handleChange}
-                disabled={!isEditing}
+                    max="70"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="location" className="block text-sm font-medium mb-1">
+                    Practice Location
+                  </label>
+                  <Input
+                    id="location"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    placeholder="City, State or Hospital Name"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="consultationFee" className="block text-sm font-medium mb-1">
+                    Consultation Fee ($)
+                  </label>
+                  <Input
+                    id="consultationFee"
+                    name="consultationFee"
+                    type="number"
+                    value={formData.consultationFee?.toString() || ''}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    min="0"
+                    placeholder="150"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label htmlFor="languages" className="block text-sm font-medium mb-1">
+                    Languages Spoken
+                  </label>
+                  <Input
+                    id="languages"
+                    name="languages"
+                    value={formData.languages.join(', ')}
+                    onChange={handleChange}
+                    disabled={!isEditing}
                     placeholder="English, Spanish, French, etc."
-              />
-                <Input
-                  id="consultationFee"
-                  name="consultationFee"
-                  label="Consultation Fee ($)"
-                  type="number"
-                  value={profile.consultationFee}
-                  onChange={handleChange}
-                  required
-                  disabled={!isEditing}
-                    min="0"
-                />
-            </div>
-          </Card>
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Separate multiple languages with commas</p>
+                </div>
+                
+                <div>
+                  <label htmlFor="timezone" className="block text-sm font-medium mb-1">
+                    Timezone
+                  </label>
+                  <Input
+                    id="timezone"
+                    name="timezone"
+                    value={formData.timezone}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    placeholder="America/New_York"
+                  />
+                </div>
+              </div>
+            </Card>
 
-          {/* Biography & Services */}
-          <Card>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center">
-              <GraduationCap className="h-5 w-5 mr-2 text-primary" />
-              <h2 className="text-lg font-medium">Biography & Services</h2>
-            </div>
-            <div className="p-4 space-y-4">
-              <Textarea
-                id="bio"
-                name="bio"
-                label="Professional Biography"
-                value={profile.bio}
-                onChange={handleChange}
-                rows={4}
-                disabled={!isEditing}
+            {/* Biography & Services */}
+            <Card>
+              <div className="p-6 bg-primary/5 border-b flex items-center gap-4">
+                <div className="bg-primary/10 rounded-full p-3">
+                  <GraduationCap size={24} className="text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold">Biography & Services</h2>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label htmlFor="bio" className="block text-sm font-medium mb-1">
+                    Professional Biography
+                  </label>
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    rows={4}
                     placeholder="Tell patients about your background, education, and expertise"
-              />
-              <Textarea
-                id="services"
-                name="services"
-                label="Services Offered"
-                value={profile.services}
-                onChange={handleChange}
-                rows={3}
-                disabled={!isEditing}
+                    maxLength={2000}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.bio.length}/2000 characters
+                  </p>
+                </div>
+                
+                <div>
+                  <label htmlFor="servicesOffered" className="block text-sm font-medium mb-1">
+                    Services Offered
+                  </label>
+                  <Textarea
+                    id="servicesOffered"
+                    name="servicesOffered"
+                    value={formData.servicesOffered}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    rows={3}
                     placeholder="List the medical services you provide (e.g., annual checkups, vaccinations, etc.)"
-              />
-            </div>
-          </Card>
+                    maxLength={2000}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.servicesOffered.length}/2000 characters
+                  </p>
+                </div>
+              </div>
+            </Card>
 
-              {isEditing && (
-                <div className="mt-6 flex justify-end space-x-4">
-                  <Button 
-                    type="button"
-                    variant="secondary" 
-                    onClick={() => setIsEditing(false)}
-                    disabled={updateProfileMutation.isPending}
-                  >
-                    Cancel
+            {/* Verification Documents Section (Placeholder) */}
+            <Card>
+              <div className="p-6 bg-primary/5 border-b flex items-center gap-4">
+                <div className="bg-primary/10 rounded-full p-3">
+                  <FileText size={24} className="text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold">Verification Documents</h2>
+              </div>
+              <div className="p-6">
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Document Management
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Upload and manage your professional verification documents
+                  </p>
+                  <Button variant="secondary" disabled>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload New Document
                   </Button>
-                  <Button 
-                    type="submit" 
-                    variant="primary"
-                    isLoading={updateProfileMutation.isPending}
-                  >
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </Button>
-            </div>
-          )}
-        </div>
-      </form>
-        </>
-      )}
-    </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Document upload functionality will be available in a future update
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Action Buttons */}
+            {isEditing && (
+              <div className="mt-6 flex justify-end space-x-3">
+                <Button 
+                  onClick={() => {
+                    setIsEditing(false);
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }} 
+                  variant="ghost" 
+                  type="button"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  disabled={isSubmitting}
+                  className="min-w-[120px]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Spinner className="mr-2 h-4 w-4" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
+    </DoctorProfileErrorBoundary>
   );
 }

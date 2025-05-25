@@ -6,11 +6,13 @@
  */
 
 import { db, FieldValue } from '../config/firebaseAdmin';
+import * as admin from 'firebase-admin';
 import { logInfo, logError, logWarn } from '../shared/logger';
 import { trackPerformance } from '../shared/performance';
+import { UserType } from '../types/enums';
 
 // Import types from local simplified types to avoid complex Zod compilation issues
-import { UserProfile, PatientProfile, DoctorProfile, UserType } from '../types/localTypes';
+import { UserProfile, PatientProfile, DoctorProfile } from '../types/localTypes';
 
 /**
  * Fetches the core UserProfile and role-specific profile (Patient or Doctor)
@@ -165,5 +167,130 @@ export async function createUserProfileInFirestore(
     logError(`[createUserProfileInFirestore] Error creating UserProfile for uid: ${uid}`, error);
     perf.stop();
     throw error; // Re-throw to be caught by the caller
+  }
+}
+
+/**
+ * User Profile Management Functions
+ * Internal functions for managing user profile updates in Firestore
+ */
+
+/**
+ * Internal function to update user documents in Firestore
+ * Handles both UserProfile (users collection) and role-specific profiles (patients/doctors collections)
+ * 
+ * @param uid - Firebase Auth UID of the user
+ * @param userType - Type of user (PATIENT, DOCTOR, ADMIN)
+ * @param updates - Object containing the fields to update
+ * @throws Error if update fails
+ */
+export async function updateUserDocumentsInFirestore(
+  uid: string, 
+  userType: UserType, 
+  updates: Record<string, any>
+): Promise<void> {
+  const perf = trackPerformance(`updateUserDocs:${uid}`);
+  
+  try {
+    logInfo('Starting user profile update', { 
+      uid, 
+      userType, 
+      updateFields: Object.keys(updates) // Log field names only, not values (PHI safety)
+    });
+
+    // Separate updates into core user fields and role-specific fields
+    const userCoreUpdates: Record<string, any> = {};
+    const roleSpecificUpdates: Record<string, any> = {};
+
+    // Define which fields belong to UserProfile (core user fields)
+    const userCoreFields = ['firstName', 'lastName', 'phone', 'profilePictureUrl'];
+    
+    // Define which fields belong to role-specific profiles
+    const patientFields = ['dateOfBirth', 'gender', 'bloodType', 'medicalHistory', 'address'];
+    const doctorFields = [
+      'specialty', 'yearsOfExperience', 'location', 'languages', 'consultationFee', 
+      'bio', 'education', 'servicesOffered', 'profilePictureUrl', 'timezone'
+    ];
+
+    // Categorize updates
+    for (const [key, value] of Object.entries(updates)) {
+      if (userCoreFields.includes(key)) {
+        userCoreUpdates[key] = value;
+      } else if (userType === UserType.PATIENT && patientFields.includes(key)) {
+        roleSpecificUpdates[key] = value;
+      } else if (userType === UserType.DOCTOR && doctorFields.includes(key)) {
+        roleSpecificUpdates[key] = value;
+      }
+      // Ignore fields that don't belong to any category (security measure)
+    }
+
+    // Convert dateOfBirth string to Firestore Timestamp if present
+    if (roleSpecificUpdates.dateOfBirth && typeof roleSpecificUpdates.dateOfBirth === 'string') {
+      try {
+        roleSpecificUpdates.dateOfBirth = admin.firestore.Timestamp.fromDate(new Date(roleSpecificUpdates.dateOfBirth));
+      } catch (error) {
+        logError('Failed to convert dateOfBirth to Timestamp', { 
+          uid, 
+          dateOfBirth: roleSpecificUpdates.dateOfBirth,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        throw new Error('Invalid date format for dateOfBirth');
+      }
+    }
+
+    // Add updatedAt timestamp to both update objects if they have fields
+    if (Object.keys(userCoreUpdates).length > 0) {
+      userCoreUpdates.updatedAt = FieldValue.serverTimestamp();
+    }
+    if (Object.keys(roleSpecificUpdates).length > 0) {
+      roleSpecificUpdates.updatedAt = FieldValue.serverTimestamp();
+    }
+
+    // Use Firestore batch write for atomic updates
+    const batch = db.batch();
+    
+    // Update users collection if there are core user fields to update
+    if (Object.keys(userCoreUpdates).length > 0) {
+      const userRef = db.collection('users').doc(uid);
+      batch.update(userRef, userCoreUpdates);
+      logInfo('Added user core updates to batch', { 
+        uid, 
+        fields: Object.keys(userCoreUpdates).filter(k => k !== 'updatedAt')
+      });
+    }
+
+    // Update role-specific collection if there are role-specific fields to update
+    if (Object.keys(roleSpecificUpdates).length > 0) {
+      const profileCollection = userType === UserType.PATIENT ? 'patients' : 'doctors';
+      const profileRef = db.collection(profileCollection).doc(uid);
+      batch.update(profileRef, roleSpecificUpdates);
+      logInfo('Added role-specific updates to batch', { 
+        uid, 
+        userType,
+        collection: profileCollection,
+        fields: Object.keys(roleSpecificUpdates).filter(k => k !== 'updatedAt')
+      });
+    }
+
+    // Commit the batch
+    await batch.commit();
+    
+    logInfo('User profile update completed successfully', { 
+      uid, 
+      userType,
+      userCoreFieldsUpdated: Object.keys(userCoreUpdates).length > 0,
+      roleSpecificFieldsUpdated: Object.keys(roleSpecificUpdates).length > 0
+    });
+
+  } catch (error) {
+    logError('Failed to update user profile', { 
+      uid, 
+      userType, 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    throw error;
+  } finally {
+    perf.stop();
   }
 } 

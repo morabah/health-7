@@ -9,22 +9,27 @@ import {
   DocumentType,
   UserType,
   VerificationStatus,
+  Gender,
+  BloodType,
 } from '../types/enums';
 
+// Local schema definitions for updatable fields
+const isoDateTimeStringSchema = z
+  .string()
+  .datetime({
+    offset: true,
+    message: 'Invalid ISO 8601 datetime string format (e.g., YYYY-MM-DDTHH:mm:ss.sssZ)',
+  })
+  .describe('ISO 8601 date-time string');
+
 /**
- * Schema for completing an appointment by a doctor
+ * Zod schema for the data payload when a doctor completes an appointment.
  */
 export const CompleteAppointmentSchema = z.object({
-  appointmentId: z
-    .string()
-    .min(1, 'Appointment ID is required')
-    .describe('ID of the appointment to complete'),
-
-  notes: z
-    .string()
-    .max(2000, 'Notes cannot exceed 2000 characters')
-    .optional()
-    .describe('@PHI - Medical notes from the appointment'),
+  /** The ID of the appointment document in Firestore to be marked as completed. Required. */
+  appointmentId: z.string().min(1, 'Appointment ID is required.'),
+  /** Optional notes added by the doctor upon completion. Max 2000 characters. @PHI field. */
+  notes: z.string().max(2000, 'Completion notes cannot exceed 2000 characters.').optional().describe('@PHI'),
 });
 
 /**
@@ -388,3 +393,55 @@ export const RegisterSchema = z.discriminatedUnion('userType', [
   PatientRegisterSchema,
   DoctorRegisterSchema,
 ]);
+
+/**
+ * Schema for updating user profile information
+ * Defines fields that are updatable by authenticated users for their own profiles
+ */
+
+/**
+ * Fields from UserProfile that are updatable by any authenticated user for themselves
+ * Excludes immutable fields like id, email, userType, createdAt, isActive, verification fields
+ */
+export const UpdatableUserCoreFieldsSchema = z.object({
+  firstName: z.string().min(1, 'First name is required.').optional(),
+  lastName: z.string().min(1, 'Last name is required.').optional(),
+  phone: z.string().nullable().optional(),
+  profilePictureUrl: z.string().nullable().optional(),
+}).describe("Fields from UserProfile updatable by any authenticated user for themselves.");
+
+/**
+ * Patient-specific fields updatable by the patient
+ * @PHI - Contains patient health information
+ */
+export const UpdatablePatientSpecificFieldsSchema = z.object({
+  dateOfBirth: isoDateTimeStringSchema.nullable().optional(),
+  gender: z.nativeEnum(Gender).optional(),
+  bloodType: z.nativeEnum(BloodType).nullable().optional(),
+  medicalHistory: z.string().max(4000, 'Medical history is too long (max 4000 characters)').nullable().optional(),
+  address: z.string().max(500, 'Address is too long').nullable().optional(),
+}).describe("@PHI - Patient-specific fields updatable by the patient.");
+
+/**
+ * Doctor-specific fields updatable by the doctor
+ * @PHI - Contains doctor professional information
+ */
+export const UpdatableDoctorSpecificFieldsSchema = z.object({
+  specialty: z.string().min(1, 'Specialty is required').optional(),
+  yearsOfExperience: z.number().int('Years of experience must be an integer').min(0, 'Years of experience cannot be negative').optional(),
+  location: z.string().nullable().optional(),
+  languages: z.array(z.string()).nullable().optional(),
+  consultationFee: z.number().min(0, 'Consultation fee cannot be negative').nullable().optional(),
+  bio: z.string().max(2000, 'Biography is too long (max 2000 characters)').nullable().optional(),
+  education: z.string().max(2000, 'Education section is too long').nullable().optional(),
+  servicesOffered: z.string().max(2000, 'Services section is too long').nullable().optional(),
+  profilePictureUrl: z.string().url('Invalid profile picture URL').nullable().optional(),
+  timezone: z.string().optional(),
+}).describe("@PHI - Doctor-specific fields updatable by the doctor.");
+
+/**
+ * Combined schema for updateUserProfile function input
+ */
+export const UpdateUserProfileSchema = z.object({
+  updates: z.record(z.any()).describe("Object containing the fields to update")
+});

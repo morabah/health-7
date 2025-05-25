@@ -38,6 +38,8 @@ This document captures important lessons learned during the development of the H
 30. [Missing Firebase Functions & Graceful Degradation](#missing-firebase-functions--graceful-degradation)
 31. [Error Handling System Architecture & Circular Reference Prevention](#error-handling-system-architecture--circular-reference-prevention)
 32. [Missing Firebase Functions & Graceful Degradation](#missing-firebase-functions--graceful-degradation)
+33. [TypeScript Schema Import Issues & Module Resolution](#typescript-schema-import-issues--module-resolution)
+34. [Firebase Auth User Type Extensions & Context Management](#firebase-auth-user-type-extensions--context-management)
 
 ---
 
@@ -124,7 +126,7 @@ Implementing a robust file upload system with progress tracking, error handling,
 ```javascript
 const handleFileUpload = useCallback(async (file, path, progressSetter) => {
   const uploadTask = uploadBytesResumable(storageRef, file);
-
+  
   return new Promise((resolve, reject) => {
     uploadTask.on(
       'state_changed',
@@ -275,18 +277,18 @@ Establishing consistent patterns for Firebase integration across backend functio
 import { FieldValue } from 'firebase-admin/firestore';
 
 export const myFunction = createAuthenticatedFunction(MyInputSchema, async (data, context) => {
-  // Validate input with Zod
-  const validatedData = MyInputSchema.parse(data);
-
-  // Use FieldValue for timestamps
-  const document = {
-    ...validatedData,
-    createdAt: FieldValue.serverTimestamp(),
+    // Validate input with Zod
+    const validatedData = MyInputSchema.parse(data);
+    
+    // Use FieldValue for timestamps
+    const document = {
+      ...validatedData,
+      createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
-  };
-
-  // Return standardized response
-  return { success: true, id: documentId };
+    };
+    
+    // Return standardized response
+    return { success: true, id: documentId };
 });
 
 // Frontend API call pattern
@@ -415,7 +417,7 @@ const fetchData = async () => {
     const result = await apiCall();
     return result;
   } catch (err) {
-    handleError(err, {
+    handleError(err, { 
       message: 'Could not load data',
       retryable: true,
     });
@@ -675,8 +677,8 @@ Accumulation of technical debt including deprecated code, inconsistent logging, 
 console.log('Raw API Response:', data);
 
 // ✅ Use - Structured logging
-logInfo('API Response received', {
-  operation: 'bookAppointment',
+logInfo('API Response received', { 
+  operation: 'bookAppointment', 
   success: data.success,
   appointmentId: data.appointment?.id,
 });
@@ -739,14 +741,14 @@ const operations = [
   createBatchOperation('getMyAppointments', { status: 'upcoming' }, 'appointments'),
 ];
 
-const results = await executeBatchOperations(operations, {
-  uid: userId,
+const results = await executeBatchOperations(operations, { 
+  uid: userId, 
   role: userRole,
 });
 
 // With fallback mechanism
 const results = await executeBatchWithFallback(
-  operations,
+  operations, 
   { uid: userId, role: userRole },
   { retryCount: 2, timeoutMs: 5000 }
 );
@@ -788,13 +790,13 @@ catch (error) {
 
 // ✅ Use - Sanitized error handling
 catch (error) {
-  logError('Operation failed', {
+  logError('Operation failed', { 
     operation: 'userRegistration',
     error: error.message,
     stack: error.stack,
     userId: sanitizeUserId(userId)
   });
-
+  
   setFormError(getUserFriendlyMessage(error));
 }
 
@@ -894,7 +896,7 @@ Access to fetch at 'https://us-central1-health7-c378f.cloudfunctions.net/registe
 
 ```
 ✅ Go to Firebase Console → Authentication → Settings → Authorized domains
-✅ Verify domains:
+✅ Verify domains: 
    - localhost
    - localhost:3000
    - health7-c378f.web.app
@@ -1237,7 +1239,7 @@ Firebase Authentication console showed only 3 users while database contained 14 
 
 👥 By User Type:
 👨‍💼 Admins: 1 (with admin claims)
-👨‍⚕️ Doctors: 9 (with doctor claims)
+👨‍⚕️ Doctors: 9 (with doctor claims)  
 👤 Patients: 4 (with patient claims)
 ```
 
@@ -1300,7 +1302,7 @@ User error - attempting to authenticate with incorrect password. The Firebase Au
 
 ✅ SUCCESSFUL LOGINS:
 • user7@demo.health (patient) - UID: u-007
-• user1@demo.health (doctor) - UID: u-001
+• user1@demo.health (doctor) - UID: u-001  
 • admin@example.com (admin) - UID: admin-1odsk03suhp9odjbe13fr8
 • morabah@gmail.com (patient) - UID: stbgu09d7t05vtu0r67tp
 
@@ -2325,6 +2327,266 @@ const useFeatureWithFallback = (featureName: string, apiCall: () => Promise<any>
 - **Reduced Error Noise**: Clean console output during development
 - **Progressive Enhancement**: Features enhance the experience but don't break it
 - **Easier Debugging**: Clear distinction between missing features and actual errors
+
+---
+
+## TypeScript Schema Import Issues & Module Resolution
+
+**Date:** January 2025  
+**Context:** Patient profile page failing to import `UpdatablePatientProfileSchema` from `@/types/schemas`
+
+### Problem
+
+Frontend components were unable to import Zod schemas from the central schemas file, causing:
+
+- Build-time import errors: `'UpdatablePatientProfileSchema' is not exported from '@/types/schemas'`
+- Development server crashes due to missing schema imports
+- TypeScript compilation failures preventing application startup
+- Form validation breaking due to missing schema definitions
+
+### Root Cause Analysis
+
+The issue was complex and involved multiple factors:
+
+1. **Module Resolution**: TypeScript module resolution was failing for specific schema exports
+2. **Build System**: Next.js build system was not properly resolving the schema imports
+3. **Export/Import Mismatch**: Potential circular dependencies or export ordering issues
+4. **Development vs Production**: Different behavior between development and production builds
+
+### Solution Implementation
+
+#### 1. Local Schema Definition Workaround
+
+```typescript
+// Import Zod for local schema definition
+import { z } from 'zod';
+
+// Local schema definition as workaround for import issue
+const UpdatablePatientProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required.').optional(),
+  lastName: z.string().min(1, 'Last name is required.').optional(),
+  phone: z.string().nullable().optional(),
+  profilePictureUrl: z.string().nullable().optional(),
+  dateOfBirth: z.string().nullable().optional(),
+  gender: z.nativeEnum(Gender).optional(),
+  bloodType: z.nativeEnum(BloodType).nullable().optional(),
+  medicalHistory: z.string().max(4000, 'Medical history is too long (max 4000 characters)').nullable().optional(),
+  address: z.string().max(500, 'Address is too long').nullable().optional(),
+});
+```
+
+#### 2. Maintained Functionality
+
+```typescript
+// Validation still works with local schema
+const validationResult = UpdatablePatientProfileSchema.safeParse(profileUpdates);
+if (!validationResult.success) {
+  setErrorMsg("Validation failed: " + validationResult.error.issues.map(i => i.message).join(', '));
+  return;
+}
+```
+
+### Key Lessons Learned
+
+#### Module Resolution Strategies
+
+1. **Local Definitions**: When imports fail, local schema definitions can maintain functionality
+2. **Schema Duplication**: Sometimes duplicating schemas is better than broken imports
+3. **Build System Debugging**: TypeScript compilation issues can be environment-specific
+4. **Import Path Verification**: Always verify import paths work in both dev and production
+5. **Fallback Patterns**: Have fallback strategies for critical dependencies
+
+#### Development Workflow
+
+1. **Incremental Testing**: Test imports immediately after adding them
+2. **Build Verification**: Verify both development and production builds work
+3. **Schema Management**: Consider schema organization and export patterns
+4. **Error Isolation**: Isolate import issues to specific files/components
+5. **Workaround Documentation**: Document workarounds for future reference
+
+#### TypeScript Best Practices
+
+```typescript
+// Pattern for handling import issues
+// Option 1: Direct import (preferred)
+try {
+  import { Schema } from '@/types/schemas';
+} catch {
+  // Option 2: Local definition (fallback)
+  const Schema = z.object({
+    // Schema definition
+  });
+}
+
+// Option 3: Conditional import
+const Schema = process.env.NODE_ENV === 'development' 
+  ? LocalSchema 
+  : ImportedSchema;
+```
+
+#### Schema Organization
+
+1. **Export Verification**: Ensure all schemas are properly exported
+2. **Circular Dependencies**: Check for circular import dependencies
+3. **Build Order**: Understand TypeScript compilation order
+4. **Module Structure**: Organize modules to avoid resolution conflicts
+5. **Testing Strategy**: Test imports in isolation
+
+### Architecture Impact
+
+- **Resilient Components**: Components work even with import issues
+- **Maintained Validation**: Form validation continues to function
+- **Development Continuity**: Development can continue despite import problems
+- **User Experience**: No impact on end-user functionality
+- **Technical Debt**: Temporary workaround that needs future resolution
+
+---
+
+## Firebase Auth User Type Extensions & Context Management
+
+**Date:** January 2025  
+**Context:** NotificationBell component errors with user role access
+
+### Problem
+
+Components were trying to access `user.role` and `user.userType` properties that don't exist on Firebase Auth's `User` type, causing:
+
+- TypeScript compilation errors: `Property 'role' does not exist on type 'User'`
+- Runtime errors when accessing undefined properties
+- Notification system failures due to incorrect user context
+- Authentication context misunderstanding
+
+### Root Cause Analysis
+
+1. **Type Confusion**: Firebase Auth `User` type vs. application `UserProfile` type
+2. **Context Misuse**: Components accessing wrong user object from AuthContext
+3. **Property Mismatch**: Using `role` instead of `userType` from UserProfile
+4. **Schema Mismatch**: Notification schema properties not matching component usage
+
+### Solution Implementation
+
+#### 1. Correct Context Usage
+
+```typescript
+// Before: Incorrect - accessing Firebase Auth User
+const { user } = useAuth();
+// user.role - doesn't exist on Firebase User type
+
+// After: Correct - accessing UserProfile from context
+const { user, userProfile } = useAuth();
+// userProfile?.userType - correct property from UserProfile
+```
+
+#### 2. API Call Corrections
+
+```typescript
+// Before: Using non-existent user.role
+const response = await callApi('getMyNotifications', {
+  uid: user.uid,
+  role: user.role, // ❌ Property doesn't exist
+});
+
+// After: Using userProfile.userType
+const response = await callApi('getMyNotifications', {
+  uid: user.uid,
+  role: userProfile?.userType, // ✅ Correct property
+});
+```
+
+#### 3. Schema Property Alignment
+
+```typescript
+// Before: Using non-existent properties
+{formatTimeAgo(notification.timestamp)} // ❌ timestamp doesn't exist
+<Link href={notification.link || '#'}> // ❌ link doesn't exist
+
+// After: Using correct schema properties
+{formatTimeAgo(new Date(notification.createdAt).getTime())} // ✅ createdAt exists
+<div> // ✅ Remove non-existent link property
+```
+
+#### 4. Notification Type Handling
+
+```typescript
+// Before: Using invalid enum values
+{notification.type === 'success' ? ( // ❌ 'success' not in NotificationType
+  <Check className="h-5 w-5 text-green-500" />
+) : notification.type === 'error' ? ( // ❌ 'error' not in NotificationType
+  <X className="h-5 w-5 text-red-500" />
+
+// After: Using valid enum values
+{notification.type === 'appointment_confirmed' ? ( // ✅ Valid enum value
+  <Check className="h-5 w-5 text-green-500" />
+) : notification.type === 'appointment_canceled' ? ( // ✅ Valid enum value
+  <X className="h-5 w-5 text-red-500" />
+```
+
+### Key Lessons Learned
+
+#### Type System Understanding
+
+1. **Firebase Auth User**: Contains authentication info (uid, email, etc.) but no application-specific data
+2. **UserProfile Type**: Contains application data (userType, firstName, lastName, etc.)
+3. **Context Separation**: AuthContext provides both `user` (Firebase) and `userProfile` (application)
+4. **Property Mapping**: Always verify property names against actual type definitions
+5. **Schema Adherence**: Component usage must match Zod schema definitions
+
+#### Component Architecture
+
+1. **Context Consumption**: Use appropriate context values for different needs
+2. **Type Safety**: Leverage TypeScript to catch property access errors
+3. **Schema Validation**: Ensure component usage aligns with backend schemas
+4. **Error Prevention**: Use optional chaining for potentially undefined properties
+5. **Documentation**: Document which context values provide which data
+
+#### Development Patterns
+
+```typescript
+// Pattern for accessing user data
+const AuthAwareComponent = () => {
+  const { user, userProfile } = useAuth();
+
+  // For authentication status
+  if (!user) return <LoginPrompt />;
+
+  // For application-specific data
+  if (!userProfile) return <LoadingProfile />;
+
+  // For role-based logic
+  const isAdmin = userProfile.userType === UserType.ADMIN;
+  const isDoctor = userProfile.userType === UserType.DOCTOR;
+
+  // For API calls requiring user context
+  const apiCall = () => callApi('someFunction', {
+    uid: user.uid,           // From Firebase Auth
+    role: userProfile.userType, // From UserProfile
+  });
+};
+```
+
+#### Schema Consistency
+
+1. **Backend-Frontend Alignment**: Ensure frontend usage matches backend schema
+2. **Type Definitions**: Keep TypeScript types in sync with Zod schemas
+3. **Property Verification**: Verify property existence before using in components
+4. **Enum Usage**: Use actual enum values, not assumed string literals
+5. **Optional Properties**: Handle optional properties with proper null checks
+
+### Architecture Benefits
+
+- **Type Safety**: Proper TypeScript usage prevents runtime errors
+- **Clear Separation**: Distinct roles for authentication vs. application data
+- **Maintainable Code**: Clear patterns for accessing user information
+- **Error Prevention**: Compile-time catching of property access errors
+- **Schema Compliance**: Components work correctly with backend APIs
+
+### Testing Strategy
+
+1. **Type Checking**: Regular TypeScript compilation to catch type errors
+2. **Context Testing**: Test components with different user states
+3. **Schema Validation**: Verify component usage matches schema definitions
+4. **Property Access**: Test optional property access patterns
+5. **Integration Testing**: Test complete authentication flow
 
 ---
 

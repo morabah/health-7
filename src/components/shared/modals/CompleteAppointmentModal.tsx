@@ -1,211 +1,273 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Modal from '@/components/ui/Modal';
+import React, { useState, useEffect, useCallback, FormEvent } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
-import { Clock, CheckCircle, AlertCircle, User, Calendar, ClipboardList } from 'lucide-react';
+import Alert from '@/components/ui/Alert';
 import Spinner from '@/components/ui/Spinner';
+import { Clock, CheckCircle, User, Calendar, ClipboardList } from 'lucide-react';
 import type { Appointment } from '@/types/schemas';
-import { UserType } from '@/types/enums';
+import { CompleteAppointmentSchema } from '@/types/schemas';
+import { callApi } from '@/lib/apiClient';
+import { logInfo, logError } from '@/lib/logger';
+import { trackPerformance } from '@/lib/performance';
 
+/**
+ * Props for the CompleteAppointmentModal component
+ */
 interface CompleteAppointmentModalProps {
+  /** Whether the modal is open */
   isOpen: boolean;
-  onClose: () => void;
+  /** Function to set modal open state */
+  setIsOpen: (open: boolean) => void;
+  /** The appointment to complete (full Appointment type) */
   appointment: Appointment | null;
-  onConfirm: (appointmentId: string, notes: string) => Promise<void> | void;
-  isSubmitting?: boolean;
-  userType?: UserType | string;
+  /** Callback triggered when appointment is successfully completed */
+  onSuccess: (appointmentId: string) => void;
 }
 
 /**
- * Unified modal component for completing appointments
- * Currently used by doctors, but designed to be extensible for potential patient feedback
+ * Modal component for completing appointments by doctors
+ * 
+ * Connects to the live completeAppointment Cloud Function to mark appointments
+ * as completed with optional notes. Includes proper validation, error handling,
+ * and UI state management.
  */
 export default function CompleteAppointmentModal({
   isOpen,
-  onClose,
+  setIsOpen,
   appointment,
-  onConfirm,
-  isSubmitting = false,
-  userType = UserType.DOCTOR
+  onSuccess
 }: CompleteAppointmentModalProps) {
+  // Local state management
   const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // Determine if this is a doctor or patient context
-  const isDoctor = userType === UserType.DOCTOR;
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotes(e.target.value);
-    if (error) setError('');
-  };
+  // Initialize/reset notes when modal opens or appointment changes
+  useEffect(() => {
+    if (appointment) {
+      setNotes(appointment.notes || '');
+      setErrorMsg(null);
+    } else {
+      setNotes('');
+    }
+  }, [appointment, isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle form submission to complete appointment
+  const handleCompleteSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    // Simple validation
-    if (!notes.trim()) {
-      setError('Please add appointment notes before completing');
+    // Validate appointment selection
+    if (!appointment?.id) {
+      setErrorMsg('Error: No appointment selected to complete.');
       return;
     }
 
-    if (!appointment?.id) return;
+    // Set loading state and clear previous errors
+    setIsLoading(true);
+    setErrorMsg(null);
+    
+    // Start performance tracking
+    const perf = trackPerformance('completeAppointmentSubmit_Live');
+    logInfo('Starting appointment completion process', { appointmentId: appointment.id });
 
     try {
-      setLoading(true);
-      await onConfirm(appointment.id, notes.trim());
-      // Success is handled in the parent component
-    } catch (error) {
-      // Convert the error to a string message for display
-      setError(error instanceof Error ? error.message : 'Failed to complete appointment');
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Prepare payload for backend
+      const payload = {
+        appointmentId: appointment.id,
+        notes: notes.trim() || undefined // Send undefined if notes are empty
+      };
 
-  // Reset form when modal opens or closes
-  useEffect(() => {
-    if (!isOpen) {
-      // Small delay to avoid visual flickering during close animation
-      const timer = setTimeout(() => {
-        setNotes('');
-        setError('');
-        setLoading(false);
-      }, 200);
-      return () => clearTimeout(timer);
+      // Optional client-side Zod validation
+      try {
+        CompleteAppointmentSchema.parse(payload);
+      } catch (zodError: any) {
+        logError('Client-side validation failed for appointment completion', { 
+          error: zodError, 
+          payload 
+        });
+        setErrorMsg('Invalid data provided. Please check your input.');
+        setIsLoading(false);
+        perf.stop();
+        return;
+      }
+
+      logInfo('Calling completeAppointment cloud function', { 
+        appointmentId: payload.appointmentId,
+        hasNotes: !!payload.notes 
+      });
+
+      // Call backend via callApi wrapper
+      await callApi<{ success: boolean }>('completeAppointment', payload);
+
+      logInfo('Appointment completed successfully via API', { appointmentId: appointment.id });
+      
+      // Trigger success callback and close modal
+      onSuccess(appointment.id);
+      setIsOpen(false);
+
+    } catch (error: any) {
+      logError('Failed to complete appointment via API', { 
+        error, 
+        appointmentId: appointment.id 
+      });
+      
+      // Display HttpsError message from callApi or generic fallback
+      setErrorMsg(error.message || 'Could not complete appointment at this time.');
+    } finally {
+      setIsLoading(false);
+      perf.stop();
     }
-  }, [isOpen]);
+  }, [appointment, notes, onSuccess, setIsOpen]);
 
   if (!appointment) return null;
 
-  // Create unique IDs for accessibility
-  const notesId = "appointment-notes";
-  const notesErrorId = "appointment-notes-error";
-  const notesDescriptionId = "notes-description";
-
-  // Ensure onClose is always a function even when we want to disable it during submission
-  const handleClose = (!isSubmitting && !loading) ? onClose : () => {};
-  
-  // Determine which name to display based on user type
-  const otherPartyName = isDoctor 
-    ? appointment.patientName || 'Unknown Patient'
-    : appointment.doctorName || 'Unknown Doctor';
-
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={handleClose} 
-      title="Complete Appointment" 
-      className="max-w-lg"
-    >
-      <form onSubmit={handleSubmit} aria-label="Complete appointment form">
-        <div className="space-y-4">
-          {/* Appointment Summary */}
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md">
-            <h3 className="font-medium mb-3 flex items-center">
-              <Calendar className="h-4 w-4 mr-2 text-primary" aria-hidden="true" />
-              Appointment Details
-            </h3>
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={() => !isLoading && setIsOpen(false)}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black bg-opacity-25" />
+        </Transition.Child>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex items-start gap-2">
-                <User className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
-                <div>
-                  <div className="text-slate-500">{isDoctor ? 'Patient' : 'Doctor'}</div>
-                  <div className="font-medium">{otherPartyName}</div>
-                </div>
-              </div>
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white dark:bg-slate-800 p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-slate-900 dark:text-slate-100 mb-4"
+                >
+                  Complete Appointment
+                </Dialog.Title>
 
-              <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
-                <div>
-                  <div className="text-slate-500">Date & Time</div>
-                  <div className="font-medium">
-                    {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.startTime}
+                <form onSubmit={handleCompleteSubmit}>
+                  <div className="space-y-4">
+                    {/* Appointment Details */}
+                    <div className="bg-slate-50 dark:bg-slate-700 p-4 rounded-lg">
+                      <h4 className="font-medium mb-3 flex items-center text-slate-900 dark:text-slate-100">
+                        <Calendar className="h-4 w-4 mr-2 text-primary-600" />
+                        Appointment Details
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-start gap-2">
+                          <User className="h-4 w-4 text-slate-500 mt-0.5" />
+                          <div>
+                            <div className="text-slate-500 dark:text-slate-400">Patient</div>
+                            <div className="font-medium text-slate-900 dark:text-slate-100">
+                              {appointment.patientName || 'Unknown Patient'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <Clock className="h-4 w-4 text-slate-500 mt-0.5" />
+                          <div>
+                            <div className="text-slate-500 dark:text-slate-400">Date & Time</div>
+                            <div className="font-medium text-slate-900 dark:text-slate-100">
+                              {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.startTime}
+                            </div>
+                          </div>
+                        </div>
+
+                        {appointment.reason && (
+                          <div className="sm:col-span-2 flex items-start gap-2">
+                            <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" />
+                            <div>
+                              <div className="text-slate-500 dark:text-slate-400">Reason for Visit</div>
+                              <div className="font-medium text-slate-900 dark:text-slate-100">
+                                {appointment.reason}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Completion Notes */}
+                    <div>
+                      <label
+                        htmlFor="completionNotes"
+                        className="block text-sm font-medium mb-2 text-slate-900 dark:text-slate-100"
+                      >
+                        Completion Notes (Optional)
+                      </label>
+                      <Textarea
+                        id="completionNotes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={4}
+                        disabled={isLoading}
+                        placeholder="Enter notes about the appointment completion..."
+                        className="w-full"
+                      />
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        These notes will be saved to the patient's medical record.
+                      </p>
+                    </div>
+
+                    {/* Error Alert */}
+                    {errorMsg && (
+                      <Alert variant="error" className="mt-4">
+                        {errorMsg}
+                      </Alert>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="mt-6 flex justify-end space-x-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setIsOpen(false)}
+                        disabled={isLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        disabled={isLoading}
+                        className="flex items-center"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Spinner className="mr-2 h-4 w-4" />
+                            Completing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Confirm Completion
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {appointment.reason && (
-                <div className="sm:col-span-2 flex items-start gap-2">
-                  <ClipboardList className="h-4 w-4 text-slate-500 mt-0.5" aria-hidden="true" />
-                  <div>
-                    <div className="text-slate-500">Reason for Visit</div>
-                    <div className="font-medium">{appointment.reason}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor={notesId}
-              className="block text-sm font-medium mb-1 flex items-center"
-            >
-              <CheckCircle className="h-4 w-4 mr-2 text-green-500" aria-hidden="true" />
-              {isDoctor ? 'Appointment Notes' : 'Feedback'} <span className="text-red-500 ml-1" aria-hidden="true">*</span>
-            </label>
-            <Textarea
-              id={notesId}
-              placeholder={isDoctor 
-                ? "Enter detailed notes about the appointment..." 
-                : "Enter your feedback about this appointment..."}
-              value={notes}
-              onChange={handleChange}
-              rows={6}
-              disabled={isSubmitting || loading}
-              error={error || ''}
-              required
-              aria-required="true"
-              aria-invalid={error ? "true" : "false"}
-              aria-describedby={error ? notesErrorId : notesDescriptionId}
-              className="w-full"
-            />
-            {error && (
-              <div className="mt-1 text-sm text-red-500 flex items-center" id={notesErrorId} role="alert">
-                <AlertCircle className="h-4 w-4 mr-1" aria-hidden="true" />
-                {error}
-              </div>
-            )}
-            <p className="mt-1 text-xs text-slate-500" id={notesDescriptionId}>
-              {isDoctor 
-                ? "These notes will be saved to the patient's medical record."
-                : "Your feedback will be shared with the doctor."}
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose} 
-              disabled={isSubmitting || loading}
-              aria-label="Cancel completion"
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              variant="primary" 
-              disabled={isSubmitting || loading}
-              aria-label="Complete appointment"
-              aria-busy={(isSubmitting || loading) ? "true" : "false"}
-            >
-              {(isSubmitting || loading) ? (
-                <>
-                  <Spinner className="mr-2" aria-hidden="true" />
-                  Completing...
-                </>
-              ) : (
-                <>Complete Appointment</>
-              )}
-            </Button>
+                </form>
+              </Dialog.Panel>
+            </Transition.Child>
           </div>
         </div>
-      </form>
-    </Modal>
+      </Dialog>
+    </Transition>
   );
 }

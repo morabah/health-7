@@ -1311,3 +1311,58 @@ export const BatchUpdateUserStatusSchema = z.object({
 
 /** TypeScript type inferred from BatchUpdateUserStatusSchema. */
 export type BatchUpdateUserStatusPayload = z.infer<typeof BatchUpdateUserStatusSchema>;
+
+/**
+ * Updatable Profile Schemas for Frontend Forms
+ * These schemas define which fields can be updated by users for their own profiles
+ */
+
+/**
+ * Fields from UserProfile that are updatable by any authenticated user for themselves
+ * Excludes immutable fields like id, email, userType, createdAt, isActive, verification fields
+ */
+export const UpdatableUserCoreFieldsSchema = z.object({
+  firstName: z.string().min(1, 'First name is required.').optional(),
+  lastName: z.string().min(1, 'Last name is required.').optional(),
+  phone: z.string().nullable().optional(),
+  profilePictureUrl: z.string().nullable().optional(),
+}).describe("Fields from UserProfile updatable by any authenticated user for themselves.");
+
+/**
+ * Patient-specific fields updatable by the patient
+ * @PHI - Contains patient health information
+ */
+export const UpdatablePatientSpecificFieldsSchema = z.object({
+  dateOfBirth: isoDateTimeStringSchema.nullable().optional(),
+  gender: z.nativeEnum(Gender).optional(),
+  bloodType: z.nativeEnum(BloodType).nullable().optional(),
+  medicalHistory: z.string().max(4000, 'Medical history is too long (max 4000 characters)').nullable().optional(),
+  address: z.string().max(500, 'Address is too long').nullable().optional(),
+}).describe("@PHI - Patient-specific fields updatable by the patient.");
+
+/**
+ * Doctor-specific fields updatable by the doctor
+ * @PHI - Contains doctor professional information
+ */
+export const UpdatableDoctorSpecificFieldsSchema = z.object({
+  specialty: z.string().min(1, 'Specialty is required').optional(),
+  yearsOfExperience: z.number().int('Years of experience must be an integer').min(0, 'Years of experience cannot be negative').optional(),
+  location: z.string().nullable().optional(),
+  languages: z.array(z.string()).nullable().optional(),
+  consultationFee: z.number().min(0, 'Consultation fee cannot be negative').nullable().optional(),
+  bio: z.string().max(2000, 'Biography is too long (max 2000 characters)').nullable().optional(),
+  education: z.string().max(2000, 'Education section is too long').nullable().optional(),
+  servicesOffered: z.string().max(2000, 'Services section is too long').nullable().optional(),
+  profilePictureUrl: z.string().url('Invalid profile picture URL').nullable().optional(),
+  timezone: z.string().optional(),
+}).describe("@PHI - Doctor-specific fields updatable by the doctor.");
+
+/**
+ * Combined schema for patient profile updates (core + patient-specific fields)
+ */
+export const UpdatablePatientProfileSchema = UpdatableUserCoreFieldsSchema.merge(UpdatablePatientSpecificFieldsSchema);
+
+/**
+ * Combined schema for doctor profile updates (core + doctor-specific fields)
+ */
+export const UpdatableDoctorProfileSchema = UpdatableUserCoreFieldsSchema.merge(UpdatableDoctorSpecificFieldsSchema);
