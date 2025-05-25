@@ -1,0 +1,173 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# User Requirements & Workflow Rules
+
+## Development Workflow Requirements
+
+### 1. Development Server Management
+- **Before running `npm run dev`**: Always check if a previous dev server is running
+- **If dev server is running**: Terminate it first, then start a new one
+- **Command sequence**: 
+  ```bash
+  # Check for running processes on port 3000
+  lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+  # Then start dev server
+  npm run dev
+  ```
+
+### 2. Task Focus & Scope
+- **Stay focused**: Only work on the specific prompt/task given
+- **No scope creep**: Don't add features or tasks not explicitly requested
+- **Ask for clarification**: If the prompt is unclear, ask before proceeding
+- **Complete the task**: Finish the requested work before suggesting additional improvements
+
+## Page Creation & Navigation Requirements
+
+### 3. Page Accessibility
+- **Every created page MUST be accessible** from either:
+  - CMS interface (for admin/management pages)
+  - Frontend navigation (for user-facing pages)
+- **No orphaned pages**: Every page must have a clear navigation path
+
+### 4. Page Interface & Access
+- **For pages with UI interfaces**:
+  - Provide the direct link/URL to access the page
+  - Specify the access button or navigation path
+  - If no access button exists in main app, add one to CMS
+- **CMS Integration**: Ensure admin pages are accessible through CMS dashboard
+
+### 5. Sitemap Adherence
+- **Always follow** `@sitemap.txt` for routing and site structure
+- **Reference sitemap** before creating new routes
+- **Maintain consistency** with established routing patterns
+
+### 6. Sitemap Updates
+- **Any new page created** must be added to `@sitemap.txt`
+- **Update sitemap** immediately after page creation
+- **Include**: Route path, page purpose, access level, navigation parent
+
+## Documentation & Tracking Requirements
+
+### 7. PROJECT_REFERENCE.md Updates
+- **After completing each prompt**:
+  - Open `PROJECT_REFERENCE.md`
+  - Add prompt number and completion details
+  - Document all changes made:
+    - Created files
+    - New features implemented
+    - Updated project structure
+    - Modified configurations
+    - Database changes
+    - Authentication updates
+- **Before starting new prompts**: Reference `PROJECT_REFERENCE.md` for current project state
+
+### 8. Completion Checklist
+- **Before finishing any prompt**, provide a checklist including:
+  - ✅ **Completed tasks**
+  - ✅ **Files created/modified**
+  - ✅ **Features implemented**
+  - ✅ **Navigation/access added**
+  - ✅ **Sitemap updated**
+  - ✅ **Documentation updated**
+  - ⚠️ **Potential items that may need attention**
+  - ❌ **Known limitations or incomplete items**
+
+## Data Contract & Type Safety Requirements
+
+### 9. Zod Schema Adherence
+- **Source of Truth**: `src/types/schemas.ts` contains all data structure definitions
+- **TypeScript Types**: Always use inferred types from Zod schemas
+  ```typescript
+  type UserProfile = z.infer<typeof UserProfileSchema> & { id: string };
+  ```
+- **No Manual Interfaces**: Don't create separate interfaces for core data models
+- **Import Strategy**: Import types from `src/types` or specific schema files
+
+### 10. Backend Validation Requirements
+- **All Cloud Functions** receiving client data MUST:
+  - Import corresponding Zod schema from `src/types/schemas.ts`
+  - Validate input payload using `schema.safeParse(data)`
+  - Perform validation immediately after authentication checks
+  ```typescript
+  const result = UserProfileSchema.safeParse(data);
+  if (!result.success) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid data');
+  }
+  ```
+
+### 11. Frontend Validation (Recommended)
+- **When sending data to backend**:
+  - Import and use relevant Zod schema for payload validation
+  - Validate before calling `callApi`
+  - Pass schema to `callApi` for validation if supported
+
+### 12. Data Consistency
+- **Ensure data consistency** between:
+  - Frontend and backend
+  - Local file DB simulation
+  - Cloud Firestore
+- **All data** must conform to Zod schema structure and TypeScript types
+
+## Quality Assurance Requirements
+
+### 13. Code Quality Standards
+- **TypeScript**: Use strict typing, derive from Zod schemas
+- **Error Handling**: Implement proper error handling patterns
+- **Validation**: Validate all inputs using Zod schemas
+- **Testing**: Test new features and pages before completion
+
+### 14. Documentation Standards
+- **Code Comments**: Add meaningful comments for complex logic
+- **README Updates**: Update README if new setup steps are required
+- **API Documentation**: Document new API endpoints in `docs/API_REFERENCE.md`
+
+### 15. Security & Performance
+- **Authentication**: Ensure proper auth checks on protected pages
+- **Authorization**: Implement role-based access control
+- **Performance**: Optimize for fast loading and good UX
+- **Security**: Follow security best practices for data handling
+
+## Workflow Summary
+
+1. **Start**: Check `PROJECT_REFERENCE.md` for current project state
+2. **Plan**: Review `@sitemap.txt` for routing context
+3. **Develop**: Follow task requirements, maintain focus
+4. **Test**: Verify functionality and accessibility
+5. **Document**: Update sitemap, PROJECT_REFERENCE.md, and relevant docs
+6. **Complete**: Provide comprehensive checklist of work done
+
+## Emergency Procedures
+
+### Development Server Issues
+```bash
+# Kill any process on port 3000
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+# Clear Next.js cache if needed
+rm -rf .next
+# Restart development server
+npm run dev
+```
+
+### Build Issues
+```bash
+# Check TypeScript errors
+npm run typecheck
+# Fix linting issues
+npm run lint:fix
+# Clear cache and rebuild
+rm -rf .next && npm run build
+```
+
+### Database Issues
+```bash
+# Verify data integrity
+npm run db:verify:uniqueness
+# Re-migrate if needed
+npm run db:migrate:local-to-cloud-dev
+# Test authentication
+npm run test:login:user
+```
+

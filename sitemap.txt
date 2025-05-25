@@ -67,6 +67,7 @@
 ├── (dev)                           # Stripped in prod build
 │   ├── ui-test/                    →  /dev/ui-test         | Primitive showcase ✓
 │   ├── cms/validation/             →  /dev/cms/validation  | Data integrity tool ✓
+│   ├── test-auth/                  →  /dev/test-auth       | Live AuthContext test page ✓
 │   └── batch-api/                  →  /dev/batch-api       | Batch API documentation
 │
 └── not-found.tsx                   →  404 fallback global  | Shared

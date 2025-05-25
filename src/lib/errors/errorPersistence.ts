@@ -7,6 +7,7 @@
  */
 
 import { AppError } from './errorClasses';
+import { debugError } from './errorDebugger';
 
 /**
  * Storage key for persisted errors
@@ -88,7 +89,10 @@ export function getPersistedErrors(): PersistedError[] {
     const storedErrors = localStorage.getItem(ERROR_STORAGE_KEY);
     return storedErrors ? JSON.parse(storedErrors) : [];
   } catch (e) {
-    console.error('Failed to retrieve persisted errors:', e);
+    // Use a more specific error message and don't use console.error to avoid loops
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('Failed to retrieve persisted errors from localStorage:', e);
+    }
     return [];
   }
 }
@@ -114,7 +118,10 @@ export function persistError(error: Error): void {
     // Save back to storage
     localStorage.setItem(ERROR_STORAGE_KEY, JSON.stringify(updatedErrors));
   } catch (e) {
-    console.error('Failed to persist error:', e);
+    // Use console.warn instead of console.error to avoid triggering error persistence
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('Failed to persist error to localStorage:', e);
+    }
   }
 }
 
@@ -129,7 +136,10 @@ export function clearPersistedErrors(): void {
   try {
     localStorage.removeItem(ERROR_STORAGE_KEY);
   } catch (e) {
-    console.error('Failed to clear persisted errors:', e);
+    // Use console.warn instead of console.error to avoid triggering error persistence
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('Failed to clear persisted errors from localStorage:', e);
+    }
   }
 }
 
@@ -149,7 +159,10 @@ export function removePersistedError(errorId: string): void {
       localStorage.setItem(ERROR_STORAGE_KEY, JSON.stringify(filteredErrors));
     }
   } catch (e) {
-    console.error('Failed to remove persisted error:', e);
+    // Use console.warn instead of console.error to avoid triggering error persistence
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('Failed to remove persisted error from localStorage:', e);
+    }
   }
 }
 
@@ -205,7 +218,10 @@ export function sendPersistedErrors(
 
       resolve({ success: successCount, failed: failedCount });
     } catch (e) {
-      console.error('Failed to send persisted errors:', e);
+      // Use console.warn instead of console.error to avoid triggering error persistence
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('Failed to send persisted errors:', e);
+      }
       resolve({ success: 0, failed: 0 });
     }
   });
@@ -215,34 +231,114 @@ export function sendPersistedErrors(
  * Hooks into the error monitoring system to persist errors
  */
 export function initErrorPersistence(): void {
+  // Prevent multiple initializations
+  if (typeof window !== 'undefined' && (window as any).__errorPersistenceInitialized) {
+    return;
+  }
+
   // Save original error handling mechanism
   const originalConsoleError = console.error;
+  
+  // Flag to prevent circular error handling
+  let isHandlingError = false;
 
   // Override console.error to capture and persist errors
   console.error = function (...args) {
-    // Call original function
-    originalConsoleError.apply(console, args);
+    // Always call original function first
+    try {
+      originalConsoleError.apply(console, args);
+    } catch (e) {
+      // If original console.error fails, fall back to basic logging
+      // eslint-disable-next-line no-console
+      console.log('[ERROR]', ...args);
+    }
 
-    // Look for Error objects in the arguments
-    for (const arg of args) {
-      if (arg instanceof Error) {
-        persistError(arg);
+    // Prevent circular error handling
+    if (isHandlingError) {
+      return;
+    }
+
+    try {
+      isHandlingError = true;
+
+             // Look for Error objects in the arguments
+       for (const arg of args) {
+         if (arg instanceof Error) {
+           // Log to debugger for analysis
+           debugError(arg, 'console', { 
+             originalArgs: args.length,
+             timestamp: Date.now()
+           });
+
+           // Only persist errors that aren't from the error system itself
+           if (!arg.message.includes('Failed to persist error') && 
+               !arg.message.includes('Failed to retrieve persisted errors') &&
+               !arg.message.includes('Failed to clear persisted errors')) {
+             persistError(arg);
+           }
+         }
+       }
+    } catch (e) {
+      // If error persistence fails, don't try to persist this error
+      // Just log it with the original console.error to avoid infinite loops
+      try {
+        originalConsoleError('Error in error persistence system:', e);
+      } catch {
+        // Last resort - use basic console.log
+        // eslint-disable-next-line no-console
+        console.log('[ERROR] Error in error persistence system:', e);
       }
+    } finally {
+      isHandlingError = false;
     }
   };
 
   // Add window error event listener
   if (typeof window !== 'undefined') {
-    window.addEventListener('error', event => {
-      if (event.error instanceof Error) {
-        persistError(event.error);
-      }
-    });
+    // Mark as initialized
+    (window as any).__errorPersistenceInitialized = true;
 
-    window.addEventListener('unhandledrejection', event => {
-      if (event.reason instanceof Error) {
-        persistError(event.reason);
-      }
-    });
+          window.addEventListener('error', event => {
+        if (event.error instanceof Error && !isHandlingError) {
+          try {
+            isHandlingError = true;
+            
+            // Log to debugger for analysis
+            debugError(event.error, 'window', {
+              filename: event.filename,
+              lineno: event.lineno,
+              colno: event.colno
+            });
+            
+            persistError(event.error);
+          } catch (e) {
+            // Silently fail to avoid infinite loops
+            originalConsoleError('Failed to persist window error:', e);
+          } finally {
+            isHandlingError = false;
+          }
+        }
+      });
+
+          window.addEventListener('unhandledrejection', event => {
+        if (event.reason instanceof Error && !isHandlingError) {
+          try {
+            isHandlingError = true;
+            
+            // Log to debugger for analysis
+            debugError(event.reason, 'unhandledRejection', {
+              type: 'unhandledrejection',
+              promise: 'present'
+            });
+            
+            persistError(event.reason);
+          } catch (e) {
+            // Silently fail to avoid infinite loops
+            originalConsoleError('Failed to persist unhandled rejection:', e);
+          } finally {
+            isHandlingError = false;
+          }
+        }
+      });
   }
 }

@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Firebase Storage Rules for Health Appointment System
+// Temporary permissive rules for testing - will be refined later
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Temporary: Allow all access for testing
+    // TODO: Refine these rules for production
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+} 

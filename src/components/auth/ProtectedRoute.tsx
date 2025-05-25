@@ -43,7 +43,7 @@ export default function ProtectedRoute({
   allowedRoles,
   redirectIfAuth = false,
 }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const redirectAttempted = useRef(false);
@@ -66,9 +66,9 @@ export default function ProtectedRoute({
       return;
     }
 
-    // For auth pages: If user is logged in and profile is ready, redirect to dashboard
-    if (redirectIfAuth && user && profile) {
-      const dashboardPath = roleToDashboard(profile.userType);
+    // For auth pages: If user is logged in and userProfile is ready, redirect to dashboard
+    if (redirectIfAuth && user && userProfile) {
+      const dashboardPath = roleToDashboard(userProfile.userType);
 
       // Avoid redirecting if we're already on the target path
       if (pathname !== dashboardPath) {
@@ -102,8 +102,8 @@ export default function ProtectedRoute({
     }
 
     // If allowedRoles are specified, check if user has required role
-    if (allowedRoles && allowedRoles.length > 0 && profile) {
-      const userType = profile.userType;
+    if (allowedRoles && allowedRoles.length > 0 && userProfile) {
+      const userType = userProfile.userType;
       const hasRequiredRole = userType && allowedRoles.includes(userType as UserType);
 
       if (!hasRequiredRole) {
@@ -136,7 +136,7 @@ export default function ProtectedRoute({
     if (isRedirecting()) {
       setRedirecting(false);
     }
-  }, [user, profile, loading, allowedRoles, router, pathname, redirectIfAuth]);
+  }, [user, userProfile, loading, allowedRoles, router, pathname, redirectIfAuth]);
 
   // Show loading spinner while authentication state is loading
   if (loading) {

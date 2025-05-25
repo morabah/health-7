@@ -9,4 +9,6 @@
 import "./config/firebaseAdmin";
 
 // Import all functions from their respective modules
-export { getMyUserProfileData } from './user/getUserProfile'; 
+export { getMyUserProfileData } from './user/getUserProfile';
+export { registerUser } from './user/userRegistration';
+export { getMyNotifications } from './notification/getMyNotifications'; 

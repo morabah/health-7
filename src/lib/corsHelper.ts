@@ -237,9 +237,9 @@ export async function callFirebaseFunction<T = any>(
       // Parse the response
       const responseData = await response.json();
       
-      // Firebase Functions return { result: { data: actualData } }
+      // Firebase Functions return { result: actualData }
       // Extract the actual data from the response
-      const result = responseData?.result?.data ?? responseData;
+      const result = responseData?.result ?? responseData;
       
       logInfo(`[${requestId}] Function call successful`, {
         attempt,
@@ -251,23 +251,57 @@ export async function callFirebaseFunction<T = any>(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // Log the error
-      logError(`[${requestId}] Attempt ${attempt} failed`, {
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-        attempt,
-        maxRetries: retries,
-      });
+      // Don't log every retry attempt for common errors
+      const isCommonError = errorMessage.includes('Authentication') ||
+                           errorMessage.includes('fetch') ||
+                           errorMessage.includes('network') ||
+                           errorMessage.includes('timeout') ||
+                           errorMessage.includes('aborted');
+      
+      // Only log detailed error info on first attempt or final failure
+      if (attempt === 1 || attempt > retries) {
+        logError(`[${requestId}] Attempt ${attempt} failed`, {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          attempt,
+          maxRetries: retries,
+          isCommonError
+        });
+      } else if (!isCommonError) {
+        // For uncommon errors, log all attempts
+        logError(`[${requestId}] Attempt ${attempt} failed`, {
+          error: errorMessage,
+          attempt,
+          maxRetries: retries,
+        });
+      } else {
+        // For common errors, just log a brief message
+        logInfo(`[${requestId}] Retry ${attempt}/${retries + 1} - ${errorMessage.substring(0, 50)}...`);
+      }
       
       // If we've reached max retries, throw the error
       if (attempt > retries) {
         logError(`[${requestId}] All ${retries + 1} attempts failed`);
-        throw new Error(`Failed after ${retries + 1} attempts: ${errorMessage}`);
+        
+        // Provide more specific error messages based on the error type
+        if (errorMessage.includes('Authentication')) {
+          throw new Error('Authentication failed - please log in again');
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+          throw new Error('Request timed out - please check your connection and try again');
+        } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+          throw new Error('Network error - please check your connection and try again');
+        } else {
+          throw new Error(`Failed after ${retries + 1} attempts: ${errorMessage}`);
+        }
       }
       
       // Calculate exponential backoff delay
       const delay = Math.min(BASE_RETRY_DELAY * Math.pow(2, attempt - 1), 30000); // Max 30s
-      logInfo(`[${requestId}] Retrying in ${delay}ms...`);
+      
+      // Only log retry delay for non-common errors or first few attempts
+      if (!isCommonError || attempt <= 2) {
+        logInfo(`[${requestId}] Retrying in ${delay}ms...`);
+      }
       
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, delay));

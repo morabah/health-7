@@ -12,9 +12,52 @@ import Spinner from '@/components/ui/Spinner';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
 import { trackPerformance } from '@/lib/performance';
-import { directRegisterUser, type RegistrationData } from '@/lib/directRegisterUser';
+import { callApi } from '@/lib/apiClient';
 import { UserType, Gender, BloodType } from '@/types/enums';
-import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
+import { z } from 'zod';
+
+// Import the backend schema for validation
+const PatientRegisterSchema = z.object({
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .min(5, 'Email is too short')
+    .max(100, 'Email is too long'),
+
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(100, 'Password is too long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    ),
+
+  userType: z.literal(UserType.PATIENT),
+
+  firstName: z
+    .string()
+    .min(2, 'First name must be at least 2 characters')
+    .max(50, 'First name is too long'),
+
+  lastName: z
+    .string()
+    .min(2, 'Last name must be at least 2 characters')
+    .max(50, 'Last name is too long'),
+
+  phone: z
+    .string()
+    .optional()
+    .describe("User's phone number (E.164 format preferred)"),
+
+  dateOfBirth: z.string().optional().describe("Patient's date of birth (ISO string)"),
+  gender: z.string().optional().describe("Patient's gender"),
+  bloodType: z.string().optional().describe("Patient's blood type"),
+  medicalHistory: z.string().optional().describe("Patient's medical history"),
+  address: z.string().optional().describe("Patient's address"),
+});
+
+type PatientRegisterData = z.infer<typeof PatientRegisterSchema>;
 
 /**
  * Patient registration form component
@@ -34,6 +77,7 @@ export default function PatientRegisterPage() {
   const [gender, setGender] = useState('');
   const [bloodType, setBloodType] = useState('');
   const [medicalHistory, setMedicalHistory] = useState('');
+  const [address, setAddress] = useState('');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -49,8 +93,8 @@ export default function PatientRegisterPage() {
     setIsLoading(true);
     setErrorMsg(null);
 
-    const perf = trackPerformance('handlePatientRegisterSubmit_Direct');
-    logInfo('Patient registration attempt started (Direct Firebase)', { email });
+    const perf = trackPerformance('handlePatientRegisterSubmit_Live');
+    logInfo('Patient registration attempt started (Live Cloud)', { email });
 
     try {
       // Client-side validation - password confirmation
@@ -62,21 +106,22 @@ export default function PatientRegisterPage() {
       }
 
       // Prepare data payload for registration
-      const registrationData: RegistrationData = {
+      const dataObject: PatientRegisterData = {
         email,
         password,
         firstName,
         lastName,
         userType: UserType.PATIENT,
-        dateOfBirth: dateOfBirth || '',
-        gender: gender || Gender.OTHER,
         phone: phone || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        gender: gender || undefined,
         bloodType: bloodType || undefined,
         medicalHistory: medicalHistory || undefined,
+        address: address || undefined,
       };
 
       // Client-side Zod validation
-      const validationResult = PatientRegistrationSchema.safeParse(registrationData);
+      const validationResult = PatientRegisterSchema.safeParse(dataObject);
       if (!validationResult.success) {
         const errorMessage = validationResult.error.errors[0]?.message || 'Please check your input and try again.';
         setErrorMsg(errorMessage);
@@ -87,41 +132,40 @@ export default function PatientRegisterPage() {
 
       logInfo('Client-side validation passed for patient registration');
 
-      // Call direct registration function
-      logInfo('Calling directRegisterUser function for PATIENT', { 
-        email: registrationData.email,
-        userType: registrationData.userType 
+      // Call backend via callApi wrapper
+      logInfo('Calling registerUser function for PATIENT (Live Cloud)', { 
+        email: dataObject.email 
       });
 
-      const result = await directRegisterUser(registrationData);
+      // Call the live registerUser Cloud Function
+      const result = await callApi<{ success: boolean; userId: string }>(
+        'registerUser',
+        validationResult.data
+      );
 
-      if (result.success && result.userId) {
-        logInfo('Patient registration successful (Direct Firebase)', { 
-          userId: result.userId,
-          email: registrationData.email 
-        });
+      logInfo('Patient registration successful (Live Cloud)', { 
+        userId: result.userId,
+        email: dataObject.email 
+      });
 
-        perf.stop();
-        
-        // Navigate to pending verification page after successful registration
-        router.push('/auth/pending-verification');
-      } else {
-        throw new Error(result.error || 'Registration failed');
-      }
+      perf.stop();
+      
+      // Navigate to pending verification page after successful registration
+      router.push('/auth/pending-verification');
 
     } catch (error: any) {
-      logError('Patient registration failed (Direct Firebase)', error);
+      logError('Patient registration failed (Live Cloud)', error);
       
-      // Display user-friendly error message
+      // Display user-friendly error message based on error type
       let friendlyMessage = 'Registration failed. Please try again.';
       
       if (error.message) {
-        if (error.message.includes('already in use') || error.code === 'auth/email-already-in-use') {
+        if (error.message.includes('already in use') || error.message.includes('already-exists')) {
           friendlyMessage = 'An account with this email address already exists. Please use a different email or try logging in.';
-        } else if (error.message.includes('invalid-argument') || error.code === 'auth/invalid-email') {
-          friendlyMessage = 'Please enter a valid email address.';
-        } else if (error.code === 'auth/weak-password') {
-          friendlyMessage = 'Password should be at least 6 characters long.';
+        } else if (error.message.includes('invalid-argument') || error.message.includes('invalid')) {
+          friendlyMessage = error.message; // Use the specific validation message from backend
+        } else if (error.message.includes('internal')) {
+          friendlyMessage = 'A server error occurred. Please try again in a few moments.';
         } else {
           friendlyMessage = error.message;
         }
@@ -134,7 +178,7 @@ export default function PatientRegisterPage() {
     }
   }, [
     email, password, confirmPassword, firstName, lastName, phone, 
-    dateOfBirth, gender, bloodType, medicalHistory, router
+    dateOfBirth, gender, bloodType, medicalHistory, address, router
   ]);
 
   return (
@@ -336,6 +380,17 @@ export default function PatientRegisterPage() {
               {medicalHistory.length}/1000 characters
             </p>
           </div>
+
+          <Input
+            label="Address (optional)"
+            id="address"
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            autoComplete="street-address"
+            disabled={isLoading}
+            placeholder="123 Main St, City, State, ZIP"
+            helpText="Your home address for medical records"
+          />
 
           <div className="pt-4">
             <Button

@@ -248,31 +248,10 @@ export async function callApiWithOptions<T = unknown>(
   const mappedMethod = METHOD_MAPPING[method] || method;
 
   try {
-    // Special handling for registerUser in development mode to bypass CORS issues
-    const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    let result;
-    
-    if (method === 'registerUser' && isFirebaseEnabled && isDevelopment && !IS_MOCK_MODE) {
-      // For user registration in development mode, use the local API implementation
-      // This bypasses CORS issues with Firebase Cloud Functions
-      logInfo(`Using local API implementation for ${method} to avoid CORS issues`);
-      
-      // In development mode, simply return a success response to bypass the CORS issue
-      // This allows the UI to proceed as if registration was successful
-      const mockUserId = `dev-user-${Date.now()}`;
-      logInfo(`Simulating successful registration with mock ID: ${mockUserId}`);
-      
-      // Simulate successful response
-      result = {
-        success: true,
-        userId: mockUserId
-      };
-    } else {
-      // Normal API call flow
-      result = isFirebaseEnabled
-        ? await callFirebaseFunction(method, ...args)
-        : await (api as ApiMethods)[mappedMethod](...args);
-    }
+    // Normal API call flow - removed hardcoded registerUser fallback
+    const result = isFirebaseEnabled
+      ? await callFirebaseFunction(mappedMethod, ...args)
+      : await (api as ApiMethods)[mappedMethod](...args);
 
     if (shouldLog) {
       logInfo(`[callApi] ${method} response:`, result);
@@ -297,15 +276,45 @@ export async function callApiWithOptions<T = unknown>(
       });
     }
 
-    // Re-throw the error if it's already an instance of AppError
-    if (error instanceof Error && 'category' in error) {
+    // Re-throw the error if it's already an instance of AppError or ApiError
+    if (error instanceof Error && ('category' in error || error.name === 'ApiError')) {
       throw error;
     }
 
-    // Wrap other errors in a generic API error
+    // Handle network and timeout errors more specifically
+    if (error instanceof Error) {
+      // Don't wrap authentication errors
+      if (error.message.includes('Authentication') || error.message.includes('auth')) {
+        throw error;
+      }
+
+      // Don't wrap network errors that are already descriptive
+      if (error.message.includes('fetch') || 
+          error.message.includes('network') || 
+          error.message.includes('timeout') ||
+          error.message.includes('Failed after') ||
+          error.message.includes('Request failed')) {
+        throw error;
+      }
+
+      // Only wrap truly unexpected errors
+      if (shouldLog) {
+        logError(`[callApi] Unexpected error in ${method}:`, {
+          error: error.message,
+          stack: error.stack,
+          args: args.length > 0 ? 'present' : 'none'
+        });
+      }
+    }
+
+    // Wrap other errors in a generic API error only if they're truly unexpected
     throw new ApiError('An unexpected error occurred while making the API request', {
       code: 'API_REQUEST_FAILED',
-      context: { originalError: error },
+      context: { 
+        originalError: error instanceof Error ? error.message : String(error),
+        method,
+        hasArgs: args.length > 0
+      },
       statusCode: 500,
     });
   }

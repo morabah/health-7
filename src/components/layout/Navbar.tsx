@@ -113,15 +113,10 @@ export default function Navbar() {
 
   // Memoized fetch notifications function
   const fetchNotifications = useCallback(async () => {
-    if (fetchingNotifications || notificationsFetchFailed || !isMountedRef.current) {
+    if (!user?.uid || !userProfile?.userType || fetchingNotifications || notificationsFetchFailed) {
       return;
     }
-    
-    // Guard for user authentication
-    if (!user?.uid || !userProfile?.userType) {
-      return;
-    }
-    
+
     // Debounce check
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 5000) {
@@ -146,7 +141,33 @@ export default function Navbar() {
         setNotificationsFetchFailed(false);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Handle specific error types gracefully
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        
+        // If the function doesn't exist in Firebase, fail silently
+        if (errorMessage.includes('function not found') || 
+            errorMessage.includes('404') ||
+            errorMessage.includes('getmynotifications') ||
+            errorMessage.includes('failed after') ||
+            errorMessage.includes('request failed')) {
+          // Silently disable notifications for this session
+          setNotificationsFetchFailed(true);
+          setUnreadCount(0);
+          return;
+        }
+        
+        // For authentication errors, also fail silently
+        if (errorMessage.includes('authentication') || 
+            errorMessage.includes('unauthorized') ||
+            errorMessage.includes('auth')) {
+          setNotificationsFetchFailed(true);
+          return;
+        }
+      }
+      
+      // Only log unexpected errors
+      console.warn('Notifications temporarily unavailable:', error instanceof Error ? error.message : String(error));
       setNotificationsFetchFailed(true);
     } finally {
       setFetchingNotifications(false);
@@ -160,19 +181,27 @@ export default function Navbar() {
     }
     
     isMountedRef.current = true;
-    fetchNotifications();
     
-    const interval = setInterval(() => {
-      if (isMountedRef.current) {
-        fetchNotifications();
-      }
-    }, 60000); // Poll every minute
+    // Only start polling if notifications haven't failed
+    if (!notificationsFetchFailed) {
+      fetchNotifications();
+      
+      const interval = setInterval(() => {
+        if (isMountedRef.current && !notificationsFetchFailed) {
+          fetchNotifications();
+        }
+      }, 60000); // Poll every minute
+      
+      return () => {
+        isMountedRef.current = false;
+        if (interval) clearInterval(interval);
+      };
+    }
     
     return () => {
       isMountedRef.current = false;
-      if (interval) clearInterval(interval);
     };
-  }, [user, userProfile, fetchNotifications]);
+  }, [user, userProfile, fetchNotifications, notificationsFetchFailed]);
 
   // Close account switcher when navigation changes
   useEffect(() => {

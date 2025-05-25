@@ -4,6 +4,7 @@ import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogIn } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/realFirebaseConfig';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
@@ -13,8 +14,6 @@ import Spinner from '@/components/ui/Spinner';
 import { logInfo, logError } from '@/lib/logger';
 import { trackPerformance } from '@/lib/performance';
 import AuthErrorBoundary from '@/components/error-boundaries/AuthErrorBoundary';
-import { directLoginUser } from '@/lib/directLoginUser';
-import { IS_DEVELOPMENT } from '@/config/appConfig';
 
 /**
  * Login Page
@@ -56,28 +55,14 @@ function LoginPageContent() {
     }
 
     try {
-      // Use direct login implementation which now uses real Firebase Auth
-      logInfo('Attempting login with direct implementation');
-      const result = await directLoginUser(email, password);
+      // Attempt to sign in with Firebase Auth (live cloud service)
+      await signInWithEmailAndPassword(auth, email, password);
+      logInfo('Login successful with Live Firebase Auth for:', { email });
       
-      if (result.success) {
-        logInfo('Login successful with direct implementation:', { 
-          email: result.email,
-          userId: result.userId,
-          userType: result.userType 
-        });
-        
-        // Redirect to the appropriate dashboard based on user type
-        const dashboardPath = result.userType === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard';
-        router.push(dashboardPath);
-        perf.stop();
-        return;
-      } else {
-        // If login fails, throw an error to be caught below
-        throw new Error(result.errorMessage || 'Login failed');
-      }
+      // AuthContext's onAuthStateChanged listener will detect the new auth state,
+      // fetch the user profile via getMyUserProfileData, and trigger redirection via ProtectedPage.
+      // No explicit router.push() needed here if AuthContext is set up correctly.
       
-
     } catch (error: any) {
       logError('Login failed (Live Auth)', { 
         email, 
@@ -178,13 +163,17 @@ function LoginPageContent() {
         </div>
 
         <div className="text-center mt-6 p-4 border border-blue-200 dark:border-blue-700 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-          <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Live Authentication</h3>
+          <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Live Firebase Authentication</h3>
           <p className="text-sm text-blue-600 dark:text-blue-300 mb-2">
-            This login connects to the live Firebase Authentication service
+            Connected to live Firebase Auth service (health7-c378f)
           </p>
-          <p className="text-xs text-blue-500 dark:text-blue-400">
-            Use valid credentials from the Firebase Authentication console
-          </p>
+          <div className="text-xs text-blue-500 dark:text-blue-400 space-y-1">
+            <p><strong>Test Accounts:</strong></p>
+            <p>• Admin: admin@example.com</p>
+            <p>• Doctor: user1@demo.health</p>
+            <p>• Patient: user7@demo.health</p>
+            <p>• Password: Password123!</p>
+          </div>
         </div>
       </Card>
     </div>

@@ -9,6 +9,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { logInfo, logError } from './logger';
 import { IS_DEVELOPMENT } from '@/config/appConfig';
 
@@ -30,6 +31,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const firestore = getFirestore(app);
 export const functions = getFunctions(app);
+export const storage = getStorage(app);
 
 // Configure Firebase services for development
 if (IS_DEVELOPMENT) {
@@ -77,6 +79,7 @@ export default {
   auth,
   firestore,
   functions,
+  storage,
   createCallable,
   callCloudFunction
 }; 
