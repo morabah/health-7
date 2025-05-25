@@ -1,0 +1,232 @@
+{
+  "timestamp": "2025-05-25T12:29:07.820Z",
+  "summary": {
+    "total": 14,
+    "hasAuth": 14,
+    "uidMatches": 14,
+    "noIssues": 14,
+    "withIssues": 0
+  },
+  "usersByType": {
+    "admin": 1,
+    "doctor": 9,
+    "patient": 4
+  },
+  "results": [
+    {
+      "email": "admin@example.com",
+      "userId": "admin-1odsk03suhp9odjbe13fr8",
+      "userType": "admin",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "admin-1odsk03suhp9odjbe13fr8",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "admin",
+        "role": "admin",
+        "admin": true
+      }
+    },
+    {
+      "email": "morabahdr@gmail.com",
+      "userId": "htggr2d1eeevik1kcux1ed",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "htggr2d1eeevik1kcux1ed",
+      "emailVerified": false,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "morabahbb@gmail.com",
+      "userId": "nh35k2nhsycrdm4l6zazq",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "nh35k2nhsycrdm4l6zazq",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "morabah@gmail.com",
+      "userId": "stbgu09d7t05vtu0r67tp",
+      "userType": "patient",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "stbgu09d7t05vtu0r67tp",
+      "emailVerified": false,
+      "disabled": false,
+      "customClaims": {
+        "userType": "patient",
+        "role": "patient"
+      }
+    },
+    {
+      "email": "user0@demo.health",
+      "userId": "u-000",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-000",
+      "emailVerified": true,
+      "disabled": true,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user1@demo.health",
+      "userId": "u-001",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-001",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user2@demo.health",
+      "userId": "u-002",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-002",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user3@demo.health",
+      "userId": "u-003",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-003",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user4@demo.health",
+      "userId": "u-004",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-004",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user5@demo.health",
+      "userId": "u-005",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-005",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user6@demo.health",
+      "userId": "u-006",
+      "userType": "doctor",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-006",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "doctor",
+        "role": "doctor"
+      }
+    },
+    {
+      "email": "user7@demo.health",
+      "userId": "u-007",
+      "userType": "patient",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-007",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "patient",
+        "role": "patient"
+      }
+    },
+    {
+      "email": "user8@demo.health",
+      "userId": "u-008",
+      "userType": "patient",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-008",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "patient",
+        "role": "patient"
+      }
+    },
+    {
+      "email": "user9@demo.health",
+      "userId": "u-009",
+      "userType": "patient",
+      "hasFirebaseAuth": true,
+      "uidMatches": true,
+      "issues": [],
+      "firebaseUid": "u-009",
+      "emailVerified": true,
+      "disabled": false,
+      "customClaims": {
+        "userType": "patient",
+        "role": "patient"
+      }
+    }
+  ],
+  "passwordInfo": {
+    "defaultPassword": "Password123!",
+    "note": "All users should be able to authenticate with this password"
+  }
+}

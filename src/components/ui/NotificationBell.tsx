@@ -223,137 +223,161 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  const toggleNotifications = () => {
+    setOpen(!open);
+  };
+
   return (
     <div ref={menuRef} className={twMerge('relative', className)}>
-      <button
-        className={clsx(
-          'relative p-2 rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors',
-          open ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-        )}
-        onClick={() => setOpen(!open)}
-        aria-label="Notifications"
-      >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4">
-            <Badge variant="danger" size="xs" pill>
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </Badge>
-          </div>
-        )}
-      </button>
-
-      <Transition
-        show={open}
-        enter="transition ease-out duration-100"
-        enterFrom="transform opacity-0 scale-95"
-        enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75"
-        leaveFrom="transform opacity-100 scale-100"
-        leaveTo="transform opacity-0 scale-95"
-      >
-        <div className="absolute right-0 mt-2 w-80 max-h-[32rem] overflow-hidden origin-top-right rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-          <div className="py-1 bg-white dark:bg-slate-800">
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                Notifications
-              </h3>
+      <Menu as="div" className="relative">
+        {({ open }) => (
+          <>
+            <Menu.Button
+              className={clsx(
+                'relative p-2 rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors',
+                open ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              )}
+              aria-label="Notifications"
+              onClick={toggleNotifications}
+            >
+              <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-primary hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
-                >
-                  Mark all as read
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-y-auto max-h-80">
-              {loading && notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Loading notifications...
-                  </p>
-                </div>
-              ) : error ? (
-                <div className="flex flex-col items-center justify-center py-6">
-                  <AlertCircle className="h-8 w-8 text-danger mb-2" />
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{error}</p>
-                  <button
-                    onClick={fetchNotifications}
-                    className="mt-2 text-xs text-primary hover:underline"
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8">
-                  <Bell className="h-10 w-10 text-slate-300 dark:text-slate-600 mb-2" />
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No notifications yet</p>
-                </div>
-              ) : (
-                <div>
-                  {notifications.map(notification => (
-                    <div
-                      key={notification.id}
-                      className={clsx(
-                        'px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-100 dark:border-slate-700/50 last:border-0',
-                        !notification.isRead && 'bg-primary-50/50 dark:bg-primary-900/10'
-                      )}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <Link
-                            href="/notifications"
-                            className="block"
-                            onClick={e => {
-                              // Mark as read when clicked
-                              e.preventDefault();
-                              markAsRead(notification.id);
-                              // Navigate to notifications page
-                              window.location.href = '/notifications';
-                            }}
-                          >
-                            <h4 className="text-sm font-medium truncate">{notification.title}</h4>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-1">
-                              {notification.message}
-                            </p>
-                            <div className="mt-1 flex items-center text-xs text-slate-500">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {formatTimeAgo(new Date(notification.createdAt).getTime())}
-                            </div>
-                          </Link>
-                        </div>
-
-                        {!notification.isRead && (
-                          <button
-                            onClick={() => markAsRead(notification.id)}
-                            className="ml-3 flex-shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400"
-                            aria-label="Mark as read"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4">
+                  <Badge variant="danger" size="xs" pill>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Badge>
                 </div>
               )}
-            </div>
+            </Menu.Button>
 
-            <div className="border-t border-slate-200 dark:border-slate-700 p-2">
-              <Link
-                href="/notifications"
-                className="block w-full text-center py-2 text-xs font-medium text-primary hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
-                onClick={() => setOpen(false)}
+            <Transition
+              show={open}
+              as="div"
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items
+                static
+                className="absolute right-0 mt-2 w-80 max-h-[32rem] overflow-hidden origin-top-right rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
               >
-                View all notifications
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Transition>
+                <div className="py-1 bg-white dark:bg-slate-800">
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      Notifications
+                    </h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllAsRead();
+                        }}
+                        className="text-xs text-primary hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[28rem] overflow-y-auto">
+                    {loading ? (
+                      <div className="px-4 py-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="px-4 py-8 text-center">
+                        <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
+                        <p className="mt-2 text-sm text-red-500">{error}</p>
+                        <button
+                          onClick={fetchNotifications}
+                          className="mt-2 text-xs text-primary hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center">
+                        <Bell className="h-8 w-8 text-slate-400 mx-auto" />
+                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                          No notifications yet
+                        </p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+                        {notifications.map((notification) => (
+                          <li
+                            key={notification.id}
+                            className={clsx(
+                              'px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors',
+                              !notification.isRead && 'bg-blue-50 dark:bg-blue-900/20'
+                            )}
+                          >
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link
+                                  href={notification.link || '#'}
+                                  className={`block ${active ? 'bg-slate-100 dark:bg-slate-700' : ''}`}
+                                  onClick={() => {
+                                    if (!notification.isRead) {
+                                      markAsRead(notification.id);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-start">
+                                    <div className="flex-shrink-0 pt-0.5">
+                                      {notification.type === 'success' ? (
+                                        <Check className="h-5 w-5 text-green-500" />
+                                      ) : notification.type === 'error' ? (
+                                        <X className="h-5 w-5 text-red-500" />
+                                      ) : (
+                                        <Clock className="h-5 w-5 text-blue-500" />
+                                      )}
+                                    </div>
+                                    <div className="ml-3 flex-1">
+                                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                                        {notification.title}
+                                      </p>
+                                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                        {notification.message}
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                                        {formatTimeAgo(notification.timestamp)}
+                                      </p>
+                                    </div>
+                                    {!notification.isRead && (
+                                      <div className="ml-2">
+                                        <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </Link>
+                              )}
+                            </Menu.Item>
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-200 dark:border-slate-700 p-2">
+                    <Link
+                      href="/notifications"
+                      className="block w-full text-center py-2 text-xs font-medium text-primary hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
+                      onClick={() => setOpen(false)}
+                    >
+                      View all notifications
+                    </Link>
+                  </div>
+                </div>
+              </Menu.Items>
+            </Transition>
+          </>
+        )}
+      </Menu>
     </div>
   );
 };

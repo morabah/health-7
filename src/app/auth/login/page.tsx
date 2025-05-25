@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { LogIn } from 'lucide-react';
+import { auth } from '@/lib/realFirebaseConfig';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
+import Spinner from '@/components/ui/Spinner';
 import { logInfo, logError } from '@/lib/logger';
-import { useAuth } from '@/context/AuthContext';
+import { trackPerformance } from '@/lib/performance';
 import AuthErrorBoundary from '@/components/error-boundaries/AuthErrorBoundary';
-import { ValidationError } from '@/lib/errors/errorClasses';
+import { directLoginUser } from '@/lib/directLoginUser';
+import { IS_DEVELOPMENT } from '@/config/appConfig';
 
 /**
  * Login Page
- * Allows users to authenticate into the application
+ * Connects to live Firebase Authentication service for user login
+ * Implements P-LOGIN and D-LOGIN user stories against live development cloud
  *
  * @returns Login form component
  */
@@ -27,91 +32,80 @@ export default function LoginPage() {
 }
 
 function LoginPageContent() {
-  const { login } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false,
-  });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsLoading(true);
+    setErrorMsg(null);
+
+    const perf = trackPerformance('handleLoginSubmit_Live');
+    logInfo('Login attempt started (Live Auth)', { email });
+
+    // Check Auth Instance
+    if (!auth) {
+      setErrorMsg('Authentication service is currently unavailable. Please try again later.');
+      setIsLoading(false);
+      logError('[Login Page] Firebase Auth instance is null during login attempt.');
+      perf.stop();
+      return;
+    }
 
     try {
-      // Capture the form values to ensure they don't change during async operations
-      const { email, password } = formData;
-
-      // Validate email and password
-      if (!email || typeof email !== 'string') {
-        throw new ValidationError('Valid email is required', {
-          validationErrors: { email: ['Email is required and must be a valid format'] }
+      // Use direct login implementation which now uses real Firebase Auth
+      logInfo('Attempting login with direct implementation');
+      const result = await directLoginUser(email, password);
+      
+      if (result.success) {
+        logInfo('Login successful with direct implementation:', { 
+          email: result.email,
+          userId: result.userId,
+          userType: result.userType 
         });
+        
+        // Redirect to the appropriate dashboard based on user type
+        const dashboardPath = result.userType === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard';
+        router.push(dashboardPath);
+        perf.stop();
+        return;
+      } else {
+        // If login fails, throw an error to be caught below
+        throw new Error(result.errorMessage || 'Login failed');
       }
+      
 
-      if (!password || typeof password !== 'string') {
-        throw new ValidationError('Valid password is required', {
-          validationErrors: { password: ['Password is required'] }
-        });
-      }
-
-      // Log authentication attempt
-      logInfo('auth-event', {
-        action: 'login-attempt',
-        email,
-        timestamp: new Date().toISOString(),
+    } catch (error: any) {
+      logError('Login failed (Live Auth)', { 
+        email, 
+        errorCode: error.code, 
+        errorMessage: error.message 
       });
-
-      try {
-        // Attempt login
-        const success = await login(email, password);
-
-        if (success) {
-          setIsLoading(false);
-          logInfo('Login successful', { email });
-          // Router redirection will be handled by AuthContext based on user role
-        } else {
-          setIsLoading(false);
-          setError('Invalid credentials. Please try again.');
-          logInfo('Login attempt failed', { email });
-        }
-      } catch (e) {
-        setIsLoading(false);
-        console.error('Error during login:', e);
-        
-        // Handle validation errors
-        if (e instanceof ValidationError) {
-          // Set validation errors properly
-          setError(e.validationErrors.email ? e.validationErrors.email[0] : e.validationErrors.password ? e.validationErrors.password[0] : 'Login failed. Please try again.');
-          return;
-        }
-        
-        // Handle different error types
-        if (typeof e === 'string') {
-          setError(e);
-        } else if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError('Login failed. Please try again.');
-        }
+      
+      // Map specific Firebase Auth error codes to user-friendly messages
+      let friendlyMessage = 'Login failed. Please check your credentials or try again.';
+      
+      if (error.code === 'auth/user-not-found' || 
+          error.code === 'auth/wrong-password' || 
+          error.code === 'auth/invalid-credential') {
+        friendlyMessage = 'Invalid email or password provided.';
+      } else if (error.code === 'auth/invalid-email') {
+        friendlyMessage = 'The email address is not valid.';
+      } else if (error.code === 'auth/too-many-requests') {
+        friendlyMessage = 'Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.';
+      } else if (error.code === 'auth/user-disabled') {
+        friendlyMessage = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/network-request-failed') {
+        friendlyMessage = 'Network error. Please check your connection and try again.';
       }
-    } catch (err) {
-      console.error('Outer error details:', err);
+      
+      setErrorMsg(friendlyMessage);
+    } finally {
       setIsLoading(false);
-      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
-      setError(errorMessage);
-      logError('Login error in outer try-catch', err);
+      perf.stop();
     }
   };
 
@@ -127,9 +121,9 @@ function LoginPageContent() {
           <p className="text-slate-600 dark:text-slate-400 mt-2">Access your health account</p>
         </div>
 
-        {error && <Alert variant="error">{error}</Alert>}
+        {errorMsg && <Alert variant="error">{errorMsg}</Alert>}
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleLogin}>
           <Input
             id="email"
             name="email"
@@ -137,8 +131,8 @@ function LoginPageContent() {
             label="Email Address"
             required
             placeholder="Enter your email"
-            value={formData.email}
-            onChange={handleChange}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
 
           <Input
@@ -148,35 +142,29 @@ function LoginPageContent() {
             label="Password"
             required
             placeholder="Enter your password"
-            value={formData.password}
-            onChange={handleChange}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                className="h-4 w-4 text-primary border-slate-300 rounded"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-              />
-              <label
-                htmlFor="rememberMe"
-                className="ml-2 block text-sm text-slate-600 dark:text-slate-400"
-              >
-                Remember me
-              </label>
-            </div>
-
             <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
-            Sign In
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Spinner size="sm" className="mr-2" />
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
 
@@ -184,39 +172,19 @@ function LoginPageContent() {
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="text-primary hover:underline">
-              Register
+              Create Account
             </Link>
           </p>
         </div>
 
-        <div className="text-center mt-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800">
-          <h3 className="font-medium text-primary mb-2">Existing Database Accounts</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-            Use database accounts with password <span className="font-semibold">password123</span>
+        <div className="text-center mt-6 p-4 border border-blue-200 dark:border-blue-700 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+          <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Live Authentication</h3>
+          <p className="text-sm text-blue-600 dark:text-blue-300 mb-2">
+            This login connects to the live Firebase Authentication service
           </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            <li>
-              <span className="font-medium">Doctor:</span> user0@demo.health (Gerald
-              Reynolds-Miller)
-            </li>
-            <li>
-              <span className="font-medium">Doctor:</span> user5@demo.health (Mohamed Rabah)
-            </li>
-            <li>
-              <span className="font-medium">Patient:</span> user7@demo.health (Anita D&apos;Amoree)
-            </li>
-            <li>
-              <span className="font-medium">Patient:</span> user8@demo.health (Traci
-              Schowalter-Haag)
-            </li>
-          </ul>
-          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Special account:</p>
-            <p className="text-sm">
-              <span className="font-medium">Admin:</span> admin@example.com with password{' '}
-              <span className="font-semibold">Targo2000!</span>
-            </p>
-          </div>
+          <p className="text-xs text-blue-500 dark:text-blue-400">
+            Use valid credentials from the Firebase Authentication console
+          </p>
         </div>
       </Card>
     </div>

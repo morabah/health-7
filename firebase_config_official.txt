@@ -1,0 +1,25 @@
+# Copy these lines to your .env.local file to fix CORS issue
+# This is the official Firebase configuration from your Firebase Console
+
+API_MODE=live
+LOG_LEVEL=info
+NODE_ENV=development
+
+# Official Firebase Configuration (from Firebase Console)
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAQ5B6mIjUw-Zc6VwG7J-jkMUXDadSOzkA
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=health7-c378f.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=health7-c378f
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=health7-c378f.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=776487659386
+NEXT_PUBLIC_FIREBASE_APP_ID=1:776487659386:web:ee5636a3c3fc4ef94dd8c3
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-HNJRSQEBLD
+
+# Firebase Services
+FIREBASE_ENABLED=true
+FIREBASE_USE_EMULATOR=false
+
+# Instructions:
+# 1. Copy these lines to .env.local file in your project root
+# 2. Restart your development server
+# 3. Test patient registration
+# 4. If CORS still occurs, also check Firebase Console → Authentication → Settings → Authorized domains 

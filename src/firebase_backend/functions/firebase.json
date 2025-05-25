@@ -1,0 +1,65 @@
+{
+  "$schema": "https://firebaseopensource.com/firebase.json.schema.json",
+  "functions": [
+    {
+      "source": ".",
+      "codebase": "default",
+      "ignore": [
+        ".cache",
+        ".git",
+        ".github",
+        ".gitignore",
+        ".idea",
+        ".vscode",
+        "coverage",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "*.log",
+        "*.tsbuildinfo",
+        "*.tsbuildinfo.local*",
+        "node_modules",
+        "src/**/__tests__",
+        "src/**/*.test.ts",
+        "src/**/*.spec.ts"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" install",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ],
+      "runtime": "nodejs18",
+      "timeout": "540s",
+      "vpcConnector": "${param:VPC_CONNECTOR}",
+      "vpcConnectorEgressSettings": "PRIVATE_RANGES_ONLY",
+      "ingressSettings": "ALLOW_ALL"
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "functions": {
+      "port": 5001,
+      "host": "localhost"
+    },
+    "firestore": {
+      "port": 8080,
+      "host": "localhost"
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true,
+    "auth": {
+      "port": 9099
+    },
+    "pubsub": {
+      "port": 8085
+    },
+    "logging": {
+      "port": 8082
+    }
+  }
+}

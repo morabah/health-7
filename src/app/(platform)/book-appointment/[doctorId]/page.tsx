@@ -170,6 +170,7 @@ function BookAppointmentPageContent() {
   const [reason, setReason] = useState<string>('');
   const [allDates, setAllDates] = useState<Date[]>([]);
   const [selectableDates, setSelectableDates] = useState<Date[]>([]);
+  const [calendarGrid, setCalendarGrid] = useState<(Date | null)[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<
     Array<{ startTime: string; endTime: string }>
   >([]);
@@ -294,15 +295,16 @@ function BookAppointmentPageContent() {
     }
   }, [bookAppointmentMutation.isSuccess, router]);
 
-  // Generate dates for the next 14 days, marking which ones are available
+  // Generate calendar grid with proper date positioning
   const generateDates = useCallback(() => {
     perfTracker.current.mark('generating-dates');
 
     // Don't proceed if component is unmounted
     if (!isMountedRef.current) return;
 
-    const dates: Date[] = [];
+    const dates: (Date | null)[] = []; // null represents empty calendar cells
     const availableDates: Date[] = [];
+    const actualDates: Date[] = []; // For tracking actual date objects
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -310,25 +312,55 @@ function BookAppointmentPageContent() {
     const weeklySchedule = availability?.weeklySchedule || {};
     const blockedDates = new Set(availability?.blockedDates || []);
 
-    // Generate the next 14 days
+    // Generate dates for the next 14 days
+    const futureDates: Date[] = [];
     for (let i = 0; i < 14; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      dates.push(date);
+      futureDates.push(date);
+    }
 
-      // Check if this date is available in doctor's schedule
-      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-      const dateStr = date.toISOString().split('T')[0];
+    // Create calendar grid - start with the first date's week
+    const firstDate = futureDates[0];
+    const startOfWeek = new Date(firstDate);
+    startOfWeek.setDate(firstDate.getDate() - firstDate.getDay()); // Go to Sunday
 
-      // Date is available if it's in weekly schedule and not in blocked dates
-      if (weeklySchedule[dayOfWeek]?.length > 0 && !blockedDates.has(dateStr)) {
-        availableDates.push(date);
+    // Generate calendar grid (3 weeks should be enough for 14 days)
+    for (let i = 0; i < 21; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      
+      // Check if this date is in our future dates list
+      const isFutureDate = futureDates.some(futureDate => 
+        date.getFullYear() === futureDate.getFullYear() &&
+        date.getMonth() === futureDate.getMonth() &&
+        date.getDate() === futureDate.getDate()
+      );
+
+      if (isFutureDate) {
+        dates.push(date);
+        actualDates.push(date);
+
+        // Check if this date is available in doctor's schedule
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = dayNames[dayOfWeek];
+        const dateStr = date.toISOString().split('T')[0];
+
+        // Date is available if it's in weekly schedule and not in blocked dates
+        if (weeklySchedule[dayName]?.length > 0 && !blockedDates.has(dateStr)) {
+          availableDates.push(date);
+        }
+      } else {
+        // Add null for empty calendar cells (past dates or future dates not in our range)
+        dates.push(null);
       }
     }
 
     if (isMountedRef.current) {
-      setAllDates(dates);
+      setAllDates(actualDates); // Only actual dates for other functions
       setSelectableDates(availableDates);
+      setCalendarGrid(dates); // Grid with nulls for proper positioning
 
       // Auto-select the first available date if none is selected
       if (!selectedDate && availableDates.length > 0) {
@@ -910,24 +942,27 @@ function BookAppointmentPageContent() {
     }
 
     return (
-      <Card className="mt-5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
-            <CalendarDays className="w-5 h-5 mr-2 text-primary" />
-            Select Date
-          </h2>
-
-          {selectedDate && (
-            <div className="text-sm font-medium">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</div>
-          )}
+      <Card className="mt-5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-primary/5 to-blue-50 dark:from-primary/10 dark:to-slate-800">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-white flex items-center">
+              <CalendarDays className="w-6 h-6 mr-3 text-primary" />
+              Select Date
+            </h2>
+            {selectedDate && (
+              <div className="bg-white dark:bg-slate-700 px-4 py-2 rounded-lg shadow-sm border">
+                <div className="text-sm font-medium text-primary">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="p-5">
-          {/* Month navigation */}
-          <div className="flex items-center justify-between mb-4">
+        <div className="p-6">
+          {/* Enhanced Month navigation */}
+          <div className="flex items-center justify-between mb-6">
             <button
               type="button"
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+              className="p-3 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg transition-all duration-200 hover:scale-105 group"
               aria-label="Previous week"
               onClick={() => {
                 if (allDates.length > 0) {
@@ -939,7 +974,7 @@ function BookAppointmentPageContent() {
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-slate-600 dark:text-slate-400"
+                className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -953,13 +988,13 @@ function BookAppointmentPageContent() {
               </svg>
             </button>
 
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <div className="text-lg font-semibold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-700 px-4 py-2 rounded-lg">
               {allDates.length > 0 && format(allDates[0], 'MMMM yyyy')}
             </div>
 
             <button
               type="button"
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+              className="p-3 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg transition-all duration-200 hover:scale-105 group"
               aria-label="Next week"
               onClick={() => {
                 if (allDates.length > 0) {
@@ -971,7 +1006,7 @@ function BookAppointmentPageContent() {
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-slate-600 dark:text-slate-400"
+                className="h-5 w-5 text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -986,70 +1021,101 @@ function BookAppointmentPageContent() {
             </button>
           </div>
 
-          {/* Days grid */}
-          <div className="grid grid-cols-7 text-center text-xs text-slate-500 dark:text-slate-400 mb-1">
+          {/* Enhanced Days grid header */}
+          <div className="grid grid-cols-7 text-center text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day}>{day}</div>
+              <div key={day} className="py-2">{day}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {allDates.map(date => {
+          {/* Enhanced calendar grid */}
+          <div className="grid grid-cols-7 gap-2">
+            {calendarGrid.map((date, index) => {
+              if (!date) {
+                // Empty calendar cell
+                return (
+                  <div 
+                    key={`empty-${index}`} 
+                    className="h-16 w-full"
+                  />
+                );
+              }
+
               const isAvailable = isDateSelectable(date);
               const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
               const isToday = new Date().toDateString() === date.toDateString();
+              const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
 
               return (
                 <button
                   key={date.toISOString()}
                   onClick={() => isAvailable && handleDateSelect(date)}
-                  disabled={!isAvailable}
+                  disabled={!isAvailable || isPast}
                   aria-selected={
                     selectedDate?.toDateString() === date.toDateString() ? 'true' : undefined
                   }
                   aria-label={`Select date ${format(date, 'EEEE, MMMM d, yyyy')}`}
                   className={`
-                    relative p-2 rounded-md flex flex-col items-center justify-center h-12
+                    relative p-3 rounded-xl flex flex-col items-center justify-center h-16 w-full
+                    transition-all duration-200 transform font-medium text-sm
                     ${
                       isSelected
-                        ? 'bg-primary text-white shadow-sm'
-                        : isAvailable
-                          ? 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white'
-                          : 'text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 cursor-not-allowed'
+                        ? 'bg-gradient-to-br from-primary to-primary/80 text-white shadow-lg scale-105 ring-2 ring-primary/30'
+                        : isAvailable && !isPast
+                          ? 'hover:bg-primary/10 dark:hover:bg-primary/20 text-slate-900 dark:text-white hover:scale-105 border-2 border-transparent hover:border-primary/30 bg-white dark:bg-slate-700 shadow-sm'
+                          : isPast
+                            ? 'text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-slate-800 cursor-not-allowed opacity-50'
+                            : 'text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 cursor-not-allowed border-2 border-dashed border-slate-200 dark:border-slate-600'
                     }
-                    transition-colors
                   `}
                 >
-                  <span className="text-sm font-medium">{format(date, 'd')}</span>
-
+                  <span className="text-base font-semibold">{format(date, 'd')}</span>
+                  
+                  {/* Enhanced indicators */}
                   {isToday && !isSelected && (
-                    <div className="absolute bottom-0.5 w-1 h-1 rounded-full bg-primary"></div>
+                    <div className="absolute -bottom-1 w-2 h-2 rounded-full bg-primary animate-pulse"></div>
                   )}
+                  
+                  {isAvailable && !isPast && !isSelected && (
+                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400"></div>
+                  )}
+
+                  {/* Day of week hint for small screens */}
+                  <span className="text-xs text-current opacity-70 sm:hidden">
+                    {format(date, 'E')}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-4 px-2">
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600"></div>
+          {/* Enhanced legend with better styling */}
+          <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-600 dark:text-slate-400 mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-600"></div>
               <span>Unavailable</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-primary"></div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-gradient-to-br from-primary to-primary/80"></div>
               <span>Selected</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-slate-900 dark:bg-white"></div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-white dark:bg-slate-700 border-2 border-primary/30 relative">
+                <div className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-green-400 -translate-y-0.5 translate-x-0.5"></div>
+              </div>
               <span>Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-primary animate-pulse"></div>
+              <span>Today</span>
             </div>
           </div>
         </div>
       </Card>
     );
-  }, [allDates, selectedDate, isLoadingAvailability, isDateSelectable, handleDateSelect]);
+  }, [calendarGrid, selectedDate, isLoadingAvailability, isDateSelectable, handleDateSelect]);
 
-  // Memoize the time slots section
+  // Enhanced time slots section
   const TimeSlotsSection = useMemo(() => {
     if (!selectedDate) {
       return null;
@@ -1073,6 +1139,8 @@ function BookAppointmentPageContent() {
     });
 
     const renderTimeBlock = (slot: (typeof availableTimeSlots)[0]) => {
+      const isSelected = selectedTimeSlot === slot.startTime;
+      
       return (
         <button
           key={`${slot.startTime}-${slot.endTime}`}
@@ -1080,18 +1148,32 @@ function BookAppointmentPageContent() {
           onClick={() => handleTimeSlotSelect(slot.startTime, slot.endTime)}
           disabled={false}
           className={`
-            w-full h-full p-3 rounded-lg text-center border transition-colors
+            group relative p-4 rounded-xl border-2 transition-all duration-200 transform
             ${
-              selectedTimeSlot === slot.startTime
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary/50'
+              isSelected
+                ? 'bg-gradient-to-br from-primary to-primary/80 border-primary text-white shadow-lg scale-105 ring-2 ring-primary/30'
+                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-primary/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:scale-105 shadow-sm hover:shadow-md'
             }
           `}
           aria-label={`Select time slot ${slot.startTime} to ${slot.endTime}`}
-          aria-selected={selectedTimeSlot === slot.startTime}
+          aria-selected={isSelected}
           aria-disabled={false}
         >
-          <span className="font-medium">{slot.startTime}</span>
+          <div className="flex flex-col items-center">
+            <span className="font-semibold text-lg">{slot.startTime}</span>
+            <span className="text-xs opacity-70 mt-1">
+              {slot.endTime}
+            </span>
+          </div>
+          
+          {/* Selected indicator */}
+          {isSelected && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+              <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
         </button>
       );
     };
@@ -1099,26 +1181,31 @@ function BookAppointmentPageContent() {
     const renderTimeSlotSection = (
       title: string,
       slots: typeof availableTimeSlots,
-      icon: React.ReactNode
+      icon: React.ReactNode,
+      bgColor: string
     ) => {
       if (slots.length === 0) return null;
 
       return (
-        <div className="mb-6">
-          <div className="flex items-center mb-3">
-            <div className="w-6 h-6 mr-2 flex-shrink-0">{icon}</div>
-            <h3
-              id={`time-slots-${title.toLowerCase()}`}
-              className="text-sm font-medium text-slate-900 dark:text-white"
-            >
-              {title} ({slots.length} slots)
-            </h3>
+        <div className="mb-8">
+          <div className={`flex items-center mb-4 p-3 rounded-lg ${bgColor}`}>
+            <div className="w-8 h-8 mr-3 flex-shrink-0 flex items-center justify-center bg-white dark:bg-slate-700 rounded-lg shadow-sm">
+              {icon}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {title}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {slots.length} slot{slots.length !== 1 ? 's' : ''} available
+              </p>
+            </div>
           </div>
 
           <div
             role="radiogroup"
             aria-labelledby={`time-slots-${title.toLowerCase()}`}
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
           >
             {slots.map(renderTimeBlock)}
           </div>
@@ -1127,30 +1214,35 @@ function BookAppointmentPageContent() {
     };
 
     return (
-      <Card className="mt-5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
-            <Clock className="w-5 h-5 mr-2 text-primary" />
+      <Card className="mt-6 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700">
+          <h2 className="text-xl font-semibold text-slate-800 dark:text-white flex items-center">
+            <Clock className="w-6 h-6 mr-3 text-primary" />
             Select Time
             {selectedDate && (
-              <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
-                for {format(selectedDate, 'MMMM d')}
+              <span className="ml-3 text-base font-normal text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-700 px-3 py-1 rounded-full">
+                {format(selectedDate, 'MMMM d')}
               </span>
             )}
           </h2>
+          {selectedTimeSlot && (
+            <div className="mt-2 text-sm text-primary font-medium">
+              Selected: {selectedTimeSlot} - {selectedEndTime}
+            </div>
+          )}
         </div>
 
-        <div className="p-5">
+        <div className="p-6">
           {slotsLoading ? (
-            <div className="animate-pulse space-y-6">
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full mr-2"></div>
-                <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="animate-pulse space-y-8">
+              <div className="flex items-center mb-4">
+                <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mr-3"></div>
+                <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-slate-200 dark:bg-slate-700 rounded-md"></div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="h-20 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
                 ))}
               </div>
             </div>
@@ -1161,7 +1253,7 @@ function BookAppointmentPageContent() {
                 morningSlots,
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-amber-500"
+                  className="h-5 w-5 text-amber-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1172,7 +1264,8 @@ function BookAppointmentPageContent() {
                     strokeWidth={2}
                     d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
                   />
-                </svg>
+                </svg>,
+                'bg-amber-50 dark:bg-amber-900/20'
               )}
 
               {renderTimeSlotSection(
@@ -1180,7 +1273,7 @@ function BookAppointmentPageContent() {
                 afternoonSlots,
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-orange-500"
+                  className="h-5 w-5 text-orange-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1191,7 +1284,8 @@ function BookAppointmentPageContent() {
                     strokeWidth={2}
                     d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
                   />
-                </svg>
+                </svg>,
+                'bg-orange-50 dark:bg-orange-900/20'
               )}
 
               {renderTimeSlotSection(
@@ -1199,7 +1293,7 @@ function BookAppointmentPageContent() {
                 eveningSlots,
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-indigo-500"
+                  className="h-5 w-5 text-indigo-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1210,17 +1304,18 @@ function BookAppointmentPageContent() {
                     strokeWidth={2}
                     d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
                   />
-                </svg>
+                </svg>,
+                'bg-indigo-50 dark:bg-indigo-900/20'
               )}
 
               {morningSlots.length === 0 &&
                 afternoonSlots.length === 0 &&
                 eveningSlots.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <div className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 p-3 rounded-full mb-3">
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 p-4 rounded-full mb-4">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
+                        className="h-8 w-8"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -1233,32 +1328,25 @@ function BookAppointmentPageContent() {
                         />
                       </svg>
                     </div>
-                    <h3 className="text-base font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">
                       No available slots
                     </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Please select another date
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-md">
+                      This date is fully booked. Please select another date from the calendar above.
                     </p>
                   </div>
                 )}
             </div>
           ) : (
-            <div className="py-6">
+            <div className="py-8">
               <Alert variant={availabilityError ? 'error' : 'warning'} className="mb-3">
-                {availabilityError || 'No available time slots for this date.'}
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {availabilityError || 'No available time slots for this date. Please try another date.'}
+                </div>
               </Alert>
-
-              <div className="text-center mt-4">
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                  Try selecting a different date to see available slots
-                </p>
-              </div>
-            </div>
-          )}
-
-          {fieldErrors.time && (
-            <div className="text-red-500 text-sm mt-4 bg-red-50 dark:bg-red-900/20 p-2 rounded-md">
-              {fieldErrors.time}
             </div>
           )}
         </div>

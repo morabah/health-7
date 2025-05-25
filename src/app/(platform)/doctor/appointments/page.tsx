@@ -20,7 +20,7 @@ import {
   ChevronRight,
   AlertTriangle,
 } from 'lucide-react';
-import CompleteAppointmentModal from '@/components/doctor/CompleteAppointmentModal';
+import CompleteAppointmentModal from '@/components/shared/modals/CompleteAppointmentModal';
 import { useDoctorAppointments, useCompleteAppointment, useDoctorCancelAppointment } from '@/data/doctorLoaders';
 import { AppointmentStatus } from '@/types/enums';
 import { format, isValid } from 'date-fns';
@@ -413,8 +413,9 @@ function DoctorAppointmentsContent() {
       <CompleteAppointmentModal
         isOpen={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
-        appt={selectedAppointment}
+        appointment={selectedAppointment}
         onConfirm={handleCompleteAppointment}
+        userType="doctor"
       />
     </div>
   );

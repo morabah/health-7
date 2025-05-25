@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-05-25T12:20:22.591Z",
+  "summary": {
+    "totalDocuments": 336,
+    "totalIssues": 0,
+    "integrityScore": 100,
+    "hasUniquenessViolations": false
+  },
+  "collections": [
+    {
+      "collection": "users",
+      "totalDocuments": 14,
+      "uniqueEmails": 14,
+      "duplicateEmails": [],
+      "issues": []
+    },
+    {
+      "collection": "patients",
+      "totalDocuments": 3,
+      "validReferences": 3,
+      "orphanedProfiles": 0,
+      "issues": []
+    },
+    {
+      "collection": "doctors",
+      "totalDocuments": 9,
+      "validReferences": 9,
+      "orphanedProfiles": 0,
+      "issues": []
+    },
+    {
+      "collection": "appointments",
+      "totalDocuments": 75,
+      "validReferences": 75,
+      "orphanedProfiles": 0,
+      "issues": []
+    },
+    {
+      "collection": "notifications",
+      "totalDocuments": 235,
+      "validReferences": 235,
+      "orphanedProfiles": 0,
+      "issues": []
+    }
+  ]
+}

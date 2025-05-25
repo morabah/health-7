@@ -7,9 +7,12 @@
  */
 
 import { UserType } from '@/types/enums';
-import { isFirebaseEnabled, auth } from './firebaseConfig';
+import { auth } from './realFirebaseConfig'; // Use real Firebase auth instead of mock
 import { logError, logInfo } from './logger';
 import { AuthError } from './errors';
+
+// Firebase is enabled when we have real Firebase config
+const isFirebaseEnabled = true;
 
 // Auth context interface - used across the application
 export interface AuthContext {

@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-05-25T12:30:01.488Z",
+  "testResults": [
+    {
+      "email": "user7@demo.health",
+      "success": true,
+      "userId": "u-007",
+      "userType": "patient"
+    },
+    {
+      "email": "user1@demo.health",
+      "success": true,
+      "userId": "u-001",
+      "userType": "doctor"
+    },
+    {
+      "email": "admin@example.com",
+      "success": true,
+      "userId": "admin-1odsk03suhp9odjbe13fr8",
+      "userType": "admin"
+    },
+    {
+      "email": "morabah@gmail.com",
+      "success": true,
+      "userId": "stbgu09d7t05vtu0r67tp",
+      "userType": "patient"
+    }
+  ],
+  "wrongPasswordTest": {
+    "email": "user7@demo.health",
+    "success": false,
+    "error": "auth/invalid-credential: Firebase: Error (auth/invalid-credential)."
+  },
+  "summary": {
+    "total": 4,
+    "successful": 4,
+    "failed": 0
+  }
+}

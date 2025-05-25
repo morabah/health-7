@@ -1,28 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
 import Alert from '@/components/ui/Alert';
+import Spinner from '@/components/ui/Spinner';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { logInfo, logError } from '@/lib/logger';
-import { UserType, Gender } from '@/types/enums';
+import { trackPerformance } from '@/lib/performance';
+import { directRegisterUser, type RegistrationData } from '@/lib/directRegisterUser';
+import { UserType, Gender, BloodType } from '@/types/enums';
 import { PatientRegistrationSchema, type PatientRegistrationPayload } from '@/types/schemas';
-import { ValidationError } from '@/lib/errors/errorClasses';
 
 /**
  * Patient registration form component
+ * Connects to live registerUser Cloud Function for user creation
  */
 export default function PatientRegisterPage() {
   const router = useRouter();
-  const { registerPatient } = useAuth();
 
-  // Form state
+  // Form state - all fields from PatientRegisterSchema
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,131 +32,110 @@ export default function PatientRegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState('');
+  const [bloodType, setBloodType] = useState('');
+  const [medicalHistory, setMedicalHistory] = useState('');
+
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Form submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
-
   /**
-   * Validate form data using Zod schema
+   * Handle patient registration form submission
+   * Calls the live registerUser Cloud Function
    */
-  const validateForm = (): boolean => {
-    const errors: { [key: string]: string } = {};
+  const handlePatientRegister = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setErrorMsg(null);
 
-    // Basic confirmation password check
-    if (password !== confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-
-    // Create the registration payload
-    const registrationData: PatientRegistrationPayload = {
-      email,
-      password,
-      userType: UserType.PATIENT,
-      firstName,
-      lastName,
-      gender: gender as Gender,
-      dateOfBirth: dateOfBirth ? `${dateOfBirth}T00:00:00.000Z` : '',
-    };
-
-    // Validate using Zod schema
-    const result = PatientRegistrationSchema.safeParse(registrationData);
-
-    if (!result.success) {
-      // Extract and format Zod validation errors
-      const formattedErrors = result.error.format();
-
-      // Convert Zod errors to our format
-      Object.entries(formattedErrors).forEach(([key, value]) => {
-        // Skip the _errors top-level property
-        if (key !== '_errors') {
-          // Use a more specific type instead of any
-          interface ZodFieldError {
-            _errors: string[];
-          }
-          const fieldErrors = value as ZodFieldError;
-          if (fieldErrors._errors && fieldErrors._errors.length > 0) {
-            errors[key] = fieldErrors._errors[0];
-          }
-        }
-      });
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  /**
-   * Handle form submission
-   */
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
-    setValidationErrors({});
-
-    // Validate the form
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
+    const perf = trackPerformance('handlePatientRegisterSubmit_Direct');
+    logInfo('Patient registration attempt started (Direct Firebase)', { email });
 
     try {
-      logInfo('patient_registration', { email });
+      // Client-side validation - password confirmation
+      if (password !== confirmPassword) {
+        setErrorMsg('Passwords do not match.');
+        setIsLoading(false);
+        perf.stop();
+        return;
+      }
 
-      // Format date of birth
-      const formattedDateOfBirth = dateOfBirth ? `${dateOfBirth}T00:00:00.000Z` : '';
-
-      // Register patient via auth context
-      const registrationResult = await registerPatient({
+      // Prepare data payload for registration
+      const registrationData: RegistrationData = {
         email,
         password,
-        userType: UserType.PATIENT,
         firstName,
         lastName,
-        gender: gender as Gender,
-        dateOfBirth: formattedDateOfBirth,
+        userType: UserType.PATIENT,
+        dateOfBirth: dateOfBirth || '',
+        gender: gender || Gender.OTHER,
+        phone: phone || undefined,
+        bloodType: bloodType || undefined,
+        medicalHistory: medicalHistory || undefined,
+      };
+
+      // Client-side Zod validation
+      const validationResult = PatientRegistrationSchema.safeParse(registrationData);
+      if (!validationResult.success) {
+        const errorMessage = validationResult.error.errors[0]?.message || 'Please check your input and try again.';
+        setErrorMsg(errorMessage);
+        setIsLoading(false);
+        perf.stop();
+        return;
+      }
+
+      logInfo('Client-side validation passed for patient registration');
+
+      // Call direct registration function
+      logInfo('Calling directRegisterUser function for PATIENT', { 
+        email: registrationData.email,
+        userType: registrationData.userType 
       });
 
-      // Type assertion to avoid TypeScript errors with the response
-      type RegistrationResponse = { success: boolean; error?: string };
-      const result = registrationResult as unknown as RegistrationResponse;
+      const result = await directRegisterUser(registrationData);
 
-      if (result.success) {
-        // Registration successful, redirect to success page
-        router.push(
-          `/auth/registration-success?type=${UserType.PATIENT}&email=${encodeURIComponent(email)}`
-        );
-      } else {
-        // Handle unsuccessful registration
-        const errorMessage = result.error || 'Registration failed';
-        setError(errorMessage);
-      }
-    } catch (err) {
-      logError('Error during patient registration', err);
-
-      // Handle validation errors
-      if (err instanceof ValidationError && err.validationErrors) {
-        const fieldErrors: { [key: string]: string } = {};
-
-        // Convert validation errors to field-specific errors
-        Object.entries(err.validationErrors).forEach(([field, errors]) => {
-          if (Array.isArray(errors) && errors.length > 0) {
-            fieldErrors[field] = errors[0];
-          }
+      if (result.success && result.userId) {
+        logInfo('Patient registration successful (Direct Firebase)', { 
+          userId: result.userId,
+          email: registrationData.email 
         });
 
-        setValidationErrors(fieldErrors);
-        setError('Please correct the validation errors below.');
+        perf.stop();
+        
+        // Navigate to pending verification page after successful registration
+        router.push('/auth/pending-verification');
       } else {
-        setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+        throw new Error(result.error || 'Registration failed');
       }
+
+    } catch (error: any) {
+      logError('Patient registration failed (Direct Firebase)', error);
+      
+      // Display user-friendly error message
+      let friendlyMessage = 'Registration failed. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('already in use') || error.code === 'auth/email-already-in-use') {
+          friendlyMessage = 'An account with this email address already exists. Please use a different email or try logging in.';
+        } else if (error.message.includes('invalid-argument') || error.code === 'auth/invalid-email') {
+          friendlyMessage = 'Please enter a valid email address.';
+        } else if (error.code === 'auth/weak-password') {
+          friendlyMessage = 'Password should be at least 6 characters long.';
+        } else {
+          friendlyMessage = error.message;
+        }
+      }
+      
+      setErrorMsg(friendlyMessage);
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
+      perf.stop();
     }
-  };
+  }, [
+    email, password, confirmPassword, firstName, lastName, phone, 
+    dateOfBirth, gender, bloodType, medicalHistory, router
+  ]);
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -172,15 +152,15 @@ export default function PatientRegisterPage() {
         </p>
       </div>
 
-      {error && (
+      {errorMsg && (
         <Alert variant="error" className="mb-6" role="alert">
-          {error}
+          {errorMsg}
         </Alert>
       )}
 
       <Card className="p-6">
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handlePatientRegister}
           className="space-y-4"
           aria-labelledby="registration-form-title"
         >
@@ -196,18 +176,11 @@ export default function PatientRegisterPage() {
                 id="firstName"
                 value={firstName}
                 onChange={e => setFirstName(e.target.value)}
-                error={validationErrors.firstName}
                 autoComplete="given-name"
                 required
+                disabled={isLoading}
                 aria-required="true"
-                aria-invalid={validationErrors.firstName ? 'true' : 'false'}
-                aria-describedby={validationErrors.firstName ? 'firstName-error' : undefined}
               />
-              {validationErrors.firstName && (
-                <div id="firstName-error" className="sr-only">
-                  {validationErrors.firstName}
-                </div>
-              )}
             </div>
             <div>
               <Input
@@ -215,18 +188,11 @@ export default function PatientRegisterPage() {
                 id="lastName"
                 value={lastName}
                 onChange={e => setLastName(e.target.value)}
-                error={validationErrors.lastName}
                 autoComplete="family-name"
                 required
+                disabled={isLoading}
                 aria-required="true"
-                aria-invalid={validationErrors.lastName ? 'true' : 'false'}
-                aria-describedby={validationErrors.lastName ? 'lastName-error' : undefined}
               />
-              {validationErrors.lastName && (
-                <div id="lastName-error" className="sr-only">
-                  {validationErrors.lastName}
-                </div>
-              )}
             </div>
           </div>
 
@@ -237,18 +203,12 @@ export default function PatientRegisterPage() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            error={validationErrors.email}
             autoComplete="email"
             required
+            disabled={isLoading}
             aria-required="true"
-            aria-invalid={validationErrors.email ? 'true' : 'false'}
-            aria-describedby={validationErrors.email ? 'email-error' : undefined}
+            placeholder="your.email@example.com"
           />
-          {validationErrors.email && (
-            <div id="email-error" className="sr-only">
-              {validationErrors.email}
-            </div>
-          )}
 
           <Input
             label="Phone Number (optional)"
@@ -256,17 +216,11 @@ export default function PatientRegisterPage() {
             type="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            error={validationErrors.phone}
             autoComplete="tel"
+            disabled={isLoading}
             placeholder="+1 (123) 456-7890"
-            aria-invalid={validationErrors.phone ? 'true' : 'false'}
-            aria-describedby={validationErrors.phone ? 'phone-error' : undefined}
+            helpText="Include country code for international numbers"
           />
-          {validationErrors.phone && (
-            <div id="phone-error" className="sr-only">
-              {validationErrors.phone}
-            </div>
-          )}
 
           {/* Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -277,22 +231,17 @@ export default function PatientRegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                error={validationErrors.password}
                 autoComplete="new-password"
                 required
+                disabled={isLoading}
                 aria-required="true"
-                aria-invalid={validationErrors.password ? 'true' : 'false'}
-                aria-describedby={validationErrors.password ? 'password-error' : undefined}
+                helpText="Must contain uppercase, lowercase, and number"
               />
-              {validationErrors.password && (
-                <div id="password-error" className="sr-only">
-                  {validationErrors.password}
-                </div>
-              )}
               <button
                 type="button"
-                className="absolute right-3 top-9 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-9 text-slate-400 hover:text-slate-600 disabled:opacity-50"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
@@ -309,24 +258,15 @@ export default function PatientRegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                error={validationErrors.confirmPassword}
                 autoComplete="new-password"
                 required
+                disabled={isLoading}
                 aria-required="true"
-                aria-invalid={validationErrors.confirmPassword ? 'true' : 'false'}
-                aria-describedby={
-                  validationErrors.confirmPassword ? 'confirmPassword-error' : undefined
-                }
               />
-              {validationErrors.confirmPassword && (
-                <div id="confirmPassword-error" className="sr-only">
-                  {validationErrors.confirmPassword}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Basic Information */}
+          {/* Medical Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Input
@@ -335,42 +275,66 @@ export default function PatientRegisterPage() {
                 type="date"
                 value={dateOfBirth}
                 onChange={e => setDateOfBirth(e.target.value)}
-                error={validationErrors.dateOfBirth}
                 autoComplete="bday"
-                required
-                aria-required="true"
-                aria-invalid={validationErrors.dateOfBirth ? 'true' : 'false'}
-                aria-describedby={validationErrors.dateOfBirth ? 'dateOfBirth-error' : undefined}
+                disabled={isLoading}
+                helpText="Must be 18+ years old"
               />
-              {validationErrors.dateOfBirth && (
-                <div id="dateOfBirth-error" className="sr-only">
-                  {validationErrors.dateOfBirth}
-                </div>
-              )}
             </div>
             <div>
               <Select
-                label="Gender"
+                label="Gender (optional)"
                 id="gender"
                 value={gender}
                 onChange={e => setGender(e.target.value)}
-                error={validationErrors.gender}
-                required
-                aria-required="true"
-                aria-invalid={validationErrors.gender ? 'true' : 'false'}
-                aria-describedby={validationErrors.gender ? 'gender-error' : undefined}
+                disabled={isLoading}
               >
                 <option value="">Select gender</option>
                 <option value={Gender.MALE}>Male</option>
                 <option value={Gender.FEMALE}>Female</option>
                 <option value={Gender.OTHER}>Other / Prefer not to say</option>
               </Select>
-              {validationErrors.gender && (
-                <div id="gender-error" className="sr-only">
-                  {validationErrors.gender}
-                </div>
-              )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Select
+                label="Blood Type (optional)"
+                id="bloodType"
+                value={bloodType}
+                onChange={e => setBloodType(e.target.value)}
+                disabled={isLoading}
+              >
+                <option value="">Select blood type</option>
+                <option value={BloodType.A_POSITIVE}>A+</option>
+                <option value={BloodType.A_NEGATIVE}>A-</option>
+                <option value={BloodType.B_POSITIVE}>B+</option>
+                <option value={BloodType.B_NEGATIVE}>B-</option>
+                <option value={BloodType.AB_POSITIVE}>AB+</option>
+                <option value={BloodType.AB_NEGATIVE}>AB-</option>
+                <option value={BloodType.O_POSITIVE}>O+</option>
+                <option value={BloodType.O_NEGATIVE}>O-</option>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="medicalHistory" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Medical History (optional)
+            </label>
+            <textarea
+              id="medicalHistory"
+              value={medicalHistory}
+              onChange={e => setMedicalHistory(e.target.value)}
+              disabled={isLoading}
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              rows={3}
+              placeholder="Any relevant medical conditions, allergies, or notes..."
+              maxLength={1000}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {medicalHistory.length}/1000 characters
+            </p>
           </div>
 
           <div className="pt-4">
@@ -378,11 +342,17 @@ export default function PatientRegisterPage() {
               type="submit"
               variant="primary"
               className="w-full py-2.5"
-              isLoading={isSubmitting}
-              disabled={isSubmitting}
-              aria-busy={isSubmitting ? 'true' : 'false'}
+              disabled={isLoading}
+              aria-busy={isLoading ? 'true' : 'false'}
             >
-              {isSubmitting ? 'Creating account...' : 'Create account'}
+              {isLoading ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Creating account...
+                </>
+              ) : (
+                'Create Patient Account'
+              )}
             </Button>
 
             <p className="mt-4 text-center text-sm">

@@ -9,8 +9,7 @@ import {
   DocumentType,
   UserType,
   VerificationStatus,
-} from '../../../../types/enums';
-import { isoDateTimeStringSchema } from '../../../../types/schemas';
+} from '../types/enums';
 
 /**
  * Schema for completing an appointment by a doctor
@@ -77,28 +76,12 @@ export const SetAvailabilitySchema = z.object({
  * Schema for searching/finding available doctors
  */
 export const FindDoctorsSchema = z.object({
-  specialty: z.string().optional().describe('Filter by doctor specialty'),
-
-  location: z.string().optional().describe('Filter by doctor location'),
-
-  language: z.string().optional().describe('Filter by language spoken by doctor'),
-
-  date: isoDateTimeStringSchema
-    .optional()
-    .describe('Filter for doctors available on this specific date'),
-
-  maxPrice: z.number().optional().describe('Maximum consultation fee'),
-
-  page: z.number().int().min(1).optional().default(1).describe('Page number for pagination'),
-
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(50)
-    .optional()
-    .default(10)
-    .describe('Number of results per page'),
+  specialty: z.string().optional(),
+  location: z.string().optional(),
+  language: z.string().optional(),
+  maxPrice: z.number().optional(),
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(50).optional().default(10),
 });
 
 /**
@@ -115,16 +98,9 @@ export const GetDoctorPublicProfileSchema = z.object({
  * Schema for retrieving available appointment slots for a doctor
  */
 export const GetAvailableSlotsSchema = z.object({
-  doctorId: z
-    .string()
-    .min(1, 'Doctor ID is required')
-    .describe('ID of the doctor to check availability for'),
-
-  startDate: isoDateTimeStringSchema.describe('Start date for availability search (inclusive)'),
-
-  endDate: isoDateTimeStringSchema
-    .optional()
-    .describe('End date for availability search (inclusive, defaults to 14 days from start)'),
+  doctorId: z.string().min(1, 'Doctor ID is required'),
+  startDate: z.string(),
+  endDate: z.string().optional(),
 });
 
 /**
@@ -136,7 +112,7 @@ export const BookAppointmentSchema = z.object({
     .min(1, 'Doctor ID is required')
     .describe('ID of the doctor for the appointment'),
 
-  appointmentDate: isoDateTimeStringSchema.describe('The specific date of the appointment'),
+  appointmentDate: z.string(),
 
   startTime: z
     .string()
@@ -322,3 +298,93 @@ export const AddVerificationDocumentSchema = z.object({
  * No input needed, uses context from the authenticated user
  */
 export const GetMyVerificationDocumentsSchema = z.object({});
+
+/**
+ * Base schema for user registration (common fields)
+ */
+const BaseRegistrationSchema = z.object({
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .min(5, 'Email is too short')
+    .max(100, 'Email is too long'),
+
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(100, 'Password is too long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    ),
+
+  userType: z.nativeEnum(UserType),
+
+  firstName: z
+    .string()
+    .min(2, 'First name must be at least 2 characters')
+    .max(50, 'First name is too long'),
+
+  lastName: z
+    .string()
+    .min(2, 'Last name must be at least 2 characters')
+    .max(50, 'Last name is too long'),
+
+  phone: z
+    .string()
+    .optional()
+    .describe("User's phone number (E.164 format preferred)"),
+});
+
+/**
+ * Schema for patient registration payload
+ */
+export const PatientRegisterSchema = BaseRegistrationSchema.extend({
+  userType: z.literal(UserType.PATIENT),
+  dateOfBirth: z.string().optional().describe("Patient's date of birth (ISO string)"),
+  gender: z.string().optional().describe("Patient's gender"),
+  bloodType: z.string().optional().describe("Patient's blood type"),
+  medicalHistory: z.string().optional().describe("Patient's medical history"),
+  address: z.string().optional().describe("Patient's address"),
+  profilePictureUrl: z.string().optional().nullable(),
+});
+
+/**
+ * Schema for doctor registration payload
+ */
+export const DoctorRegisterSchema = BaseRegistrationSchema.extend({
+  userType: z.literal(UserType.DOCTOR),
+  specialty: z
+    .string()
+    .min(3, 'Specialty must be at least 3 characters')
+    .max(100, 'Specialty is too long'),
+
+  licenseNumber: z
+    .string()
+    .min(5, 'License number must be at least 5 characters')
+    .max(50, 'License number is too long'),
+
+  yearsOfExperience: z
+    .number()
+    .int('Experience must be a whole number')
+    .min(0, 'Experience cannot be negative')
+    .max(70, 'Please enter a valid years of experience')
+    .optional()
+    .default(0),
+
+  profilePictureUrl: z.string().optional().nullable(),
+  licenseDocumentUrl: z.string().optional().nullable(),
+  bio: z.string().optional(),
+  consultationFee: z.number().optional(),
+  languages: z.array(z.string()).optional(),
+  educationHistory: z.array(z.any()).optional(),
+  experienceHistory: z.array(z.any()).optional(),
+});
+
+/**
+ * Combined schema for user registration (discriminated union)
+ */
+export const RegisterSchema = z.discriminatedUnion('userType', [
+  PatientRegisterSchema,
+  DoctorRegisterSchema,
+]);

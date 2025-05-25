@@ -1,0 +1,195 @@
+import * as functions from 'firebase-functions';
+import { getMyUserProfileData } from '../../user/getUserProfile';
+import { logInfo, logError } from '../../shared/logger';
+
+// Mock the logger
+jest.mock('../../shared/logger', () => ({
+  logInfo: jest.fn(),
+  logError: jest.fn(),
+  logWarn: jest.fn(),
+  logDebug: jest.fn(),
+}));
+
+// Mock Firestore
+const mockGet = jest.fn();
+const mockDoc = jest.fn((id: string) => ({
+  get: mockGet,
+  exists: true,
+  id,
+  data: jest.fn().mockReturnValue({
+    email: 'test@example.com',
+    displayName: 'Test User',
+    userType: 'patient',
+    createdAt: '2023-01-01T00:00:00.000Z',
+  }),
+}));
+
+const mockCollection = jest.fn(() => ({
+  doc: mockDoc,
+  get: jest.fn().mockResolvedValue({
+    empty: false,
+    docs: [mockDoc('test-user-123')],
+  }),
+}));
+
+// Mock the Firebase Admin SDK
+const mockFirestore = jest.fn(() => ({
+  collection: mockCollection,
+  FieldValue: {
+    serverTimestamp: jest.fn(() => 'MOCK_TIMESTAMP'),
+  },
+}));
+
+const mockAuth = {
+  verifyIdToken: jest.fn().mockResolvedValue({ uid: 'test-user-123' }),
+};
+
+const mockAdmin = {
+  initializeApp: jest.fn(() => ({
+    firestore: mockFirestore,
+    auth: jest.fn(() => mockAuth),
+  })),
+  credential: {
+    cert: jest.fn(),
+  },
+  firestore: mockFirestore,
+  apps: [],
+};
+
+// Mock firebase-admin
+jest.mock('firebase-admin', () => mockAdmin);
+
+// Mock Firebase Functions
+jest.mock('firebase-functions', () => ({
+  https: {
+    HttpsError: jest.fn().mockImplementation((code, message, details) => ({
+      code,
+      message,
+      details,
+      toJSON: () => ({ code, message, details }),
+    })),
+  },
+  config: jest.fn(),
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+describe('getMyUserProfileData', () => {
+  let context: any;
+  const mockUserData = {
+    email: 'test@example.com',
+    displayName: 'Test User',
+    userType: 'patient',
+    createdAt: '2023-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Setup default context with authenticated user
+    context = {
+      auth: {
+        uid: 'test-user-123',
+        token: {
+          email: 'test@example.com',
+        },
+      },
+      rawRequest: {
+        headers: {
+          origin: 'http://localhost:3000',
+        },
+      },
+    };
+
+    // Reset mock implementations
+    mockGet.mockReset();
+    mockDoc.mockImplementation((id) => ({
+      get: mockGet,
+      exists: true,
+      id,
+      data: () => mockUserData,
+    }));
+  });
+
+  it('should return user profile data when user is authenticated and profile exists', async () => {
+    // Mock successful Firestore response
+    mockGet.mockResolvedValueOnce({
+      exists: true,
+      id: 'test-user-123',
+      data: () => mockUserData,
+    });
+
+    // Call the function
+    const result = await getMyUserProfileData({}, context);
+
+    // Verify Firestore was called correctly
+    expect(mockCollection).toHaveBeenCalledWith('users');
+    expect(mockDoc).toHaveBeenCalledWith('test-user-123');
+    expect(mockGet).toHaveBeenCalled();
+
+    // Verify the result
+    expect(result).toEqual({
+      success: true,
+      data: {
+        id: 'test-user-123',
+        ...mockUserData,
+      },
+    });
+  });
+
+  it('should throw an unauthenticated error when user is not authenticated', async () => {
+    // Setup unauthenticated context
+    context.auth = null;
+
+    // Call the function and expect it to throw
+    await expect(getMyUserProfileData({}, context)).rejects.toThrow(
+      functions.https.HttpsError
+    );
+    
+    // Verify the error details
+    expect(functions.https.HttpsError).toHaveBeenCalledWith(
+      'unauthenticated',
+      'User must be authenticated to access profile data'
+    );
+  });
+
+  it('should throw a not-found error when user profile does not exist', async () => {
+    // Setup mock for non-existent document
+    mockGet.mockResolvedValueOnce({
+      exists: false,
+    });
+
+    // Call the function and expect it to throw
+    await expect(getMyUserProfileData({}, context)).rejects.toThrow(
+      functions.https.HttpsError
+    );
+    
+    // Verify the error details
+    expect(functions.https.HttpsError).toHaveBeenCalledWith(
+      'not-found',
+      'User profile not found'
+    );
+  });
+
+  it('should handle Firestore errors', async () => {
+    // Setup mock to throw an error
+    const error = new Error('Firestore error');
+    mockGet.mockRejectedValueOnce(error);
+
+    // Call the function and expect it to throw
+    await expect(getMyUserProfileData({}, context)).rejects.toThrow(
+      functions.https.HttpsError
+    );
+    
+    // Verify the error details
+    expect(functions.https.HttpsError).toHaveBeenCalledWith(
+      'internal',
+      'Failed to fetch user profile',
+      'Firestore error'
+    );
+  });
+});

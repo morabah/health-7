@@ -1,0 +1,14 @@
+# Firebase Emulator Configuration for CORS Fix
+# Copy these to your .env.local file if Console settings don't work
+
+API_MODE=live
+LOG_LEVEL=info
+FIREBASE_ENABLED=true
+FIREBASE_USE_EMULATOR=true
+FIREBASE_EMULATOR_HOST=localhost:5001
+NODE_ENV=development
+
+# Instructions:
+# 1. First try Firebase Console → Authentication → Settings → Add localhost domains
+# 2. If that doesn't work, copy these settings to .env.local
+# 3. Then run: cd src/firebase_backend/functions && firebase emulators:start --only functions 

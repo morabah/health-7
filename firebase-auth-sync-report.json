@@ -1,0 +1,111 @@
+{
+  "timestamp": "2025-05-25T12:23:54.142Z",
+  "summary": {
+    "total": 14,
+    "created": 11,
+    "updated": 3,
+    "exists": 0,
+    "errors": 0
+  },
+  "results": [
+    {
+      "email": "admin@example.com",
+      "userId": "admin-1odsk03suhp9odjbe13fr8",
+      "action": "updated",
+      "firebaseUid": "admin-1odsk03suhp9odjbe13fr8",
+      "details": "Updated with password: Password123!"
+    },
+    {
+      "email": "morabahdr@gmail.com",
+      "userId": "htggr2d1eeevik1kcux1ed",
+      "action": "updated",
+      "firebaseUid": "htggr2d1eeevik1kcux1ed",
+      "details": "Updated with password: Password123!"
+    },
+    {
+      "email": "morabahbb@gmail.com",
+      "userId": "nh35k2nhsycrdm4l6zazq",
+      "action": "updated",
+      "firebaseUid": "nh35k2nhsycrdm4l6zazq",
+      "details": "Updated with password: Password123!"
+    },
+    {
+      "email": "morabah@gmail.com",
+      "userId": "stbgu09d7t05vtu0r67tp",
+      "action": "created",
+      "firebaseUid": "stbgu09d7t05vtu0r67tp",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user0@demo.health",
+      "userId": "u-000",
+      "action": "created",
+      "firebaseUid": "u-000",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user1@demo.health",
+      "userId": "u-001",
+      "action": "created",
+      "firebaseUid": "u-001",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user2@demo.health",
+      "userId": "u-002",
+      "action": "created",
+      "firebaseUid": "u-002",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user3@demo.health",
+      "userId": "u-003",
+      "action": "created",
+      "firebaseUid": "u-003",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user4@demo.health",
+      "userId": "u-004",
+      "action": "created",
+      "firebaseUid": "u-004",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user5@demo.health",
+      "userId": "u-005",
+      "action": "created",
+      "firebaseUid": "u-005",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user6@demo.health",
+      "userId": "u-006",
+      "action": "created",
+      "firebaseUid": "u-006",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user7@demo.health",
+      "userId": "u-007",
+      "action": "created",
+      "firebaseUid": "u-007",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user8@demo.health",
+      "userId": "u-008",
+      "action": "created",
+      "firebaseUid": "u-008",
+      "details": "Created with password: Password123!"
+    },
+    {
+      "email": "user9@demo.health",
+      "userId": "u-009",
+      "action": "created",
+      "firebaseUid": "u-009",
+      "details": "Created with password: Password123!"
+    }
+  ],
+  "defaultPassword": "Password123!"
+}

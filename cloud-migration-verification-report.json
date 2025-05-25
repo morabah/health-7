@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-05-25T11:59:30.427Z",
+  "summary": {
+    "totalLocalDocs": 336,
+    "totalCloudDocs": 337,
+    "totalValidated": 336,
+    "totalTimestamps": 0,
+    "totalErrors": 0,
+    "successRate": 100,
+    "overallSuccess": true
+  },
+  "collections": [
+    {
+      "collectionName": "users",
+      "localCount": 14,
+      "cloudCount": 15,
+      "matchingDocuments": 14,
+      "missingInCloud": [],
+      "extraInCloud": [
+        "3WNivtBaUUdCy2Yz8c5Cod7XBoa2"
+      ],
+      "schemaValidationErrors": [],
+      "timestampConversions": 0,
+      "success": true
+    },
+    {
+      "collectionName": "patients",
+      "localCount": 3,
+      "cloudCount": 3,
+      "matchingDocuments": 3,
+      "missingInCloud": [],
+      "extraInCloud": [],
+      "schemaValidationErrors": [],
+      "timestampConversions": 0,
+      "success": true
+    },
+    {
+      "collectionName": "doctors",
+      "localCount": 9,
+      "cloudCount": 9,
+      "matchingDocuments": 9,
+      "missingInCloud": [],
+      "extraInCloud": [],
+      "schemaValidationErrors": [],
+      "timestampConversions": 0,
+      "success": true
+    },
+    {
+      "collectionName": "appointments",
+      "localCount": 75,
+      "cloudCount": 75,
+      "matchingDocuments": 75,
+      "missingInCloud": [],
+      "extraInCloud": [],
+      "schemaValidationErrors": [],
+      "timestampConversions": 0,
+      "success": true
+    },
+    {
+      "collectionName": "notifications",
+      "localCount": 235,
+      "cloudCount": 235,
+      "matchingDocuments": 235,
+      "missingInCloud": [],
+      "extraInCloud": [],
+      "schemaValidationErrors": [],
+      "timestampConversions": 0,
+      "success": true
+    }
+  ]
+}

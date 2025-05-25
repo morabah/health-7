@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-05-25T12:18:14.062Z",
+  "analysis": [
+    {
+      "email": "morabah@gmail.com",
+      "duplicates": [
+        {
+          "id": "stbgu09d7t05vtu0r67tp",
+          "data": {
+            "id": "stbgu09d7t05vtu0r67tp",
+            "email": "morabah@gmail.com",
+            "phone": null,
+            "firstName": "Mohamed",
+            "lastName": "Rabah",
+            "userType": "patient",
+            "isActive": true,
+            "emailVerified": false,
+            "phoneVerified": false,
+            "createdAt": {
+              "_seconds": 1746173742,
+              "_nanoseconds": 479000000
+            },
+            "updatedAt": {
+              "_seconds": 1746465919,
+              "_nanoseconds": 145000000
+            },
+            "profilePictureUrl": null
+          },
+          "createdAt": {
+            "_seconds": 1746173742,
+            "_nanoseconds": 479000000
+          },
+          "userType": "patient",
+          "isActive": true,
+          "hasPatientProfile": false,
+          "hasDoctorProfile": false,
+          "appointmentCount": 0,
+          "notificationCount": 4
+        },
+        {
+          "id": "3WNivtBaUUdCy2Yz8c5Cod7XBoa2",
+          "data": {
+            "id": "3WNivtBaUUdCy2Yz8c5Cod7XBoa2",
+            "email": "morabah@gmail.com",
+            "firstName": "morabah",
+            "lastName": "",
+            "userType": "patient",
+            "isActive": true,
+            "emailVerified": false,
+            "phoneVerified": false,
+            "phone": null,
+            "createdAt": "2025-05-25T11:17:58.038Z",
+            "updatedAt": "2025-05-25T11:17:58.038Z",
+            "profilePictureUrl": null
+          },
+          "createdAt": "2025-05-25T11:17:58.038Z",
+          "userType": "patient",
+          "isActive": true,
+          "hasPatientProfile": false,
+          "hasDoctorProfile": false,
+          "appointmentCount": 0,
+          "notificationCount": 0
+        }
+      ],
+      "totalCount": 2
+    }
+  ],
+  "summary": {
+    "totalEmails": 1,
+    "totalDuplicateUsers": 2
+  }
+}

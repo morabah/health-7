@@ -41,3 +41,8 @@ next-env.d.ts
 # project specific
 serviceAccountKey.json
 emulator_data/
+
+# Firebase credentials and sensitive data
+*firebase-adminsdk*.json
+__mocks__/*firebase-adminsdk*.json
+firebase-service-account*.json
