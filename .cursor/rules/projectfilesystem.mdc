@@ -6,42 +6,81 @@ alwaysApply: true
 Crucial Project Filesystem Rules — Reference for every Cursor prompt
 
 #	Path	Type	Purpose / What must live here
-1	/ (project root)	dir	Package.json, Next config, .env.*, local_db/ JSON store, scripts/ (seeders, migrations), Git artefacts.
-2	/local_db	dir	Flat-file “database” — seeded JSON collections (users.json, patients.json, …). Never commit PII; always in .gitignore.
-3	/scripts	dir	All Node/TS CLI helpers (e.g. seedLocalDb.ts, migration tools). Invoked via npm run *.
-4	/src	dir	All application TS/TSX source code (no stray files outside).
-5	/src/app	dir	Next-js App-Router tree only—no helpers or utils. Route groups:
+1	/ (project root)	dir	Package.json, Next config, .env.*, local_db/ JSON store, scripts/ (seeders, migrations), Git artefacts, core documentation.
+2	/ARCHITECTURE.md	file	System architecture, tech stack, design patterns. Core reference document.
+3	/DEVELOPMENT.md	file	Development workflow, scripts, best practices. Developer guide.
+4	/AUTHENTICATION.md	file	Firebase Auth setup, user roles, security implementation.
+5	/PROJECT_REFERENCE.md	file	Central navigation hub to all documentation. Quick reference and status.
+6	/LOGIN_CREDENTIALS.md	file	Development login credentials and test user accounts.
+7	/local_db	dir	Flat-file "database" — seeded JSON collections (users.json, patients.json, …). Never commit PII; always in .gitignore.
+8	/scripts	dir	All Node/TS CLI helpers (e.g. seedLocalDb.ts, migration tools). Invoked via npm run *.
+9	/docs	dir	Specialized documentation, organized by topic:
+└─ /docs/API_REFERENCE.md	file	API endpoints, schemas, validation rules.
+└─ /docs/DEPLOYMENT.md	file	Firebase deployment procedures and configuration.
+└─ /docs/ERROR_HANDLING.md	file	Error system and troubleshooting guides.
+└─ /docs/TESTING.md	file	Testing strategies and validation tools.
+└─ /docs/UI_COMPONENTS.md	file	Component library and styling guidelines.
+└─ /docs/history/	dir	Historical records and logs:
+  └─ PROMPT_COMPLETION_LOG.md	file	Detailed prompt completion history.
+  └─ MIGRATION_HISTORY.md	file	Database migrations and Firebase setup.
+  └─ BUG_FIXES.md	file	Bug resolution history.
+  └─ FEATURE_DEVELOPMENT.md	file	Feature implementation timeline.
+10	/src	dir	All application TS/TSX source code (no stray files outside).
+11	/src/app	dir	Next-js App-Router tree only—no helpers or utils. Route groups:
 └─ (public)	dir	Marketing pages (home, about, contact, find-doctors).
 └─ (auth)	dir	Auth flow pages (login, register/*, forgot-password, …).
 └─ (platform)	dir	All authenticated areas.
 - sub-layout patient, doctor, admin, notifications, book-appointment.
 └─ (dev)	dir	Dev-only UI (ui-test, cms/validation). Will be stripped in prod build.
 └─ not-found.tsx	file	Global 404 fallback.
-6	/src/components/ui	dir	Atomic, theme-aware primitives only (Button, Card, Input, Spinner, Alert, Badge, …). No business logic.
-7	/src/components/layout	dir	Structural components used site-wide (Navbar, Footer, Layout wrapper).
-8	/src/components/auth	dir	Auth helpers visible to UI (e.g. Protected.tsx).
-9	/src/context	dir	React context providers only (ThemeContext.tsx, AuthContext.tsx). Each must export its own useX hook.
-10	/src/hooks	dir	Reusable client hooks (e.g. TanStack Query wrappers). No UI markup.
-11	/src/lib	dir	Pure logic / node-safe utilities.
+12	/src/components/ui	dir	Atomic, theme-aware primitives only (Button, Card, Input, Spinner, Alert, Badge, …). No business logic.
+13	/src/components/layout	dir	Structural components used site-wide (Navbar, Footer, Layout wrapper).
+14	/src/components/auth	dir	Auth helpers visible to UI (e.g. Protected.tsx).
+15	/src/context	dir	React context providers only (ThemeContext.tsx, AuthContext.tsx). Each must export its own useX hook.
+16	/src/hooks	dir	Reusable client hooks (e.g. TanStack Query wrappers). No UI markup.
+17	/src/lib	dir	Pure logic / node-safe utilities.
 • logger.ts, performance.ts
 • localDb.ts (low-level JSON R/W)
 • localApiFunctions.ts (Phase-4 local backend stubs)
 • apiClient.ts (flag-switch wrapper for local ↔️ emulator)
-12	/src/data	dir	High-level data-loader modules (patientLoaders.ts, doctorLoaders.ts, …). These call apiClient.
-13	/src/types	dir	Project-wide types only:
+18	/src/data	dir	High-level data-loader modules (patientLoaders.ts, doctorLoaders.ts, …). These call apiClient.
+19	/src/types	dir	Project-wide types only:
 • enums.ts (UserType, AppointmentStatus …)
 • schemas.ts (Zod)
 • index.ts (re-exports & inferred types).
-14	/src/styles	dir	Tailwind base files (globals.css, tailwind.config.ts, etc.). No CSS Modules here.
-15	/public/	dir	Static assets (favicons, images); automatically served by Next.
-16	/README.md	file	Project overview, setup, script docs—kept up-to-date.
-17	/docs/ (optional)	dir	Long-form design docs, ADRs. Build artefacts never imported from code.
+20	/src/styles	dir	Tailwind base files (globals.css, tailwind.config.ts, etc.). No CSS Modules here.
+21	/src/firebase_backend/functions	dir	Firebase Cloud Functions backend code:
+• package.json, tsconfig.json (Functions-specific config)
+• src/index.ts (Functions entry point)
+• src/config/ (Firebase Admin SDK setup)
+• src/shared/ (Shared utilities, schemas)
+• src/user/, src/patient/, src/doctor/, src/appointment/, src/notification/, src/admin/ (Domain-specific functions)
+22	/public/	dir	Static assets (favicons, images); automatically served by Next.
+23	/README.md	file	Project overview, quick start guide, basic setup instructions.
+
 🔑 Enforcement Rules
 
-Never import from src/app into src/lib, context, or components/ui. (App-Router must stay top-level only).
-No business logic in src/components/ui/*. They are presentation-only.
-Every new file must be placed in the table-designated directory that matches its role. If uncertain, default to src/lib (logic) or src/components (UI) and update this rule set.
-Do not place .env, DB JSON, or build artefacts inside src/.
-All Cloud-Function look-alike names must exist in localApiFunctions.localApi and later in the Firebase functions index; the names must match 1-for-1.
-All shared types live in src/types; UI must import them, never re-declare.
-local_db is the only place file-writes are permitted outside node_modules during dev.
+Documentation Structure:
+• Core documentation (ARCHITECTURE.md, DEVELOPMENT.md, AUTHENTICATION.md, PROJECT_REFERENCE.md) lives in project root for easy access.
+• Specialized documentation lives in /docs/ organized by topic.
+• Historical records and logs live in /docs/history/ for archival purposes.
+• PROJECT_REFERENCE.md serves as the central navigation hub to all other documentation.
+• Never duplicate documentation content across files; use cross-references instead.
+
+Code Organization:
+• Never import from src/app into src/lib, context, or components/ui. (App-Router must stay top-level only).
+• No business logic in src/components/ui/*. They are presentation-only.
+• Every new file must be placed in the table-designated directory that matches its role. If uncertain, default to src/lib (logic) or src/components (UI) and update this rule set.
+• Do not place .env, DB JSON, or build artefacts inside src/.
+• All Cloud-Function look-alike names must exist in localApiFunctions.localApi and later in the Firebase functions index; the names must match 1-for-1.
+• All shared types live in src/types; UI must import them, never re-declare.
+
+Data and Security:
+• local_db is the only place file-writes are permitted outside node_modules during dev.
+• Never commit PII or sensitive data; ensure proper .gitignore coverage.
+• Firebase Functions code lives in src/firebase_backend/functions with its own package.json and build system.
+
+Documentation Maintenance:
+• Update PROJECT_REFERENCE.md when adding new major features or documentation.
+• Log significant changes in docs/history/PROMPT_COMPLETION_LOG.md.
+• Keep documentation current with code changes; outdated docs are worse than no docs.
